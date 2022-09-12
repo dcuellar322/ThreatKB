@@ -46,6 +46,6 @@ services:
      restart: always
      environment:
        - RUN_AGENT=1
-       - C_FORCE_ROOT=true
+       - C_FORCE_ROOT=1
 volumes:
     db_data:
