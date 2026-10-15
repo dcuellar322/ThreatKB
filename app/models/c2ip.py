@@ -88,7 +88,8 @@ class C2ip(db.Model):
 
         if include_comments:
             if comments_cache:
-                d["comments"] = comments_cache['c2ip'][self.id] if self.id in comments_cache['c2ip'] else []
+                c2ip_comments = comments_cache.get('c2ip', {})
+                d["comments"] = c2ip_comments.get(self.id, [])
             else:
                 d["comments"] = [comment.to_dict() for comment in Comments.query.filter_by(entity_id=self.id).filter_by(
                     entity_type=ENTITY_MAPPING["IP"]).all()]

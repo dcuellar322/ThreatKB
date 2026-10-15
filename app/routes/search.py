@@ -21,14 +21,15 @@ def get_caches():
 @app.route('/ThreatKB/search', methods=['GET'])
 @auto.doc()
 def do_search():
-    """Returns list of artifacts based on the search criteria.
-    From Data: tag (str), state (str), category (str), description (str), artifact_type (comma-separated list of dns, ip, signature, task)
-    Return: dictionary of lists of artifact dictionaries"""
     tag = request.args.get("tag", None)
     state = request.args.get('state', None)
     all = request.args.get("all", None)
     artifact_type = request.args.get('artifact_type', None)
     category = request.args.get('category', None)
+
+    # Pagination parameters with defaults
+    limit = request.args.get("limit", default=100, type=int)
+    offset = request.args.get("offset", default=0, type=int)
 
     if not tag and not state and not category and not artifact_type and not all:
         abort(400)
@@ -38,28 +39,29 @@ def do_search():
 
     results = {"tasks": [], "ips": [], "dns": [], "signatures": []}
 
-    signatures = yara_rule.Yara_rule.query
-    ips = c2ip.C2ip.query
-    dns = c2dns.C2dns.query
-    task = tasks.Tasks.query
+    # Default sorted queries
+    signatures = yara_rule.Yara_rule.query.order_by(yara_rule.Yara_rule.id.desc())
+    ips = c2ip.C2ip.query.order_by(c2ip.C2ip.id.desc())
+    dns = c2dns.C2dns.query.order_by(c2dns.C2dns.id.desc())
+    task = tasks.Tasks.query.order_by(tasks.Tasks.id.desc())
 
     if tag:
         signatures = db.session.query(yara_rule.Yara_rule).join(tags_mapping.Tags_mapping,
                                                                 tags_mapping.Tags_mapping.source_id == yara_rule.Yara_rule.id).join(
             tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "yara_rules")
+            tags_mapping.Tags_mapping.source_table == "yara_rules").order_by(yara_rule.Yara_rule.id.desc())
         ips = db.session.query(c2ip.C2ip).join(tags_mapping.Tags_mapping,
                                                tags_mapping.Tags_mapping.source_id == c2ip.C2ip.id).join(
             tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "c2ip")
+            tags_mapping.Tags_mapping.source_table == "c2ip").order_by(c2ip.C2ip.id.desc())
         dns = db.session.query(c2dns.C2dns).join(tags_mapping.Tags_mapping,
                                                  tags_mapping.Tags_mapping.source_id == c2dns.C2dns.id).join(
             tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "c2dns")
+            tags_mapping.Tags_mapping.source_table == "c2dns").order_by(c2dns.C2dns.id.desc())
         task = db.session.query(tasks.Tasks).join(tags_mapping.Tags_mapping,
                                                   tags_mapping.Tags_mapping.source_id == tasks.Tasks.id).join(
             tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "tasks")
+            tags_mapping.Tags_mapping.source_table == "tasks").order_by(tasks.Tasks.id.desc())
 
     if state:
         signatures = signatures.filter(yara_rule.Yara_rule.state == state)
@@ -96,16 +98,59 @@ def do_search():
 
     metadata_cache, tags_mapping_cache, user_cache, comments_cache = get_caches()
 
+    # Per-artifact-type total counts
+    sig_total = signatures.order_by(None).count() if not artifact_type or "signature" in artifact_type else 0
+    ip_total = ips.order_by(None).count() if not artifact_type or "ip" in artifact_type else 0
+    dns_total = dns.order_by(None).count() if not artifact_type or "dns" in artifact_type else 0
+    task_total = task.order_by(None).count() if not artifact_type or "task" in artifact_type else 0
+
     if not artifact_type or "signature" in artifact_type:
-        results["signatures"] = [signature.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache) for signature in signatures.all()]
+        results["signatures"] = [
+            signature.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache)
+            for signature in signatures.offset(offset).limit(limit).all()
+        ]
 
     if not artifact_type or "ip" in artifact_type:
-        results["ips"] = [ip.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache) for ip in ips.all()]
+        results["ips"] = [
+            ip.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache)
+            for ip in ips.offset(offset).limit(limit).all()
+        ]
 
     if not artifact_type or "dns" in artifact_type:
-        results["dns"] = [d.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache) for d in dns.all()]
+        results["dns"] = [
+            d.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache)
+            for d in dns.offset(offset).limit(limit).all()
+        ]
 
     if not artifact_type or "task" in artifact_type:
-        results["tasks"] = [t.to_dict() for t in task.all()]
+        results["tasks"] = [
+            t.to_dict() for t in task.offset(offset).limit(limit).all()
+        ]
 
-    return Response(json.dumps(results), mimetype='application/json')
+    response_data = {
+        **results,
+        "pagination": {
+            "signatures": {
+                "limit": limit,
+                "offset": offset,
+                "total": sig_total
+            },
+            "ips": {
+                "limit": limit,
+                "offset": offset,
+                "total": ip_total
+            },
+            "dns": {
+                "limit": limit,
+                "offset": offset,
+                "total": dns_total
+            },
+            "tasks": {
+                "limit": limit,
+                "offset": offset,
+                "total": task_total
+            }
+        }
+    }
+
+    return Response(json.dumps(response_data), mimetype='application/json')
