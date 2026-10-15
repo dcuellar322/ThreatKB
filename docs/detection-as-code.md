@@ -83,7 +83,7 @@ then pass through the same testing gates. Historical manifests are immutable
 records and should not be edited to manufacture a rollback.
 
 External contracts still require integration at the receiving system: UUID-aware
-TAC consumers, ten-minute channel polling, telemetry delivery, alert escalation,
-and vendor DFI preprocessing. No TAC/customer endpoints, private collection
-checkouts, production corpora or DFI image were available locally. The application
+TAC consumers, ten-minute channel polling, telemetry delivery and alert escalation.
+Optional vendor DFI preprocessing is disabled by user choice. No TAC/customer
+endpoints, private collection checkouts or production corpora were available locally. The application
 provides tested contracts and blocks promotion when required telemetry is missing.
