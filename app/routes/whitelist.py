@@ -89,3 +89,48 @@ def delete_whitelist(id):
     db.session.delete(entity)
     db.session.commit()
     return jsonify(''), 204
+from ipaddress import ip_network
+import re
+import json
+
+
+@app.post('/ThreatKB/whitelist/import-misp')
+@login_required
+@admin_only()
+def import_misp_warninglist():
+    """Import an official MISP warninglist JSON document idempotently."""
+    data = request.get_json()
+    entries = data.get('list')
+    kind = data.get('type')
+    if not isinstance(entries, list) or len(entries) > 100000 or kind not in {'hostname', 'string', 'cidr', 'regex'}:
+        abort(400, description='Provide a MISP hostname, string, cidr, or regex warninglist.')
+    normalized = []
+    try:
+        for entry in entries:
+            if not isinstance(entry, str) or not entry or len(entry) > 1024:
+                raise ValueError('Invalid warninglist entry')
+            if kind == 'cidr':
+                entry = str(ip_network(entry, strict=False))
+            elif kind == 'hostname':
+                host = entry.lower().lstrip('.').rstrip('.')
+                entry = r'(?:^|\.)' + re.escape(host) + '$'
+            elif kind == 'string':
+                entry = '^' + re.escape(entry) + '$'
+            else:
+                re.compile(entry)
+            normalized.append(entry)
+    except (ValueError, re.error) as error:
+        abort(400, description=str(error))
+    existing = {row.whitelist_artifact for row in whitelist.Whitelist.query.all()}
+    added = 0
+    for entry in dict.fromkeys(normalized):
+        if entry in existing:
+            continue
+        db.session.add(whitelist.Whitelist(whitelist_artifact=entry,
+            notes=json.dumps({'source': 'MISP warninglists', 'name': data.get('name'), 'version': data.get('version')}),
+            created_by_user_id=current_user.id, modified_by_user_id=current_user.id))
+        added += 1
+    db.session.commit()
+    from app import cache
+    cache.clear()
+    return jsonify(added=added, source=data.get('name'), version=data.get('version'))
