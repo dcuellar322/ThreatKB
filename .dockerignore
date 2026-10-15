@@ -8,3 +8,11 @@ __pycache__
 *.pyc
 instance
 .idea
+
+**/node_modules
+.playwright-cli
+output
+app/static/workbench
+
+app/static/lib
+.git

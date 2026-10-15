@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 30
   redis:
-    image: redis:8.10.2
+    image: redis:8.10.2@sha256:2c2dff791878316e3b083188be0d578423b24813cdda5de0e80ea4f7b3e6bfd6
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -25,7 +25,7 @@ services:
   web:
     build: .
     ports:
-      - "127.0.0.1:5000:5000"
+      - "127.0.0.1:5080:5000"
     environment: &app_environment
       THREATKB_DATABASE_URL: mysql+pymysql://threatkb:${SQL_PASSWORD}@db:3306/threatkb?charset=utf8mb4
       THREATKB_SECRET_KEY: ${THREATKB_SECRET_KEY:?Set THREATKB_SECRET_KEY}
@@ -33,11 +33,25 @@ services:
       THREATKB_ADMIN_EMAIL: ${THREATKB_ADMIN_EMAIL:-}
       THREATKB_ADMIN_PASSWORD: ${THREATKB_ADMIN_PASSWORD:-}
     volumes:
-      - samples:/opt/threatkb/instance/samples
+      - workspace:/opt/threatkb/instance
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+  scheduler:
+    build: .
+    entrypoint: ["celery", "-A", "app.celery", "beat", "--schedule", "/tmp/threatkb-schedule", "--loglevel=info"]
+    environment: *app_environment
+    volumes:
+      - workspace:/opt/threatkb/instance
+    depends_on:
+      web:
         condition: service_healthy
   worker:
     build: .
@@ -45,10 +59,10 @@ services:
       <<: *app_environment
       RUN_AGENT: "1"
     volumes:
-      - samples:/opt/threatkb/instance/samples
+      - workspace:/opt/threatkb/instance
     depends_on:
       web:
-        condition: service_started
+        condition: service_healthy
 volumes:
   mysql_2026:
-  samples:
+  workspace:
