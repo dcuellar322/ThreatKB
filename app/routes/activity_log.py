@@ -1,4 +1,4 @@
-from flask import request, json, Response
+from flask import request, json, Response, jsonify, abort
 
 from app import app, db, auto
 from flask_login import login_required
@@ -7,6 +7,24 @@ from app.models import activity_log
 from datetime import timedelta, datetime
 
 from app.utilities import filter_entities
+from app.models.users import KBUser
+
+
+@app.get('/ThreatKB/activity_log/distribution')
+@login_required
+def activity_distribution():
+    days = request.args.get('since', 45, type=int)
+    if not 1 <= days <= 3650:
+        abort(400, description='Choose a range from 1 to 3650 days.')
+    count = db.func.count(activity_log.ActivityLog.id)
+    rows = db.session.query(KBUser.id, KBUser.email, count.label('count')).select_from(
+        activity_log.ActivityLog).outerjoin(KBUser, KBUser.id == activity_log.ActivityLog.user_id).filter(
+            activity_log.ActivityLog.activity_date >= datetime.now() - timedelta(days=days)).group_by(
+                KBUser.id, KBUser.email).order_by(count.desc()).all()
+    total = sum(row.count for row in rows)
+    return jsonify(total=total, days=days, users=[{
+        'id': row.id, 'email': row.email or 'System', 'count': row.count,
+        'percent': round(100 * row.count / total, 2) if total else 0} for row in rows])
 
 
 @app.route('/ThreatKB/activity_log', methods=['GET'])
