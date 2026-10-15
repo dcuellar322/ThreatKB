@@ -1,6 +1,7 @@
 from flask import jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import exists, and_, or_
+from sqlalchemy.orm import joinedload
 from app import app, db
 from app.models.activity_log import ActivityLog
 from app.models.bookmarks import Bookmarks
@@ -25,7 +26,7 @@ def artifact_notifications():
     query = ActivityLog.query.filter(ActivityLog.id > after, or_(bookmarked, *owned),
         or_(ActivityLog.user_id != current_user.id, ActivityLog.user_id.is_(None)))
     return jsonify(unread_count=query.count(), after_id=after,
-                   data=[item.to_dict() for item in query.order_by(ActivityLog.id.desc()).limit(100)])
+                   data=[item.to_dict() for item in query.options(joinedload(ActivityLog.user)).order_by(ActivityLog.id.desc()).limit(100)])
 
 
 @app.post('/ThreatKB/notifications/clear')

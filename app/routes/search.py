@@ -100,36 +100,24 @@ def do_search():
         task = task.filter(or_(tasks.Tasks.state.like("%" + all + "%"), tasks.Tasks.title.like("%" + all + "%"),
                                tasks.Tasks.final_artifact.like("%" + all + "%")))
 
-    metadata_cache, tags_mapping_cache, user_cache, comments_cache = get_caches()
-
-    # Per-artifact-type total counts
-    sig_total = signatures.order_by(None).count() if not artifact_type or "signature" in artifact_type else 0
-    ip_total = ips.order_by(None).count() if not artifact_type or "ip" in artifact_type else 0
-    dns_total = dns.order_by(None).count() if not artifact_type or "dns" in artifact_type else 0
-    task_total = task.order_by(None).count() if not artifact_type or "task" in artifact_type else 0
-
-    if not artifact_type or "signature" in artifact_type:
-        results["signatures"] = [
-            signature.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache)
-            for signature in signatures.offset(offset).limit(limit).all()
-        ]
-
-    if not artifact_type or "ip" in artifact_type:
-        results["ips"] = [
-            ip.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache)
-            for ip in ips.offset(offset).limit(limit).all()
-        ]
-
-    if not artifact_type or "dns" in artifact_type:
-        results["dns"] = [
-            d.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache)
-            for d in dns.offset(offset).limit(limit).all()
-        ]
-
-    if not artifact_type or "task" in artifact_type:
-        results["tasks"] = [
-            t.to_dict() for t in task.offset(offset).limit(limit).all()
-        ]
+    from app.querying import visible_query,eager_people,serialize_page
+    from app.models.cfg_settings import Cfg_settings
+    pairs=[('signatures',yara_rule.Yara_rule,1,signatures,'signature'),('ips',c2ip.C2ip,3,ips,'ip'),('dns',c2dns.C2dns,2,dns,'dns'),('tasks',tasks.Tasks,4,task,'task')]
+    totals={}
+    for key,model,kind,query,selector in pairs:
+        if artifact_type and selector not in artifact_type:
+            totals[key]=0
+            continue
+        if not current_user.admin:
+            if kind==4:
+                from app.compat import strtobool
+                public=Cfg_settings.get_setting('ENABLE_NON_ADMIN_TASK_VISIBILITY')
+                if not(public and strtobool(public)):query=query.filter(or_(model.owner_user_id==current_user.id,model.owner_user_id.is_(None)))
+            else:query=query.filter(model.owner_user_id==current_user.id)
+        totals[key]=query.order_by(None).count()
+        rows=eager_people(query,model).offset(offset).limit(limit).all()
+        results[key]=serialize_page(rows,model,kind,short=True)
+    sig_total,ip_total,dns_total,task_total=(totals[key] for key in ('signatures','ips','dns','tasks'))
 
     response_data = {
         **results,

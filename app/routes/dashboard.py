@@ -13,8 +13,15 @@ from app.models.activity_log import ActivityLog
 @app.get("/ThreatKB/dashboard")
 @login_required
 def dashboard_summary():
+    from app.querying import visible_query
+    from sqlalchemy.orm import joinedload
+
     counts = {
-        key: model.query.filter_by(active=True).count()
+        key: visible_query(
+            model, {"signatures": 1, "ips": 3, "domains": 2, "tasks": 4}[key]
+        )
+        .filter_by(active=True)
+        .count()
         for key, model in [
             ("signatures", Yara_rule),
             ("ips", C2ip),
@@ -27,7 +34,8 @@ def dashboard_summary():
         Job.status.in_(["queued", "running"])
     ).count()
     states = (
-        db.session.query(Yara_rule.state, db.func.count(Yara_rule.id))
+        visible_query(Yara_rule, 1)
+        .with_entities(Yara_rule.state, db.func.count(Yara_rule.id))
         .filter(Yara_rule.active.is_(True))
         .group_by(Yara_rule.state)
         .all()
@@ -39,6 +47,8 @@ def dashboard_summary():
         ],
         activity=[
             row.to_dict()
-            for row in ActivityLog.query.order_by(ActivityLog.id.desc()).limit(8)
+            for row in ActivityLog.query.options(joinedload(ActivityLog.user))
+            .order_by(ActivityLog.id.desc())
+            .limit(8)
         ],
     )

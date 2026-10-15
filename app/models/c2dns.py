@@ -142,8 +142,8 @@ class C2dns(db.Model):
         )
 
         if include_tags:
-            if tags_mapping_cache and tags_mapping_cache['c2dns'].get(self.id, None):
-                d["tags"] = tags_mapping_cache['c2dns'][self.id]
+            if tags_mapping_cache is not None:
+                d["tags"] = tags_mapping_cache.get('c2dns',{}).get(self.id,[])
             else:
                 d["tags"] = tags_mapping.get_tags_for_source(self.__tablename__, self.id)
 

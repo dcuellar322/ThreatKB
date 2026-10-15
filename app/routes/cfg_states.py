@@ -16,7 +16,15 @@ def get_all_cfg_states():
     if not current_user.admin:
         entities = entities.filter_by(is_release_state=0)
 
-    return Response(json.dumps([entity.to_dict() for entity in entities.all()]), mimetype='application/json')
+    from app.models.yara_rule import Yara_rule
+    from app.models.c2ip import C2ip
+    from app.models.c2dns import C2dns
+    from app.models.tasks import Tasks
+    from app.querying import visible_query
+    counts={}
+    for key,model,kind in [('sig_count',Yara_rule,1),('dns_count',C2dns,2),('ip_count',C2ip,3),('task_count',Tasks,4)]:
+        counts[key]=dict(visible_query(model,kind).filter(model.active.is_(True)).with_entities(model.state,db.func.count(model.id)).group_by(model.state).all())
+    return jsonify([dict(id=entity.id,state=entity.state,is_release_state=entity.is_release_state,is_staging_state=entity.is_staging_state,is_retired_state=entity.is_retired_state,**{key:values.get(entity.state,0) for key,values in counts.items()}) for entity in entities.all()])
 
 
 @app.route('/ThreatKB/cfg_states/<int:id>', methods=['GET'])

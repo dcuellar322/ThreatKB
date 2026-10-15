@@ -20,7 +20,8 @@ def get_all_metadata():
     if format == "dict" and filter:
         return Response(json.dumps([metadata.Metadata.get_metadata_dict(filter.upper())]), mimetype="application/json")
 
-    q = metadata.Metadata.query
+    from sqlalchemy.orm import joinedload,selectinload
+    q = metadata.Metadata.query.options(joinedload(metadata.Metadata.created_user),selectinload(metadata.Metadata.choices))
     from app.compat import strtobool
     if strtobool(active_only):
         q = q.filter_by(active=True)

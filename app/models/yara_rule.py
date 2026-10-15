@@ -150,8 +150,8 @@ class Yara_rule(db.Model):
         )
 
         if include_tags:
-            if tags_mapping_cache and tags_mapping_cache['yara_rules'].get(self.id, None):
-                yara_dict["tags"] = tags_mapping_cache['yara_rules'][self.id]
+            if tags_mapping_cache is not None:
+                yara_dict["tags"] = tags_mapping_cache.get('yara_rules',{}).get(self.id,[])
             else:
                 yara_dict["tags"] = tags_mapping.get_tags_for_source(self.__tablename__, self.id)
 

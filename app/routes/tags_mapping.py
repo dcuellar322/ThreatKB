@@ -41,22 +41,8 @@ def get_tags_for_source_auth(source_table, source_id):
 
 
 def get_tags_for_source(source_table, source_id):
-    entities = tags_mapping.Tags_mapping.query.filter_by(source_table=source_table, source_id=source_id).all()
-
-    list_of_tags = []
-    if not entities:
-        return list_of_tags
-    else:
-        for entity in entities:
-            try:
-                entity = get_tags(entity.to_dict()['tag_id'])
-            except:
-                continue
-
-            if entity.status_code == 200:
-                list_of_tags.append(json.loads(entity.data))
-
-    return list_of_tags
+    from app.models.tags import Tags
+    return [row.to_dict() for row in db.session.query(Tags).join(tags_mapping.Tags_mapping,Tags.id==tags_mapping.Tags_mapping.tag_id).filter(tags_mapping.Tags_mapping.source_table==source_table,tags_mapping.Tags_mapping.source_id==source_id).order_by(Tags.text)]
 
 
 @app.route('/ThreatKB/tags_mapping', methods=['POST', 'PUT'])

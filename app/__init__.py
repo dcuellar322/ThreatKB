@@ -283,3 +283,5 @@ from app.routes import ingestion_health
 from app.routes import notifications
 from app.routes import dashboard
 from app.routes import content
+
+from app.models import indexes
