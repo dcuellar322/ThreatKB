@@ -194,13 +194,16 @@ export function Records({ page, version, notify, refresh, user }: any) {
   useEffect(() => {
     const id = recordId;
     const controller = new AbortController();
-    if (id && editable)
+    if (id && editable) {
+      setEditor(null);
       api("/" + page + "/" + id, { signal: controller.signal })
-        .then(setEditor)
+        .then((value) => {
+          if (!controller.signal.aborted) setEditor(value);
+        })
         .catch((e: any) => {
           if (e.name !== "AbortError") notify(e.message, true);
         });
-    else if (newRecord) setEditor({ new: true, tags: [] });
+    } else if (newRecord) setEditor({ new: true, tags: [] });
     else setEditor(null);
     return () => controller.abort();
   }, [page, recordId, newRecord]);
@@ -498,7 +501,12 @@ export function Records({ page, version, notify, refresh, user }: any) {
               <summary>Columns</summary>
               <div>
                 {[
-                  ...(editable ? [["owner", "Owner"], ["tags", "Tags"]] : []),
+                  ...(editable
+                    ? [
+                        ["owner", "Owner"],
+                        ["tags", "Tags"],
+                      ]
+                    : []),
                   ...(page === "yara_rules" ? [["category", "Category"]] : []),
                   ["updated", page === "releases" ? "Created" : "Updated"],
                   ...definitions.map((d) => ["metadata:" + d.key, d.key]),
