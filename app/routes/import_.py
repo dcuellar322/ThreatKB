@@ -235,6 +235,11 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
                 db.session.add(m)
         db.session.commit()
 
+    if return_artifacts or resurrected_artifacts:
+        from app.ingestion_health import record_ingestion_success
+        source = request.get_json(silent=True).get('source', 'default') if request.is_json else 'default'
+        record_ingestion_success(source, len(return_artifacts) + len(resurrected_artifacts))
+
     return {"committed": [artifact.to_dict() for artifact in return_artifacts],
             "duplicates": duplicate_artifacts,
             "resurrected": resurrected_artifacts,

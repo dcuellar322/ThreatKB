@@ -280,3 +280,5 @@ from app.routes import scanner
 from app.routes import scheduled_confidence
 from app import dev_seed
 from app.routes import jobs
+
+from app.routes import ingestion_health
