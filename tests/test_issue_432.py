@@ -34,3 +34,8 @@ def test_lost_sample_matches_are_persisted_and_ghosted(authenticated, tmp_path):
         )
         == 2
     )
+
+    run_rule_test(rule, [str(unmatched)], 1, is_neg_test=True)
+    after_negative = authenticated.get("/ThreatKB/yara_rules/1/sample-results").json
+    assert after_negative["files"][0]["status"] == "regressed"
+    assert after_negative["current_history_id"] == response.json["current_history_id"]

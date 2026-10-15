@@ -289,12 +289,14 @@ def sample_result_comparison(rule_id):
     rule = db.get_or_404(Yara_rule, rule_id)
     if not current_user.admin and rule.owner_user_id != current_user.id:
         abort(403)
-    histories = Yara_testing_history.query.filter_by(yara_rule_id=rule_id).order_by(Yara_testing_history.id.desc()).all()
+    test_type=request.args.get('test_type','POSITIVE').upper()
+    if test_type not in ('POSITIVE','NEGATIVE'): abort(400)
+    histories = Yara_testing_history.query.filter_by(yara_rule_id=rule_id,test_type=test_type).order_by(Yara_testing_history.id.desc()).all()
     if not histories:
         return jsonify(files=[], current_history_id=None)
     latest = histories[0].id
     rows = db.session.query(Yara_testing_history_files_matches).join(Yara_testing_history).filter(
-        Yara_testing_history.yara_rule_id == rule_id).order_by(Yara_testing_history_files_matches.history_id).all()
+        Yara_testing_history.yara_rule_id == rule_id, Yara_testing_history.test_type == test_type).order_by(Yara_testing_history_files_matches.history_id).all()
     results = {}
     for result in rows:
         item = results.setdefault(result.path, dict(path=result.path, ever_matched=False, matched=None,

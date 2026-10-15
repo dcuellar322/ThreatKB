@@ -50,3 +50,6 @@ not automatically closed, and unlisted issues remain outstanding.
 Final bulk-edit review also found legacy category-range reassignment in the batch
 path. The #505 follow-up removes it and verifies that both EventID and UUID stay
 stable when changing a category in bulk.
+The #432 follow-up keeps positive and negative testing histories separate so a
+later goodware scan cannot hide a positive sample regression. The UI hides
+never-matched samples by default and offers an explicit inclusion control.
