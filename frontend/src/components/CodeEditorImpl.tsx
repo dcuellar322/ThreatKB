@@ -138,7 +138,18 @@ export function CodeEditor({
       });
   }, [value]);
   return (
-    <div className={"code-editor " + className}>
+    <div
+      className={"code-editor " + className}
+      onKeyDownCapture={(event) => {
+        const target = event.target as HTMLElement;
+        if (event.key === "Escape" && target.closest(".cm-search")) {
+          // Commit a pasted search before CodeMirror removes its focused input.
+          // Otherwise the resulting blur dispatches during the panel update.
+          target.blur();
+          editor.current?.focus();
+        }
+      }}
+    >
       <div className="editor-toolbar">
         <button
           type="button"
