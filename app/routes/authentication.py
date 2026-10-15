@@ -14,19 +14,23 @@ import datetime
 def login():
     """Log a user into ThreatKB.
     Return: user dictionary"""
-    app.logger.info("login called with payload: '%s'" % request.data)
-    json_data = request.json
-    user = KBUser.query.filter_by(email=json_data.get('email', None), active=True).first()
-    app.logger.info("user is '%s'" % user)
-    if user and bcrypt.check_password_hash(user.password, json_data['password']):
-        session['logged_in'] = True
-        s = True
-        flask_login.login_user(user)
-        is_admin = user.admin
-    else:
-        s = False
-        is_admin = False
-    return jsonify({'result': s, 'a': is_admin, 'user': user.to_dict()})
+    json_data = request.get_json(silent=True)
+    if not isinstance(json_data, dict) or not isinstance(json_data.get("email"), str) or not isinstance(json_data.get("password"), str):
+        return jsonify(result=False, a=False, user=None, error="Email and password are required."), 400
+    user = KBUser.query.filter_by(email=json_data["email"].strip(), active=True).first()
+    valid = False
+    if user:
+        try:
+            valid = bcrypt.check_password_hash(user.password, json_data["password"])
+        except (ValueError, TypeError):
+            pass
+    if not valid:
+        return jsonify(result=False, a=False, user=None, error="Invalid email or password."), 401
+    session.clear()
+    flask_login.login_user(user)
+    session["logged_in"] = True
+    return jsonify(result=True, a=user.admin, user=user.to_dict())
+
 
 
 @app.route('/ThreatKB/logout')

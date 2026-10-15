@@ -31,22 +31,22 @@ def handle_exception(exception):
 
     db.session.rollback()
 
-    stacktrace = "%s" % (
-        re.sub(r'\"[^\"]+\/([^\"]+)', r"\1", traceback.format_exc().replace("\n", "<BR>").replace(" ", "&nbsp;")))
-    err = Error(
-        stacktrace=traceback.format_exc(),
-        user_id=current_user.id,
-        remote_addr=request.remote_addr,
-        args=str(request.args.to_dict(flat=False)),
-        method=request.method,
-        route=request.url_rule
-    )
-    db.session.add(err)
-    db.session.commit()
-
-    stacktrace += str(exception)
-
-    return stacktrace, 500
+    try:
+        err = Error(
+            stacktrace=traceback.format_exc(),
+            user_id=getattr(current_user, "id", None),
+            remote_addr=request.remote_addr,
+            args=str(request.args.to_dict(flat=False)),
+            method=request.method,
+            route=str(request.url_rule) if request.url_rule else request.path,
+        )
+        db.session.add(err)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Could not persist error report")
+    from flask import jsonify
+    return jsonify(error="An internal error occurred."), 500
 
 
 @app.route('/ThreatKB/error', methods=["GET"])
