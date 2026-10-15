@@ -45,8 +45,10 @@ formats can be implemented as consumers of these manifests.
 A second analyst records `review.yaml` with distinct `author` and `reviewer` IDs
 and the exact `source_digest` returned by validation. Group policy may restrict
 reviewers. The web API derives the author from Git history and refuses self-review.
-Repository maintainers must protect the release branch and require an independent
-PR approval in their hosting system; a local file cannot replace host access policy.
+The fork master branch is protected with the verify status check, independent PR
+approval, stale approval dismissal and approval after the last push, including for
+administrators. Apply the same hosting policy to a separate content repository;
+a local file cannot replace host access policy.
 
 ```sh
 .venv/bin/python -m threatkb_content --root detections publish-testing instance/builds/BUILD_UUID/manifest.json

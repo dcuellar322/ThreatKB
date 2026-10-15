@@ -57,7 +57,7 @@ improvement requires real usage and is measured rather than asserted.
 
 ## Final local pass
 
-The final container suite passed all 49 tests without warnings, including Git
+The final container suite passed all 50 tests without warnings, including Git
 authoring, immutable UUIDs, review gates and legacy-to-Feedpack selection/export.
 `uv pip check` reports all 70 installed packages compatible. TypeScript checking and
 production bundling pass. Desktop (1440 px) and mobile (390 px) screenshots were
@@ -76,3 +76,8 @@ matched its attached positive sample and passed all 25 goodware files. The mobil
 pass also verified Escape closes navigation, hidden navigation is inert, and the
 390 px page has no horizontal overflow. Failed-login feedback and return to the
 requested Tasks route were exercised in the browser.
+
+Fork master now requires the `verify` status check, an independent PR approval
+(including approval after the last push), resolved review conversations and stale
+approval dismissal. These rules apply to administrators; force pushes and branch
+deletion are disabled. The modernization PR remains a draft for independent review.
