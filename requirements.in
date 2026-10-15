@@ -20,7 +20,5 @@ PyYAML
 jsonschema
 Jinja2
 packaging
-pytest
 waitress
 setuptools
-ruff

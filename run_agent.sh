@@ -6,4 +6,4 @@ if [ -f .env ]; then
     . ./.env
     set +a
 fi
-exec .venv/bin/celery -A app.celery worker --loglevel=info
+exec .venv/bin/celery -A app.celeryapp:celery worker --loglevel="${LOG_LEVEL:-info}" --concurrency="${CELERY_CONCURRENCY:-2}"

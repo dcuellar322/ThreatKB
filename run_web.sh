@@ -6,4 +6,4 @@ if [ -f .env ]; then
     . ./.env
     set +a
 fi
-exec .venv/bin/waitress-serve --host="${LISTEN_ON:-127.0.0.1}" --port="${LISTEN_PORT:-5000}" app:app
+exec .venv/bin/waitress-serve --host="${LISTEN_ON:-127.0.0.1}" --port="${LISTEN_PORT:-5080}" app:app

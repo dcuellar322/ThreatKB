@@ -16,3 +16,6 @@ app/static/workbench
 
 app/static/lib
 .git
+
+.ruff_cache
+.pytest_cache

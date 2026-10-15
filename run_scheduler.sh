@@ -6,4 +6,6 @@ if [ -f .env ]; then
     . ./.env
     set +a
 fi
-exec .venv/bin/celery -A app.celery beat --schedule=instance/celerybeat-schedule --loglevel=info
+instance=${THREATKB_INSTANCE_PATH:-instance}
+mkdir -p "$instance"
+exec .venv/bin/celery -A app.celeryapp:celery beat --schedule="$instance/celerybeat-schedule" --loglevel="${LOG_LEVEL:-info}"

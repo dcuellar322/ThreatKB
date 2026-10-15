@@ -1,0 +1,50 @@
+[
+  {
+    "kind": "image",
+    "name": "node",
+    "version": "26.9.0-bookworm-slim",
+    "digest": "sha256:582460f614631b59b824ac6020533b9bf339c7fdf3a6d7db31abb6b4065f0212",
+    "published": "2026-09-19T05:41:47.675674Z",
+    "source": "https://hub.docker.com/v2/repositories/library/node/tags/26.9.0-bookworm-slim"
+  },
+  {
+    "kind": "image",
+    "name": "python",
+    "version": "3.14.7-slim-bookworm",
+    "digest": "sha256:82bc3c539b8813ada9d68c63b40158fa002f7f33de9bf3312a3dfdc0620dff56",
+    "published": "2026-09-19T08:11:26.640501Z",
+    "source": "https://hub.docker.com/v2/repositories/library/python/tags/3.14.7-slim-bookworm"
+  },
+  {
+    "kind": "image",
+    "name": "mysql",
+    "version": "26.7.0",
+    "digest": "sha256:9d48c42f8341068f199116dfccb919b607c99765b5c61e549a548a43033471a4",
+    "published": "2026-09-29T21:53:53Z",
+    "source": "https://github.com/docker-library/repo-info/blob/f78150053c5b48e16377e00a061a1d7c724d3084/repos/mysql/remote/26.7.0.md"
+  },
+  {
+    "kind": "image",
+    "name": "redis",
+    "version": "8.10.2",
+    "digest": "sha256:6f81e8915c60b065a524e6967e0ad1c639ba6efa84d669f823683ea04d9150ee",
+    "published": "2026-09-29T15:52:54Z",
+    "source": "https://github.com/docker-library/repo-info/blob/702bc910417e2b913389daeaaecadea333bdfa89/repos/redis/remote/8.10.2.md"
+  },
+  {
+    "kind": "action",
+    "name": "actions/checkout",
+    "version": "v7.0.1",
+    "commit": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "published": "2026-07-20T15:10:05Z",
+    "source": "https://github.com/actions/checkout/releases/tag/v7.0.1"
+  },
+  {
+    "kind": "action",
+    "name": "actions/upload-artifact",
+    "version": "v7.0.1",
+    "commit": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "published": "2026-04-10T17:31:14Z",
+    "source": "https://github.com/actions/upload-artifact/releases/tag/v7.0.1"
+  }
+]

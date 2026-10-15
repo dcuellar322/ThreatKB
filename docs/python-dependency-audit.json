@@ -340,6 +340,11 @@
     "published": "2026-09-27T18:33:39.685530Z"
   },
   {
+    "name": "wheel",
+    "version": "0.48.0",
+    "published": "2026-08-11T22:02:26.100721Z"
+  },
+  {
     "name": "yara-python",
     "version": "4.5.4",
     "published": "2025-05-27T14:14:03.034375Z"

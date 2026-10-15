@@ -1,7 +1,9 @@
 @echo off
-py -3.14 -m venv .venv
-if errorlevel 1 exit /b 1
-.venv\Scripts\python -m pip install -r requirements.txt
-if errorlevel 1 exit /b 1
-.venv\Scripts\flask --app app db upgrade
-if errorlevel 1 exit /b 1
+rem The content engine and worker require POSIX locking/process behavior.
+where wsl.exe >nul 2>nul
+if errorlevel 1 (
+  echo Install WSL2 and Python 3.14/uv, then run sh install.sh inside WSL.
+  exit /b 1
+)
+wsl.exe --exec sh ./install.sh
+exit /b %errorlevel%
