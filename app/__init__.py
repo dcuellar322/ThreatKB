@@ -276,3 +276,4 @@ with app.app_context():
     setup_logging()
 
 from app import commands
+from app.routes import scanner
