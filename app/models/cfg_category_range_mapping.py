@@ -51,7 +51,6 @@ class CfgCategoryRangeMapping(db.Model):
                                                        range_max=default_category_max,
                                                        range_min=default_category_min, current=default_category_min)
                     if connection:
-                        transaction = connection.begin()
                         connection.execute(CfgCategoryRangeMapping.__table__.insert().values(
                             category=bindparam("category"),
                             range_max=bindparam("range_max"),
@@ -63,7 +62,6 @@ class CfgCategoryRangeMapping(db.Model):
                             "range_min": category.range_min,
                             "current": category.current
                         })
-                        transaction.commit()
                         category = CfgCategoryRangeMapping.query.filter(
                             CfgCategoryRangeMapping.category == CfgCategoryRangeMapping.DEFAULT_CATEGORY).first()
                     CfgCategoryRangeMapping.COMMITTED_DEFAULT = category

@@ -31,9 +31,9 @@ class Tasks(db.Model):
     owner_user = db.relationship('KBUser', foreign_keys=owner_user_id,
                                  primaryjoin="KBUser.id==Tasks.owner_user_id")
 
-    comments = db.relationship("Comments", foreign_keys=[id],
+    comments = db.relationship("Comments", foreign_keys="Comments.entity_id", viewonly=True,
                                primaryjoin="and_(Comments.entity_id==Tasks.id, Comments.entity_type=='%s')" % (
-                                   ENTITY_MAPPING["DNS"]))
+                                   ENTITY_MAPPING["TASK"]))
 
     def to_dict(self, include_comments=True):
         task = dict(

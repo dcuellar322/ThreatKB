@@ -84,7 +84,7 @@ def get_state_change(target, artifact):
             n_state = Cfg_states.query.filter(Cfg_states.state == state_history.added[0]).first()
 
             if o_state is None or o_state.is_release_state > 0 or o_state.is_retired_state > 0 or o_state.is_staging_state > 0\
-                    or n_state.is_release_state > 0 or n_state.is_retired_state > 0 or n_state.is_staging_state > 0:
+                    or (n_state is not None and (n_state.is_release_state > 0 or n_state.is_retired_state > 0 or n_state.is_staging_state > 0)):
                 activity_text = "State for '%s' was toggled from '%s' to '%s'" \
                                 % (artifact, o_state.state if o_state is not None else 'None', n_state.state)
 
@@ -99,7 +99,6 @@ def log_activity(connection,
                  entity_id,
                  user_id,
                  activity_text_short=""):
-    transaction = connection.begin()
 
     webhook = cfg_settings.Cfg_settings.get_setting(key="SLACK_WEBHOOK")
 
@@ -160,4 +159,3 @@ def log_activity(connection,
         "entity_id": entity_id,
         "user_id": user_id
     })
-    transaction.commit()

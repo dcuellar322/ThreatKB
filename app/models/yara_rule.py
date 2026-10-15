@@ -55,22 +55,22 @@ class Yara_rule(db.Model):
     owner_user = db.relationship('KBUser', foreign_keys=owner_user_id,
                                  primaryjoin="KBUser.id==Yara_rule.owner_user_id")
 
-    comments = db.relationship("Comments", foreign_keys=[id],
+    comments = db.relationship("Comments", foreign_keys="Comments.entity_id", viewonly=True,
                                primaryjoin="and_(Comments.entity_id==Yara_rule.id, Comments.entity_type=='%s')" % (
                                    ENTITY_MAPPING["SIGNATURE"]), cascade="all,delete", uselist=True)
 
-    files = db.relationship("Files", foreign_keys=[id],
+    files = db.relationship("Files", foreign_keys="Files.entity_id", viewonly=True,
                             primaryjoin="and_(Files.entity_id==Yara_rule.id, Files.entity_type=='%s')" % (
                                 ENTITY_MAPPING["SIGNATURE"]), cascade="all,delete", uselist=True)
 
-    history = db.relationship("Yara_rule_history", foreign_keys=[id],
+    history = db.relationship("Yara_rule_history", foreign_keys="Yara_rule_history.yara_rule_id",
                               primaryjoin="Yara_rule_history.yara_rule_id==Yara_rule.id",
                               cascade="all,delete", uselist=True)
 
-    current_history = db.relationship("Yara_rule_history", foreign_keys=id,
+    current_history = db.relationship("Yara_rule_history", foreign_keys="Yara_rule_history.yara_rule_id", viewonly=True,
                                       primaryjoin="and_(Yara_rule_history.yara_rule_id==Yara_rule.id, Yara_rule_history.revision==Yara_rule.revision)")
 
-    test_history = db.relationship("Yara_testing_history", foreign_keys=[id],
+    test_history = db.relationship("Yara_testing_history", foreign_keys="Yara_testing_history.yara_rule_id",
                                    primaryjoin="Yara_testing_history.yara_rule_id==Yara_rule.id",
                                    cascade="all,delete", uselist=True)
 

@@ -25,7 +25,7 @@ class Metadata(db.Model):
     created_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
     created_user = db.relationship('KBUser', foreign_keys=created_user_id,
                                    primaryjoin="KBUser.id==Metadata.created_user_id")
-    choices = db.relationship('MetadataChoices', primaryjoin="MetadataChoices.metadata_id==Metadata.id")
+    choices = db.relationship('MetadataChoices', primaryjoin="MetadataChoices.metadata_id==Metadata.id", back_populates="metadata_object")
 
     @staticmethod
     def get_metadata_dict(entity_type):
@@ -179,7 +179,7 @@ class MetadataChoices(db.Model):
                               onupdate=db.func.current_timestamp())
     metadata_id = db.Column(db.Integer, db.ForeignKey('metadata.id'), nullable=False)
     metadata_object = db.relationship('Metadata', foreign_keys=metadata_id,
-                                      primaryjoin="Metadata.id==MetadataChoices.metadata_id")
+                                      primaryjoin="Metadata.id==MetadataChoices.metadata_id", back_populates="choices")
     created_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
     created_user = db.relationship('KBUser', foreign_keys=created_user_id,
                                    primaryjoin="KBUser.id==MetadataChoices.created_user_id")

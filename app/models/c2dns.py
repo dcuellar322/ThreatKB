@@ -45,7 +45,7 @@ class C2dns(db.Model):
     owner_user = db.relationship('KBUser', foreign_keys=owner_user_id,
                                  primaryjoin="KBUser.id==C2dns.owner_user_id")
 
-    comments = db.relationship("Comments", foreign_keys=[id],
+    comments = db.relationship("Comments", foreign_keys="Comments.entity_id", viewonly=True,
                                primaryjoin="and_(Comments.entity_id==C2dns.id, Comments.entity_type=='%s')" % (
                                    ENTITY_MAPPING["DNS"]), uselist=True)
 
