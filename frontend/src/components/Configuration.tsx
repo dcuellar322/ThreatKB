@@ -148,6 +148,9 @@ export function Configuration({
       ? "/" + encodeURIComponent(edit.id ?? edit.key ?? edit.tag)
       : "");
   const dirty = edit && JSON.stringify(value) !== JSON.stringify(edit.form);
+  const deactivating =
+    ["Metadata", "Users"].includes(tab) || (tab === "Macros" && !!edit?.active);
+  const inactiveDefinition = edit?.active === false || edit?.active === 0;
   const close = () => {
     if (!busy && (!dirty || confirm("Discard unsaved changes?"))) setEdit(null);
   };
@@ -279,6 +282,9 @@ export function Configuration({
                       ""}
                   </small>
                 </button>
+                {(row.active === false || row.active === 0) && (
+                  <Badge value="Inactive" />
+                )}
                 {tab === "Sources" && (
                   <Badge
                     value={
@@ -498,26 +504,36 @@ export function Configuration({
               )}
             </div>
             <div className="dialog-footer">
-              {!edit.new && tab !== "Sources" && (
-                <button
-                  type="button"
-                  className="text-danger dialog-danger"
-                  onClick={async () => {
-                    if (!confirm("Delete this definition?")) return;
-                    try {
-                      await api(endpoint(), { method: "DELETE" });
-                      setEdit(null);
-                      reload();
-                      refresh();
-                      notify("Deleted.");
-                    } catch (e: any) {
-                      notify(e.message, true);
-                    }
-                  }}
-                >
-                  Delete
-                </button>
-              )}
+              {!edit.new &&
+                tab !== "Sources" &&
+                !(
+                  inactiveDefinition && ["Metadata", "Users"].includes(tab)
+                ) && (
+                  <button
+                    type="button"
+                    className="text-danger dialog-danger"
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          (deactivating ? "Deactivate" : "Delete") +
+                            " this definition?",
+                        )
+                      )
+                        return;
+                      try {
+                        await api(endpoint(), { method: "DELETE" });
+                        setEdit(null);
+                        reload();
+                        refresh();
+                        notify(deactivating ? "Deactivated." : "Deleted.");
+                      } catch (e: any) {
+                        notify(e.message, true);
+                      }
+                    }}
+                  >
+                    {deactivating ? "Deactivate" : "Delete"}
+                  </button>
+                )}
               <button type="button" onClick={close}>
                 Cancel
               </button>
