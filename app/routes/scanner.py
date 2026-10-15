@@ -29,3 +29,19 @@ def scan_upload():
                                    for instance in string.instances]}
                     for string in match.strings],
     } for match in matches], bytes_scanned=len(data))
+
+
+@app.post('/ThreatKB/yara_rules/generate')
+@login_required
+def generate_signature_candidate():
+    from app.signature_generation import generate_candidate
+    files = request.files.getlist('files') or request.files.getlist('file')
+    if not files or len(files) > 8:
+        abort(400, description='Choose between one and eight related samples.')
+    samples = [upload.read(4 * 1024 * 1024 + 1) for upload in files]
+    if any(not sample or len(sample) > 4 * 1024 * 1024 for sample in samples):
+        abort(413, description='Each sample must contain between 1 byte and 4 MiB.')
+    try:
+        return jsonify(generate_candidate(samples, request.form.get('name', 'generated_candidate')))
+    except ValueError as error:
+        abort(422, description=str(error))
