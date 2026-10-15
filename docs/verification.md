@@ -87,3 +87,5 @@ deletion are disabled. The modernization PR remains a draft for independent revi
 ## Performance and UI review follow-up
 
 The October 2026 follow-up passes **71 tests locally and in the production Docker image**. All independent Sigpack, Feedpack and Codepack pipelines pass in that image. MySQL migrations were applied to the main development database and a separate browser-QA database. The frontend production build and unused-declaration checks pass. Real-browser workflows and before/after query measurements are recorded in [2026-review.md](2026-review.md); screenshots remain local under `output/playwright/`.
+
+The subsequent UI capability comparison against upstream `rc` is recorded in [ui-parity-2026-10-15.md](ui-parity-2026-10-15.md). It restores missing permalink, searchable-control, tag, editor, revision, file, profile and overview workflows. The backend suite now passes 73 tests locally and in the production Docker image; all 87 locked frontend packages meet the original release-age cutoff.

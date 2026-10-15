@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { normalizeHash } from "./lib/links";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Shield, Bell, Menu, LogOut, RefreshCw, X, Search } from "lucide-react";
 import { api, write } from "./lib/api";
 import { nav, title } from "./lib/navigation";
@@ -9,12 +10,13 @@ import { Dashboard } from "./components/Dashboard";
 import { Records } from "./components/Records";
 import { Content } from "./components/Content";
 import { SampleLab } from "./components/SampleLab";
-import { Configuration } from "./components/Configuration";
+import { LegacyTools } from "./components/LegacyTools";
+import { Configuration, ImportForm } from "./components/Configuration";
 import { Account, Following } from "./components/Account";
 
 export function App() {
   const [user, setUser] = useState<any>(undefined),
-    [route, setRoute] = useState(location.hash),
+    [route, setRoute] = useState(() => normalizeHash(location.hash)),
     [notice, setNotice] = useState<any>(null),
     [mobile, setMobile] = useState(false),
     [narrow, setNarrow] = useState(matchMedia("(max-width:800px)").matches),
@@ -25,6 +27,8 @@ export function App() {
     [search, setSearch] = useState(""),
     [hits, setHits] = useState<any>(null),
     [searchError, setSearchError] = useState("");
+  const currentRoute = useRef(route);
+  currentRoute.current = route;
   const page = route.replace(/^#!?\//, "").split("?")[0] || "yara_rules";
   const notify = useCallback((message: string, error = false) => {
     setNotice({ message, error });
@@ -42,11 +46,29 @@ export function App() {
         sessionStorage.setItem("threatkb.returnTo", location.hash);
         setUser(null);
       });
-    const hash = () => setRoute(location.hash),
+    const hash = () => {
+        if (location.hash === "#main-content") {
+          document.getElementById("main-content")?.focus();
+          return;
+        }
+        const next = normalizeHash(location.hash);
+        if (
+          next !== currentRoute.current &&
+          !window.dispatchEvent(
+            new Event("threatkb:before-navigate", { cancelable: true }),
+          )
+        ) {
+          history.replaceState(null, "", currentRoute.current);
+          return;
+        }
+        if (next !== location.hash) history.replaceState(null, "", next);
+        setRoute(next);
+      },
       expired = () => {
         sessionStorage.setItem("threatkb.returnTo", location.hash);
         setUser(null);
       };
+    hash();
     window.addEventListener("hashchange", hash);
     window.addEventListener("threatkb:unauthorized", expired);
     return () => {
@@ -117,7 +139,7 @@ export function App() {
             setNotice(null);
             const saved = sessionStorage.getItem("threatkb.returnTo");
             sessionStorage.removeItem("threatkb.returnTo");
-            go(saved?.startsWith("#/") ? saved.slice(2) : "yara_rules");
+            go(saved ? normalizeHash(saved).slice(2) : "yara_rules");
           }}
         />
         {toast}
@@ -125,7 +147,14 @@ export function App() {
     );
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
         Skip to content
       </a>
       <aside
@@ -141,18 +170,27 @@ export function App() {
         <nav aria-label="Main navigation">
           {nav
             .filter(
-              ([key]) => user.admin || !["settings", "releases"].includes(key),
+              ([key]) =>
+                user.admin || !["settings", "releases", "errors"].includes(key),
             )
             .map(([key, label, Icon]) => (
-              <button
+              <a
+                href={"#/" + key}
                 key={key}
-                className={page === key ? "active" : ""}
+                className={
+                  (page === key ? "active " : "") +
+                  (["yara_rules", "releases", "settings", "bookmarks"].includes(
+                    key,
+                  )
+                    ? "nav-group-start"
+                    : "")
+                }
                 aria-current={page === key ? "page" : undefined}
-                onClick={() => go(key)}
+                onClick={() => setMobile(false)}
               >
                 <Icon size={17} />
                 <span>{label}</span>
-              </button>
+              </a>
             ))}
         </nav>
         <div className="account-row">
@@ -214,7 +252,7 @@ export function App() {
             </IconButton>
           </div>
         </header>
-        <main id="main-content" className="main">
+        <main id="main-content" className="main" tabIndex={-1}>
           <div className="page-heading">
             <h1>{title(page)}</h1>
             <IconButton label="Refresh view" onClick={refresh}>
@@ -229,9 +267,33 @@ export function App() {
             ) : page === "scanner" ? (
               <SampleLab notify={notify} />
             ) : page === "settings" ? (
-              <Configuration notify={notify} refresh={refresh} />
+              <Configuration
+                notify={notify}
+                refresh={refresh}
+                selectedTab={new URLSearchParams(route.split("?")[1]).get(
+                  "tab",
+                )}
+              />
+            ) : page === "whitelist" ? (
+              <Configuration
+                notify={notify}
+                refresh={refresh}
+                selectedTab="Whitelist"
+                standalone
+              />
+            ) : page === "import" ? (
+              <section className="panel import-panel">
+                <ImportForm notify={notify} />
+              </section>
+            ) : ["tests", "files", "errors"].includes(page) ? (
+              <LegacyTools
+                page={page}
+                version={version}
+                notify={notify}
+                user={user}
+              />
             ) : page === "account" ? (
-              <Account user={user} notify={notify} />
+              <Account user={user} notify={notify} onUser={setUser} />
             ) : page === "bookmarks" ? (
               <Following notify={notify} />
             ) : (

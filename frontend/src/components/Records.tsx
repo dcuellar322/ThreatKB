@@ -1,9 +1,13 @@
+import { TagInput, RecordTags } from "./TagInput";
+import { recordLink } from "../lib/links";
+import { Select } from "./Select";
 import { useState, useEffect, useRef } from "react";
 import {
   Search,
   Plus,
   ChevronLeft,
   ChevronRight,
+  ArrowUpRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -82,6 +86,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
     [selected, setSelected] = useState<Set<number>>(new Set()),
     [editor, setEditor] = useState<any>(null),
     [extra, setExtra] = useState<any>(null),
+    [savingRow, setSavingRow] = useState<number | null>(null),
     [bulk, setBulk] = useState(false),
     [source, setSource] = useState<any>(null),
     [wrap, setWrap] = useState(false),
@@ -94,7 +99,27 @@ export function Records({ page, version, notify, refresh, user }: any) {
     [visibleColumns, setVisibleColumns] = useState<string[]>(
       prefs.columns || ["owner", "category", "tags", "updated"],
     );
-  const allRef = useRef<HTMLInputElement>(null);
+  const allRef = useRef<HTMLInputElement>(null),
+    columnMenuRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (!showColumns) return;
+    const outside = (e: PointerEvent) => {
+      if (!columnMenuRef.current?.contains(e.target as Node))
+        setShowColumns(false);
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowColumns(false);
+        columnMenuRef.current?.querySelector("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [showColumns]);
   const editable = !!kinds[page];
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -158,16 +183,25 @@ export function Records({ page, version, notify, refresh, user }: any) {
     if (page === "yara_rules")
       api("/cfg_category_range_mapping").then(setCategories);
   }, [page]);
+  const newRecord = new URLSearchParams(location.hash.split("?")[1] || "").has(
+    "new",
+  );
   const recordId = new URLSearchParams(location.hash.split("?")[1] || "").get(
     "id",
   );
   useEffect(() => {
     const id = recordId;
+    const controller = new AbortController();
     if (id && editable)
-      api("/" + page + "/" + id)
+      api("/" + page + "/" + id, { signal: controller.signal })
         .then(setEditor)
-        .catch((e: any) => notify(e.message, true));
-  }, [page, recordId]);
+        .catch((e: any) => {
+          if (e.name !== "AbortError") notify(e.message, true);
+        });
+    else if (newRecord) setEditor({ new: true, tags: [] });
+    else setEditor(null);
+    return () => controller.abort();
+  }, [page, recordId, newRecord]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -229,10 +263,31 @@ export function Records({ page, version, notify, refresh, user }: any) {
     ]);
   const open = async (row: any) => {
     try {
-      if (editable) setEditor(await api("/" + page + "/" + row.id));
+      if (editable) location.hash = recordLink(page, row.id);
       else setExtra(row);
     } catch (e: any) {
       notify(e.message, true);
+    }
+  };
+  const closeEditor = () => {
+    setEditor(null);
+    if (recordId || location.hash.includes("new=")) location.hash = "#/" + page;
+  };
+  const quickEdit = async (row: any, field: string, value: any) => {
+    setSavingRow(row.id);
+    try {
+      const record = await api("/" + page + "/" + row.id);
+      await write(
+        "/" + page + "/" + row.id,
+        { ...record, [field]: value, do_not_bump_revision: true },
+        "PUT",
+      );
+      refresh();
+      notify("Record updated.");
+    } catch (e: any) {
+      notify(e.message, true);
+    } finally {
+      setSavingRow(null);
     }
   };
   const columns: any[] = [
@@ -359,7 +414,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
           </div>
           <div className="toolbar-actions">
             {page === "activity_log" && (
-              <select
+              <Select
                 aria-label="Activity period"
                 value={days}
                 onChange={(e) => {
@@ -372,11 +427,11 @@ export function Records({ page, version, notify, refresh, user }: any) {
                     Last {day} days
                   </option>
                 ))}
-              </select>
+              </Select>
             )}
             {editable && (
               <>
-                <select
+                <Select
                   aria-label="Filter by state"
                   value={filters.find((f) => f.field === "state")?.value || ""}
                   onChange={(e) => quick("state", e.target.value)}
@@ -385,8 +440,8 @@ export function Records({ page, version, notify, refresh, user }: any) {
                   {states.map((state) => (
                     <option key={state.id}>{state.state}</option>
                   ))}
-                </select>
-                <select
+                </Select>
+                <Select
                   aria-label="Record visibility"
                   value={view}
                   onChange={(e) => {
@@ -397,7 +452,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
                   <option>Active Only</option>
                   <option>Inactive Only</option>
                   <option>All</option>
-                </select>
+                </Select>
                 <button
                   aria-expanded={filterOpen}
                   onClick={() => setFilterOpen(!filterOpen)}
@@ -408,6 +463,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
               </>
             )}
             <details
+              ref={columnMenuRef}
               className="column-menu"
               open={showColumns}
               onToggle={(e) => setShowColumns(e.currentTarget.open)}
@@ -500,7 +556,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
           >
             <label>
               Field
-              <select
+              <Select
                 aria-label="Field"
                 value={newFilter.field}
                 onChange={(e) =>
@@ -512,11 +568,11 @@ export function Records({ page, version, notify, refresh, user }: any) {
                     {label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               Match
-              <select
+              <Select
                 aria-label="Match"
                 value={newFilter.op}
                 onChange={(e) =>
@@ -537,7 +593,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
                     {label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               Value
@@ -636,7 +692,12 @@ export function Records({ page, version, notify, refresh, user }: any) {
         ) : !data ? (
           <Loading />
         ) : (
-          <div className="table-scroll">
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label="Record table"
+            tabIndex={0}
+          >
             <table
               className={"records-table " + (wrap ? "wrap" : "")}
               id="records-table"
@@ -748,11 +809,23 @@ export function Records({ page, version, notify, refresh, user }: any) {
                         }
                       >
                         {colIndex === 0 ? (
-                          <button
+                          <a
                             className="record-name"
-                            disabled={loading}
+                            href={
+                              editable ? recordLink(page, row.id) : "#/" + page
+                            }
+                            aria-disabled={loading || undefined}
                             title={row.uuid || String(row.id)}
-                            onClick={() => open(row)}
+                            onClick={(e) => {
+                              if (loading) {
+                                e.preventDefault();
+                                return;
+                              }
+                              if (!editable) {
+                                e.preventDefault();
+                                open(row);
+                              }
+                            }}
                           >
                             {row[nameKeys[page]] ||
                               row.name ||
@@ -763,7 +836,38 @@ export function Records({ page, version, notify, refresh, user }: any) {
                                 {row.id.slice(0, 8)} · {row.progress}%
                               </small>
                             )}
-                          </button>
+                          </a>
+                        ) : column.key === "state" && editable ? (
+                          <Select
+                            className="cell-select state-select"
+                            renderValue={(label: string) => (
+                              <Badge value={label} />
+                            )}
+                            aria-label={"State for " + row[nameKeys[page]]}
+                            value={row.state || ""}
+                            disabled={loading || savingRow === row.id}
+                            onChange={(e: any) => {
+                              if (e.target.value !== row.state)
+                                quickEdit(row, "state", e.target.value);
+                            }}
+                          >
+                            {row.state &&
+                              !states.some((s) => s.state === row.state) && (
+                                <option>{row.state}</option>
+                              )}
+                            {states
+                              .filter(
+                                (s) =>
+                                  user.admin ||
+                                  !s.is_release_state ||
+                                  s.state === row.state,
+                              )
+                              .map((s) => (
+                                <option key={s.id} value={s.state}>
+                                  {s.state}
+                                </option>
+                              ))}
+                          </Select>
                         ) : column.key === "state" ||
                           column.key === "status" ||
                           column.key === "activity_type" ||
@@ -777,11 +881,34 @@ export function Records({ page, version, notify, refresh, user }: any) {
                             }
                           />
                         ) : column.key === "owner_user.email" ? (
-                          <span className="owner-name">
-                            {row.owner_user?.first_name ||
-                              row.owner_user?.email ||
-                              "Unassigned"}
-                          </span>
+                          <Select
+                            className="cell-select owner-select"
+                            aria-label={"Owner for " + row[nameKeys[page]]}
+                            value={row.owner_user?.id || ""}
+                            disabled={loading || savingRow === row.id}
+                            onChange={(e: any) => {
+                              if (
+                                String(e.target.value) !==
+                                String(row.owner_user?.id || "")
+                              )
+                                quickEdit(
+                                  row,
+                                  "owner_user",
+                                  e.target.value
+                                    ? { id: Number(e.target.value) }
+                                    : null,
+                                );
+                            }}
+                          >
+                            <option value="">Unassigned</option>
+                            {users
+                              .filter((u: any) => u.id)
+                              .map((u: any) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.email}
+                                </option>
+                              ))}
+                          </Select>
                         ) : column.key === timestampKeys[page] ? (
                           <time title={row[column.key]}>
                             {date(
@@ -791,20 +918,10 @@ export function Records({ page, version, notify, refresh, user }: any) {
                             )}
                           </time>
                         ) : column.type === "tags" ? (
-                          <div className="tag-list">
-                            {row.tags?.slice(0, 3).map((tag: any) => (
-                              <button
-                                className="tag"
-                                key={tag.text || tag}
-                                onClick={() => quick("tags", tag.text || tag)}
-                              >
-                                {tag.text || tag}
-                              </button>
-                            ))}
-                            {row.tags?.length > 3 && (
-                              <span>+{row.tags.length - 3}</span>
-                            )}
-                          </div>
+                          <RecordTags
+                            tags={row.tags || []}
+                            onFilter={(tag: string) => quick("tags", tag)}
+                          />
                         ) : column.type === "metadata" ? (
                           String(
                             row.metadata_values?.[column.field]?.value ?? "—",
@@ -818,8 +935,9 @@ export function Records({ page, version, notify, refresh, user }: any) {
                       <button
                         aria-label={"Open " + (row[nameKeys[page]] || row.id)}
                         onClick={() => open(row)}
+                        disabled={loading}
                       >
-                        Open
+                        <ArrowUpRight size={14} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>
@@ -844,7 +962,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
           <div>
             <label>
               Rows
-              <select
+              <Select
                 aria-label="Rows per page"
                 value={size}
                 onChange={(e) => {
@@ -855,7 +973,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
                 {[25, 50, 100, 200].map((value) => (
                   <option key={value}>{value}</option>
                 ))}
-              </select>
+              </Select>
             </label>
             <IconButton
               label="Previous page"
@@ -930,9 +1048,9 @@ export function Records({ page, version, notify, refresh, user }: any) {
           page={page}
           initial={editor}
           notify={notify}
-          onClose={() => setEditor(null)}
+          onClose={closeEditor}
           onSaved={() => {
-            setEditor(null);
+            closeEditor();
             refresh();
           }}
         />
@@ -942,7 +1060,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
           count={selected.size}
           ids={[...selected]}
           page={page}
-          states={states}
+          states={states.filter((s) => user.admin || !s.is_release_state)}
           users={users}
           categories={categories}
           notify={notify}
@@ -1096,6 +1214,14 @@ function BulkEditor({
     [description, setDescription] = useState(""),
     [replace, setReplace] = useState(false),
     [busy, setBusy] = useState(false);
+  const close = () => {
+    if (
+      !busy &&
+      (!(state || owner !== "unchanged" || category || tags || replace) ||
+        confirm("Discard unsaved changes?"))
+    )
+      onClose();
+  };
   return (
     <Dialog
       title={"Edit " + count + " records"}
@@ -1133,7 +1259,7 @@ function BulkEditor({
         <div className="dialog-body form-grid">
           <label>
             State
-            <select
+            <Select
               aria-label="State"
               value={state}
               onChange={(e) => setState(e.target.value)}
@@ -1142,11 +1268,11 @@ function BulkEditor({
               {states.map((row: any) => (
                 <option key={row.id}>{row.state}</option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Owner
-            <select
+            <Select
               aria-label="Owner"
               value={owner}
               onChange={(e) => setOwner(e.target.value)}
@@ -1160,12 +1286,12 @@ function BulkEditor({
                     {row.email}
                   </option>
                 ))}
-            </select>
+            </Select>
           </label>
           {page === "yara_rules" && (
             <label className="span2">
               Category
-              <select
+              <Select
                 aria-label="Category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -1174,18 +1300,20 @@ function BulkEditor({
                 {categories.map((row: any) => (
                   <option key={row.id}>{row.category}</option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
-          <label className="span2">
-            Add tags
-            <input
-              aria-label="Add tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="Comma separated"
+          <div className="field span2">
+            <span>Add tags</span>
+            <TagInput
+              label="Add tags"
+              value={tags
+                .split(",")
+                .map((t: string) => t.trim())
+                .filter(Boolean)}
+              onChange={(next: string[]) => setTags(next.join(","))}
             />
-          </label>
+          </div>
           <label className="span2 check-label">
             <input
               type="checkbox"
@@ -1207,7 +1335,7 @@ function BulkEditor({
           )}
         </div>
         <div className="dialog-footer">
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={close}>
             Cancel
           </button>
           <button className="primary" disabled={busy}>

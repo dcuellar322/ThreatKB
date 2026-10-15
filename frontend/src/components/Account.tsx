@@ -1,13 +1,20 @@
-import { useState, useEffect } from "react";
-import { Bell } from "lucide-react";
-import { api, write } from "../lib/api";
+import { useState, useEffect, useRef } from "react";
+import { Bell, Download, Upload, Save } from "lucide-react";
+import { api, base, write } from "../lib/api";
 import { date } from "../lib/format";
 
 import { Empty } from "./ui";
-export function Account({ user, notify }: any) {
+export function Account({ user, notify, onUser }: any) {
+  const pictureInput = useRef<HTMLInputElement>(null);
   const [keys, setKeys] = useState<any[]>([]),
     [secret, setSecret] = useState<any>(null),
-    [password, setPassword] = useState("");
+    [password, setPassword] = useState(""),
+    [profile, setProfile] = useState({
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      email: user.email,
+    }),
+    [pictureVersion, setPictureVersion] = useState(0);
   const reload = () => api("/access_keys").then(setKeys);
   useEffect(() => {
     reload();
@@ -16,7 +23,98 @@ export function Account({ user, notify }: any) {
     <div className="split-panels">
       <section className="panel import-panel">
         <h2>Your profile</h2>
-        <p>{user.email}</p>
+        <div className="profile-picture">
+          <img
+            src={base + "/users/me/picture?v=" + pictureVersion}
+            alt="Profile picture"
+          />
+          <button type="button" onClick={() => pictureInput.current?.click()}>
+            <Upload size={15} />
+            Change picture
+          </button>
+          <input
+            ref={pictureInput}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const body = new FormData();
+                body.append("file", file);
+                const response = await fetch(base + "/users/me/picture", {
+                  method: "POST",
+                  credentials: "include",
+                  body,
+                });
+                if (!response.ok) throw new Error("Could not upload picture.");
+                setPictureVersion((v) => v + 1);
+                notify("Picture updated.");
+              } catch (error: any) {
+                notify(error.message, true);
+              }
+            }}
+          />
+        </div>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              const saved = await write(
+                "/users/" + user.id,
+                { ...user, ...profile },
+                "PUT",
+              );
+              onUser(saved);
+              notify("Profile updated.");
+            } catch (error: any) {
+              notify(error.message, true);
+            }
+          }}
+        >
+          <div className="profile-fields">
+            <label>
+              First name
+              <input
+                aria-label="First name"
+                required
+                value={profile.first_name}
+                onChange={(e) =>
+                  setProfile({ ...profile, first_name: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Last name
+              <input
+                aria-label="Last name"
+                required
+                value={profile.last_name}
+                onChange={(e) =>
+                  setProfile({ ...profile, last_name: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Email address
+              <input
+                aria-label="Profile email address"
+                required
+                type="email"
+                value={profile.email}
+                onChange={(e) =>
+                  setProfile({ ...profile, email: e.target.value })
+                }
+              />
+            </label>
+          </div>
+          <button>
+            <Save size={15} />
+            Save profile
+          </button>
+        </form>
+        <hr className="section-divider" />
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -46,7 +144,13 @@ export function Account({ user, notify }: any) {
         </form>
       </section>
       <section className="panel import-panel">
-        <h2>API access keys</h2>
+        <div className="section-top">
+          <h2>API access keys</h2>
+          <a className="button" href={base + "/access_keys/cli"} download>
+            <Download size={15} />
+            Download CLI
+          </a>
+        </div>
         <p className="muted">
           Use a Bearer token with the X-ThreatKB-Secret header. Save a new
           secret before closing this view.

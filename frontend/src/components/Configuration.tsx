@@ -1,3 +1,6 @@
+import { CodeEditor } from "./CodeEditor";
+import { TagInput } from "./TagInput";
+import { Select } from "./Select";
 import { useState, useEffect } from "react";
 import { Plus, ArrowUpRight } from "lucide-react";
 import { api, write } from "../lib/api";
@@ -69,8 +72,15 @@ const labels: Record<string, string> = {
   whitelist_artifact: "Indicator",
   match_regex: "Highlight pattern",
 };
-export function Configuration({ notify, refresh }: any) {
-  const [tab, setTab] = useState("Metadata"),
+export function Configuration({
+  notify,
+  refresh,
+  selectedTab,
+  standalone = false,
+}: any) {
+  const [tab, setTab] = useState(
+      selectedTab && schemas[selectedTab] ? selectedTab : "Metadata",
+    ),
     [data, setData] = useState<any[]>([]),
     [edit, setEdit] = useState<any>(null),
     [value, setValue] = useState<any>({}),
@@ -91,6 +101,9 @@ export function Configuration({ notify, refresh }: any) {
     Categories: "cfg_category_range_mapping",
     Scripts: "scripts",
   };
+  useEffect(() => {
+    if (selectedTab && schemas[selectedTab]) setTab(selectedTab);
+  }, [selectedTab]);
   const reload = () =>
     api("/" + paths[tab])
       .then((r) =>
@@ -173,17 +186,19 @@ export function Configuration({ notify, refresh }: any) {
   };
   return (
     <>
-      <div className="tabs config-tabs">
-        {Object.keys(paths).map((t) => (
-          <button
-            className={tab === t ? "active" : ""}
-            key={t}
-            onClick={() => setTab(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      {!standalone && (
+        <div className="tabs config-tabs">
+          {Object.keys(paths).map((t) => (
+            <button
+              className={tab === t ? "active" : ""}
+              key={t}
+              onClick={() => setTab(t)}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      )}
       <section className="panel">
         <div className="section-top">
           <h2>{tab}</h2>
@@ -251,30 +266,32 @@ export function Configuration({ notify, refresh }: any) {
           ))}
         {!data.length && <Empty text="No definitions." />}
       </section>
-      <details className="panel import-panel">
-        <summary>Import and export</summary>
-        <ImportForm notify={notify} />
-        <div className="button-row">
-          {[
-            ["export-legacy", "Export signatures to Git"],
-            ["export-indicators", "Export released indicators to Git"],
-          ].map(([path, label]) => (
-            <button
-              key={path}
-              onClick={async () => {
-                try {
-                  const r = await write("/content/" + path, {});
-                  notify((r.added ?? r.exported) + " records exported.");
-                } catch (e: any) {
-                  notify(e.message, true);
-                }
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </details>
+      {!standalone && (
+        <details className="panel import-panel">
+          <summary>Import and export</summary>
+          <ImportForm notify={notify} />
+          <div className="button-row">
+            {[
+              ["export-legacy", "Export signatures to Git"],
+              ["export-indicators", "Export released indicators to Git"],
+            ].map(([path, label]) => (
+              <button
+                key={path}
+                onClick={async () => {
+                  try {
+                    const r = await write("/content/" + path, {});
+                    notify((r.added ?? r.exported) + " records exported.");
+                  } catch (e: any) {
+                    notify(e.message, true);
+                  }
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
       {edit && (
         <Dialog
           title={
@@ -311,6 +328,13 @@ export function Configuration({ notify, refresh }: any) {
                           : e.target.value,
                     }),
                 };
+                if (type === "code")
+                  return (
+                    <div className="field span-two" key={key}>
+                      <span>{label}</span>
+                      <CodeEditor label={label} {...input} />
+                    </div>
+                  );
                 return (
                   <label
                     key={key}
@@ -337,7 +361,7 @@ export function Configuration({ notify, refresh }: any) {
                       <>
                         {label}
                         {Array.isArray(type) ? (
-                          <select {...input}>
+                          <Select {...input}>
                             {type.map((option) => {
                               const [text, val] = option.split("|");
                               return (
@@ -346,12 +370,14 @@ export function Configuration({ notify, refresh }: any) {
                                 </option>
                               );
                             })}
-                          </select>
-                        ) : type === "code" || type === "textarea" ? (
+                          </Select>
+                        ) : type === "code" ? (
+                          <CodeEditor label={label} {...input} />
+                        ) : type === "textarea" ? (
                           <textarea
                             {...input}
                             rows={type === "code" ? 12 : 3}
-                            className={type === "code" ? "code-input" : ""}
+                            className=""
                           />
                         ) : (
                           <input
@@ -523,15 +549,17 @@ export function ImportForm({ notify }: any) {
         />
       </label>
       <div className="form-grid">
-        <label>
-          Context tags
-          <input
-            aria-label="Context tags"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="source:community, campaign:example"
+        <div className="field ">
+          <span>Context tags</span>
+          <TagInput
+            label="Context tags"
+            value={tags
+              .split(",")
+              .map((t: string) => t.trim())
+              .filter(Boolean)}
+            onChange={(next: string[]) => setTags(next.join(","))}
           />
-        </label>
+        </div>
         <label className="check-label">
           <input
             type="checkbox"
@@ -574,7 +602,7 @@ export function ImportForm({ notify }: any) {
           ))}
           <label>
             State
-            <select
+            <Select
               aria-label="Import state"
               value={options.shared_state || ""}
               onChange={(e) =>
@@ -585,11 +613,11 @@ export function ImportForm({ notify }: any) {
               {states.map((row) => (
                 <option key={row.id}>{row.state}</option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Owner
-            <select
+            <Select
               aria-label="Import owner"
               value={options.shared_owner || ""}
               onChange={(e) =>
@@ -605,7 +633,7 @@ export function ImportForm({ notify }: any) {
                   {row.email}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             Reference

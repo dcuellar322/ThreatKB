@@ -1,9 +1,15 @@
+import { CodeEditor, RevisionDiff } from "./CodeEditor";
+import { UploadFiles } from "./UploadFiles";
+import { permalink } from "../lib/links";
+import { TagInput } from "./TagInput";
+import { Select } from "./Select";
 import { useState, useEffect } from "react";
 import {
+  Link,
+  Copy,
   FileCode2,
   Bell,
   Check,
-  Upload,
   Download,
   Play,
   Trash2,
@@ -37,15 +43,44 @@ export function ArtifactEditor({
     [discussion, setDiscussion] = useState<any[]>(initial.comments || []),
     [source, setSource] = useState(""),
     [compare, setCompare] = useState<any>(null),
+    [leftRevision, setLeftRevision] = useState("current"),
+    [rightRevision, setRightRevision] = useState(""),
+    [comparing, setComparing] = useState(false),
+    [keepRevision, setKeepRevision] = useState(false),
     [merging, setMerging] = useState(false),
     [mergeQuery, setMergeQuery] = useState(""),
     [destinations, setDestinations] = useState<any[]>([]),
     [destination, setDestination] = useState("");
   const dirty = JSON.stringify(value) !== JSON.stringify(initial);
+  const revisions = (initial.revisions || []).filter(
+    (revision: any, index: number, rows: any[]) =>
+      rows.findIndex((row) => row.revision === revision.revision) === index,
+  );
   const close = () => {
     if (!busy && (!dirty || confirm("Discard unsaved changes?"))) onClose();
   };
   useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (!busy)
+          (
+            document.getElementById("artifact-form") as HTMLFormElement
+          )?.requestSubmit();
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "q") {
+        event.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener("keydown", shortcut);
+    return () => document.removeEventListener("keydown", shortcut);
+  }, [busy, dirty]);
+  useEffect(() => {
+    const navigate = (event: Event) => {
+      if (dirty && !confirm("Discard unsaved changes?")) event.preventDefault();
+    };
+    window.addEventListener("threatkb:before-navigate", navigate);
     const before = (event: BeforeUnloadEvent) => {
       if (dirty) {
         event.preventDefault();
@@ -53,7 +88,10 @@ export function ArtifactEditor({
       }
     };
     window.addEventListener("beforeunload", before);
-    return () => window.removeEventListener("beforeunload", before);
+    return () => {
+      window.removeEventListener("beforeunload", before);
+      window.removeEventListener("threatkb:before-navigate", navigate);
+    };
   }, [dirty]);
   useEffect(() => {
     if (!merging) return;
@@ -121,6 +159,9 @@ export function ArtifactEditor({
     try {
       const payload = {
         ...value,
+        ...(isRule && !initial.new
+          ? { do_not_bump_revision: keepRevision }
+          : {}),
         asn: value.asn || "",
         state:
           typeof value.state === "object" ? value.state.state : value.state,
@@ -219,7 +260,7 @@ export function ArtifactEditor({
                   <>
                     <label>
                       Workflow state
-                      <select
+                      <Select
                         aria-label="Workflow state"
                         required
                         value={
@@ -253,11 +294,11 @@ export function ArtifactEditor({
                         {states.map((s) => (
                           <option key={s.id}>{s.state}</option>
                         ))}
-                      </select>
+                      </Select>
                     </label>
                     <label>
                       Owner
-                      <select
+                      <Select
                         aria-label="Owner"
                         value={
                           value.owner_user?.id || value.owner_user_id || ""
@@ -285,12 +326,12 @@ export function ArtifactEditor({
                             {u.email}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </label>
                     {isRule && (
                       <label className="span2">
                         Category
-                        <select
+                        <Select
                           aria-label="Category"
                           value={
                             typeof value.category === "object"
@@ -317,7 +358,7 @@ export function ArtifactEditor({
                               {category.category}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </label>
                     )}
                     <label>
@@ -341,7 +382,7 @@ export function ArtifactEditor({
                         </label>
                         <label>
                           Country
-                          <select
+                          <Select
                             aria-label="Country"
                             value={value.country?.countryCode2 || ""}
                             onChange={(e) =>
@@ -362,21 +403,21 @@ export function ArtifactEditor({
                                 {country.countryName}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </label>
                       </>
                     )}
                     {page === "c2dns" && (
                       <label>
                         Match type
-                        <select
+                        <Select
                           aria-label="Match type"
                           value={value.match_type || "exact"}
                           onChange={(e) => field("match_type", e.target.value)}
                         >
                           <option value="exact">Exact</option>
                           <option value="wildcard">Wildcard</option>
-                        </select>
+                        </Select>
                       </label>
                     )}
                     {(page === "c2ips" || page === "c2dns") && (
@@ -420,44 +461,39 @@ export function ArtifactEditor({
                     )}
                     {isRule && (
                       <>
-                        <label>
-                          Strings
-                          <textarea
-                            aria-label="Strings"
+                        <div className="field">
+                          <span>Strings</span>
+                          <CodeEditor
+                            label="Strings"
                             className="code-input"
-                            spellCheck={false}
-                            rows={7}
                             value={String(value.strings || "").replace(
                               /^\s*strings:\s*/,
                               "",
                             )}
                             onChange={(e) => field("strings", e.target.value)}
                           />
-                        </label>
-                        <label>
-                          Condition
-                          <textarea
-                            aria-label="Condition"
+                        </div>
+                        <div className="field">
+                          <span>Condition</span>
+                          <CodeEditor
+                            label="Condition"
                             className="code-input"
-                            spellCheck={false}
-                            rows={4}
                             value={String(value.condition || "").replace(
                               /^\s*condition:\s*/,
                               "",
                             )}
                             onChange={(e) => field("condition", e.target.value)}
                           />
-                        </label>
-                        <label className="span2">
-                          Imports
-                          <textarea
-                            aria-label="Imports"
-                            className="code-input"
-                            rows={2}
+                        </div>
+                        <div className="field span2">
+                          <span>Imports</span>
+                          <CodeEditor
+                            label="Imports"
+                            className="code-input compact-editor"
                             value={value.imports || ""}
                             onChange={(e) => field("imports", e.target.value)}
                           />
-                        </label>
+                        </div>
                       </>
                     )}
                     {isRule && (
@@ -513,24 +549,13 @@ export function ArtifactEditor({
                         </label>
                       </>
                     )}
-                    <label className="span2">
-                      Tags <small>Separate with commas</small>
-                      <input
-                        aria-label="Tags"
-                        value={(value.tags || [])
-                          .map((t: any) => (typeof t === "string" ? t : t.text))
-                          .join(", ")}
-                        onChange={(e) =>
-                          field(
-                            "tags",
-                            e.target.value
-                              .split(",")
-                              .map((t) => t.trim())
-                              .filter(Boolean),
-                          )
-                        }
+                    <div className="field span2">
+                      <span>Tags</span>
+                      <TagInput
+                        value={value.tags || []}
+                        onChange={(tags: string[]) => field("tags", tags)}
                       />
-                    </label>
+                    </div>
                     {definitions
                       .filter((d: any) => d.active)
                       .map((definition: any) => {
@@ -544,7 +569,8 @@ export function ArtifactEditor({
                           <label key={definition.id}>
                             {definition.key}
                             {definition.choices?.length ? (
-                              <select
+                              <Select
+                                required={!!definition.required}
                                 value={item?.value ?? definition.default ?? ""}
                                 onChange={(e) => change(e.target.value)}
                               >
@@ -554,7 +580,13 @@ export function ArtifactEditor({
                                     {c.choice}
                                   </option>
                                 ))}
-                              </select>
+                              </Select>
+                            ) : definition.type === "multiline_comment" ? (
+                              <textarea
+                                required={!!definition.required}
+                                value={item?.value ?? definition.default ?? ""}
+                                onChange={(e) => change(e.target.value)}
+                              />
                             ) : (
                               <input
                                 required={!!definition.required}
@@ -564,7 +596,9 @@ export function ArtifactEditor({
                                     definition.type,
                                   )
                                     ? "number"
-                                    : "text"
+                                    : definition.type === "date"
+                                      ? "date"
+                                      : "text"
                                 }
                                 onChange={(e) => change(e.target.value)}
                               />
@@ -631,45 +665,145 @@ export function ArtifactEditor({
               </div>
             </form>
           ) : tab === "Source" ? (
-            <label>
-              YARA source
-              <textarea
-                aria-label="YARA source"
-                className="code-input source-editor"
-                readOnly
-                value={source}
-              />
-              <button
-                onClick={async () => {
-                  await navigator.clipboard.writeText(source);
-                  notify("YARA copied.");
-                }}
-              >
-                Copy YARA
-              </button>
-            </label>
+            <div>
+              <div className="field">
+                <span>YARA source</span>
+                <CodeEditor
+                  label="YARA source"
+                  className="code-input source-editor"
+                  readOnly
+                  value={source}
+                />
+              </div>
+              <div className="button-row source-actions">
+                <button
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(source);
+                    notify("YARA copied.");
+                  }}
+                >
+                  <Copy size={15} />
+                  Copy YARA
+                </button>
+                <a
+                  className="button"
+                  download={(initial.name || "signature") + ".yar"}
+                  href={
+                    "data:text/plain;charset=utf-8," +
+                    encodeURIComponent(source)
+                  }
+                >
+                  <Download size={15} />
+                  Download YARA
+                </a>
+              </div>
+            </div>
           ) : tab === "Revisions" ? (
             <div>
+              {!!revisions.length && (
+                <div className="revision-picker">
+                  <label>
+                    First revision
+                    <Select
+                      aria-label="First revision"
+                      value={leftRevision}
+                      onChange={(e: any) => {
+                        setLeftRevision(e.target.value);
+                        setCompare(null);
+                      }}
+                    >
+                      <option value="current">
+                        Current ({initial.revision})
+                      </option>
+                      {revisions.map((r: any) => (
+                        <option key={r.revision} value={r.revision}>
+                          Revision {r.revision}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label>
+                    Second revision
+                    <Select
+                      aria-label="Second revision"
+                      value={rightRevision}
+                      onChange={(e: any) => {
+                        setRightRevision(e.target.value);
+                        setCompare(null);
+                      }}
+                    >
+                      <option value="">Choose revision</option>
+                      {revisions.map((r: any) => (
+                        <option key={r.revision} value={r.revision}>
+                          Revision {r.revision}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+                  <button
+                    disabled={
+                      !rightRevision ||
+                      leftRevision === rightRevision ||
+                      comparing
+                    }
+                    onClick={async () => {
+                      setComparing(true);
+                      try {
+                        const getSource = (r: string) =>
+                          r === "current"
+                            ? write("/yara_rules/copy", {
+                                copy: { ids: [initial.id] },
+                              })
+                            : api(
+                                "/yara_rules/" + initial.id + "/revision/" + r,
+                              );
+                        const [left, right] = await Promise.all([
+                          getSource(leftRevision),
+                          getSource(rightRevision),
+                        ]);
+                        setCompare({
+                          revision: rightRevision,
+                          source: right,
+                          current: left,
+                          left: leftRevision,
+                          right: rightRevision,
+                        });
+                      } catch (e: any) {
+                        notify(e.message, true);
+                      } finally {
+                        setComparing(false);
+                      }
+                    }}
+                  >
+                    <History size={15} />
+                    {comparing ? "Comparing…" : "Compare revisions"}
+                  </button>
+                </div>
+              )}
               {compare && (
                 <div>
                   <div className="section-top">
-                    <h3>
-                      Revision {compare.revision} and current revision{" "}
-                      {initial.revision}
-                    </h3>
+                    <h3>Revision comparison</h3>
                     <button onClick={() => setCompare(null)}>
                       Close comparison
                     </button>
                   </div>
-                  <div className="revision-compare">
-                    <pre>{compare.source}</pre>
-                    <pre>{compare.current}</pre>
+                  <div className="revision-labels">
+                    <strong>
+                      {compare.left && compare.left !== "current"
+                        ? "Revision " + compare.left
+                        : "Current revision " + initial.revision}
+                    </strong>
+                    <strong>
+                      Revision {compare.right || compare.revision}
+                    </strong>
                   </div>
+                  <RevisionDiff left={compare.current} right={compare.source} />
                 </div>
               )}
 
-              {initial.revisions?.length ? (
-                initial.revisions.map((r: any) => (
+              {revisions.length ? (
+                revisions.map((r: any) => (
                   <article className="activity-row" key={r.revision}>
                     <span className="event-icon">
                       <History size={17} />
@@ -741,42 +875,108 @@ export function ArtifactEditor({
             <>
               <div className="section-top">
                 <h3>Attached samples</h3>
-                <label className="button">
-                  <Upload size={15} />
-                  Upload file
-                  <input
-                    type="file"
-                    hidden
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const body = new FormData();
-                      body.append("file", file);
-                      body.append("entity_type", "1");
-                      body.append("entity_id", initial.id);
-                      try {
-                        const upload = await api("/file_upload", {
-                          method: "POST",
-                          body,
-                        });
-                        setFiles(
-                          await api(
-                            "/files?entity_type=1&entity_id=" + initial.id,
-                          ),
-                        );
-                        notify(
-                          Object.keys(upload.postprocessing_skipped || {})
-                            .length
-                            ? "Sample uploaded. Optional DFI preprocessing was skipped."
-                            : "Sample uploaded.",
-                        );
-                      } catch (err: any) {
-                        notify(err.message, true);
-                      }
-                    }}
-                  />
-                </label>
+                <UploadFiles
+                  entityId={initial.id}
+                  notify={notify}
+                  onUploaded={async () =>
+                    setFiles(
+                      await api("/files?entity_type=1&entity_id=" + initial.id),
+                    )
+                  }
+                />
               </div>
+              {user?.admin && files.some((f) => f.parent_sha1) && (
+                <details className="sample-folders">
+                  <summary>Sample folders</summary>
+                  {files
+                    .filter(
+                      (f) =>
+                        !f.parent_sha1 &&
+                        files.some((child) => child.parent_sha1 === f.sha1),
+                    )
+                    .map((f) => (
+                      <div className="file-group-row" key={f.id}>
+                        <code>{f.filename}</code>
+                        <button
+                          className="text-danger"
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                "Delete " +
+                                  f.filename +
+                                  " and all extracted files?",
+                              )
+                            )
+                              return;
+                            try {
+                              await api("/files/" + f.id + "?path=1", {
+                                method: "DELETE",
+                              });
+                              setFiles(
+                                await api(
+                                  "/files?entity_type=1&entity_id=" +
+                                    initial.id,
+                                ),
+                              );
+                              setChosen(new Set());
+                              notify("Sample group deleted.");
+                            } catch (e: any) {
+                              notify(e.message, true);
+                            }
+                          }}
+                        >
+                          <Trash2 size={14} />
+                          Delete group
+                        </button>
+                      </div>
+                    ))}
+                  {files
+                    .filter(
+                      (f, index, rows) =>
+                        f.parent_sha1 &&
+                        f.path &&
+                        rows.findIndex(
+                          (r) =>
+                            r.parent_sha1 === f.parent_sha1 &&
+                            r.path === f.path,
+                        ) === index,
+                    )
+                    .map((f) => (
+                      <div className="file-group-row" key={f.id}>
+                        <code>{f.path}</code>
+                        <button
+                          className="text-danger"
+                          onClick={async () => {
+                            if (
+                              !confirm(
+                                "Delete the extracted folder " + f.path + "?",
+                              )
+                            )
+                              return;
+                            try {
+                              await api("/files/" + f.id + "?path=1", {
+                                method: "DELETE",
+                              });
+                              setFiles(
+                                await api(
+                                  "/files?entity_type=1&entity_id=" +
+                                    initial.id,
+                                ),
+                              );
+                              setChosen(new Set());
+                              notify("Folder deleted.");
+                            } catch (e: any) {
+                              notify(e.message, true);
+                            }
+                          }}
+                        >
+                          <Trash2 size={14} />
+                          Delete folder
+                        </button>
+                      </div>
+                    ))}
+                </details>
+              )}
               {files.map((file) => (
                 <label className="file-row" key={file.id}>
                   <input
@@ -796,6 +996,7 @@ export function ArtifactEditor({
                   <FileCode2 size={18} />
                   <span>
                     {file.filename}
+                    {file.path && <small>{file.path}</small>}
                     <small>{file.sha256 || file.sha1}</small>
                   </span>
                   <a
@@ -809,6 +1010,7 @@ export function ArtifactEditor({
               {!files.length && <Empty text="No samples attached." />}
               <div className="button-row">
                 <button
+                  hidden={!user?.admin}
                   disabled={!chosen.size}
                   onClick={async () => {
                     try {
@@ -914,6 +1116,36 @@ export function ArtifactEditor({
                 : ""}
           </span>
           <div className="button-row">
+            {!initial.new && (
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      permalink(page, initial.id),
+                    );
+                    notify("Permalink copied.");
+                  } catch {
+                    notify(
+                      "Could not copy the link. Copy it from the address bar.",
+                      true,
+                    );
+                  }
+                }}
+              >
+                <Link size={15} />
+                Copy permalink
+              </button>
+            )}
+            {isRule && !initial.new && (
+              <label className="check-label revision-option">
+                <input
+                  type="checkbox"
+                  checked={keepRevision}
+                  onChange={(e) => setKeepRevision(e.target.checked)}
+                />
+                Keep revision number
+              </label>
+            )}
             {!initial.new && (
               <button
                 onClick={async () => {
@@ -1060,7 +1292,7 @@ export function ArtifactEditor({
               </label>
               <label>
                 Destination signature
-                <select
+                <Select
                   aria-label="Destination signature"
                   required
                   value={destination}
@@ -1072,7 +1304,7 @@ export function ArtifactEditor({
                       {row.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             </div>
             <div className="dialog-footer">

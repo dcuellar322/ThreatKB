@@ -1,3 +1,5 @@
+import { CodeEditor } from "./CodeEditor";
+import { Select } from "./Select";
 import { useState, useEffect } from "react";
 import {
   FileCode2,
@@ -112,18 +114,24 @@ export function Content({ version, notify, refresh }: any) {
         <Dialog
           wide
           title="Repository settings"
+          dirty={config.yaml !== config.original}
           onClose={() => setConfig(null)}
         >
           <div className="dialog-body">
             <label>
               Content definition
-              <select
+              <Select
                 aria-label="Content definition"
                 value={config.name}
                 onChange={async (e) => {
+                  if (
+                    config.yaml !== config.original &&
+                    !confirm("Discard unsaved changes?")
+                  )
+                    return;
                   const name = e.target.value;
                   const value = await api("/content/config/" + name);
-                  setConfig({ name, yaml: value.yaml });
+                  setConfig({ name, yaml: value.yaml, original: value.yaml });
                 }}
               >
                 {[
@@ -137,20 +145,31 @@ export function Content({ version, notify, refresh }: any) {
                 ].map((name) => (
                   <option key={name}>{name}</option>
                 ))}
-              </select>
+              </Select>
             </label>
-            <label>
-              YAML definition
-              <textarea
-                aria-label="YAML definition"
+            <div className="field ">
+              <span>YAML definition</span>
+              <CodeEditor
+                mode="yaml"
+                label="YAML definition"
                 className="code-input yaml-editor"
                 value={config.yaml}
                 onChange={(e) => setConfig({ ...config, yaml: e.target.value })}
               />
-            </label>
+            </div>
           </div>
           <div className="dialog-footer">
-            <button onClick={() => setConfig(null)}>Close</button>
+            <button
+              onClick={() => {
+                if (
+                  config.yaml === config.original ||
+                  confirm("Discard unsaved changes?")
+                )
+                  setConfig(null);
+              }}
+            >
+              Close
+            </button>
             <button
               className="primary"
               onClick={async () => {
@@ -198,7 +217,11 @@ export function Content({ version, notify, refresh }: any) {
               setEdit(null);
               setNewName(null);
               const value = await api("/content/config/macros");
-              setConfig({ name: "macros", yaml: value.yaml });
+              setConfig({
+                name: "macros",
+                yaml: value.yaml,
+                original: value.yaml,
+              });
             }}
           >
             Repository settings
@@ -207,7 +230,7 @@ export function Content({ version, notify, refresh }: any) {
             <CheckCircle2 size={16} />
             Validate content
           </button>
-          <select
+          <Select
             aria-label="Content pack type"
             value={pack}
             onChange={(e) => setPack(e.target.value)}
@@ -215,7 +238,7 @@ export function Content({ version, notify, refresh }: any) {
             <option value="sigpack">Sigpack</option>
             <option value="feedpack">Feedpack</option>
             <option value="codepack">Codepack</option>
-          </select>
+          </Select>
           <button className="primary" onClick={() => action("build_content")}>
             <Package size={16} />
             Build {pack}
@@ -233,7 +256,7 @@ export function Content({ version, notify, refresh }: any) {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <select
+          <Select
             aria-label="Policy group"
             value={group}
             onChange={(e) => setGroup(e.target.value)}
@@ -241,7 +264,7 @@ export function Content({ version, notify, refresh }: any) {
             {Object.keys(data.groups).map((g) => (
               <option key={g}>{g}</option>
             ))}
-          </select>
+          </Select>
         </div>
         <div className="table-scroll">
           <table>
@@ -402,16 +425,17 @@ export function Content({ version, notify, refresh }: any) {
           onClose={() => setEdit(null)}
         >
           <div className="dialog-body">
-            <label>
-              Signature YAML
-              <textarea
-                aria-label="Signature YAML"
+            <div className="field ">
+              <span>Signature YAML</span>
+              <CodeEditor
+                mode="yaml"
+                label="Signature YAML"
                 className="code-input yaml-editor"
                 spellCheck={false}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
               />
-            </label>
+            </div>
             <h3>Git history</h3>
             {edit.history.map((h: string) => (
               <pre className="history-line" key={h}>
