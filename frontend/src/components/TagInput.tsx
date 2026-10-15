@@ -109,6 +109,7 @@ export function TagInput({
         <input
           ref={input}
           aria-label={label}
+          data-pending-entry={query.trim() ? "true" : undefined}
           role="combobox"
           aria-expanded={focused && matches.length > 0}
           aria-autocomplete="list"

@@ -62,7 +62,11 @@ export function ArtifactEditor({
       rows.findIndex((row) => row.revision === revision.revision) === index,
   );
   const close = () => {
-    if (!busy && (!dirty || confirm("Discard unsaved changes?"))) onClose();
+    const pending = document
+      .getElementById("artifact-form")
+      ?.querySelector('[data-pending-entry="true"]');
+    if (!busy && (!(dirty || pending) || confirm("Discard unsaved changes?")))
+      onClose();
   };
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {

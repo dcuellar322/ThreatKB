@@ -1,5 +1,5 @@
 import { date } from "../lib/format";
-import { useEffect, useRef, useState, useId } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useId } from "react";
 import { X, Loader2, Maximize2, Minimize2 } from "lucide-react";
 
 export function Badge({ value }: any) {
@@ -48,6 +48,12 @@ export function Loading() {
 }
 let dialogLocks = 0;
 let previousOverflow = "";
+const dialogDrafts = new Map<
+  HTMLDialogElement,
+  { dirty: boolean; busy: boolean }
+>();
+const pendingInput = (element: Element | null) =>
+  !!element?.querySelector('[data-pending-entry="true"]');
 
 export function Dialog({
   title,
@@ -61,7 +67,11 @@ export function Dialog({
   const heading = useId();
   const [expanded, setExpanded] = useState(false);
   const close = () => {
-    if (!busy && (!dirty || window.confirm("Discard unsaved changes?")))
+    if (
+      !busy &&
+      (!(dirty || pendingInput(ref.current)) ||
+        window.confirm("Discard unsaved changes?"))
+    )
       onClose();
   };
   useEffect(() => {
@@ -82,18 +92,25 @@ export function Dialog({
       });
     };
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const element = ref.current!;
+    dialogDrafts.set(element, { dirty, busy });
     const topmost = () =>
       [...document.querySelectorAll("dialog[open]")].at(-1) === ref.current;
     const navigate = (event: Event) => {
+      const drafts = [...dialogDrafts.entries()];
+      const blocked = drafts.some(([, state]) => state.busy);
+      const unsaved = drafts.some(
+        ([dialog, state]) => state.dirty || pendingInput(dialog),
+      );
       if (
         topmost() &&
-        (busy || (dirty && !window.confirm("Discard unsaved changes?")))
+        (blocked || (unsaved && !window.confirm("Discard unsaved changes?")))
       )
         event.preventDefault();
     };
     const unload = (event: BeforeUnloadEvent) => {
-      if (dirty || busy) {
+      if (dirty || busy || pendingInput(element)) {
         event.preventDefault();
         event.returnValue = "";
       }
@@ -101,6 +118,7 @@ export function Dialog({
     window.addEventListener("threatkb:before-navigate", navigate);
     window.addEventListener("beforeunload", unload);
     return () => {
+      dialogDrafts.delete(element);
       window.removeEventListener("threatkb:before-navigate", navigate);
       window.removeEventListener("beforeunload", unload);
     };
