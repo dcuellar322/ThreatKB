@@ -53,7 +53,7 @@ def seed_database(user_id, rules=2500, ips=10000, domains=5000, tasks=400, conte
             snapshot = {**values, "id": rule_id, "creation_date": timestamp.isoformat(),
                         "last_revision_date": timestamp.isoformat(), "metadata": {}, "metadata_values": {}}
             db.session.add(Yara_rule_history(yara_rule_id=rule_id, revision=1, user_id=user_id,
-                                             state=state, rule_json=json.dumps(snapshot)))
+                                             state=state, date_created=timestamp, rule_json=json.dumps(snapshot)))
             db.session.execute(ActivityLog.__table__.insert().values(activity_type="ARTIFACT_CREATED",
                 activity_text=name, activity_date=timestamp, entity_type=1, entity_id=rule_id, user_id=user_id))
             added["rules"] += 1
