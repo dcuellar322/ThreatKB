@@ -22,7 +22,7 @@ class C2ip(db.Model):
     date_created = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
     date_modified = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp(),
                               onupdate=db.func.current_timestamp())
-    ip = db.Column(db.String(15), index=True, unique=True)
+    ip = db.Column(db.String(45), index=True, unique=True)
     asn = db.Column(db.String(128))
     country = db.Column(db.String(64))
     state = db.Column(db.String(32), index=True)
@@ -233,6 +233,10 @@ class C2ip(db.Model):
 
 @listens_for(C2ip, "before_insert")
 def run_against_whitelist(mapper, connect, target):
+    try:
+        target.ip = str(IPAddress(target.ip))
+    except ValueError:
+        abort(412, description=f"Invalid IP address: {target.ip}")
     if Whitelist.hits_whitelist(target.ip, target.state):
         abort(412, f"Failed whitelist validation {target.ip}")
 

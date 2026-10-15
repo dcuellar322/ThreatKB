@@ -48,7 +48,7 @@ class Whitelist(db.Model):
         whitelist_states = Cfg_settings.get_setting("WHITELIST_STATES")
 
         if not whitelist_enabled or not strtobool(whitelist_enabled) or not whitelist_states:
-            return True
+            return False
 
         states = []
 

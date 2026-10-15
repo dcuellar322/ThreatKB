@@ -8,6 +8,7 @@ from app.compat import strtobool
 from app.models.whitelist import Whitelist
 import datetime
 import json
+from ipaddress import ip_address
 
 
 #####################################################################
@@ -43,6 +44,7 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
     for artifact in artifacts:
         try:
             if artifact["type"].lower() == "ip" and extract_ip:
+                artifact["artifact"] = str(ip_address(artifact["artifact"]))
 
                 # old_ip = c2ip.C2ip.query.filter(c2ip.C2ip.ip == artifact["artifact"]).first()
                 old_ip = ip_addresses.get(artifact["artifact"], None)
@@ -189,6 +191,7 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
                 return_artifacts.append(yr)
                 fields_to_add[yr] = fta
         except Exception as e:
+            db.session.rollback()
             app.logger.exception(e)
             if type(e) == UnicodeEncodeError:
                 error_artifacts.append((artifact, "Unicode error: %s" % e.reason))
