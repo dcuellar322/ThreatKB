@@ -1,4 +1,4 @@
-# Resolve stable releases published no later than 2026-10-05 (ten-day age gate).
+# Resolve stable releases published no later than 2026-10-05T00:00:00Z (ten-day age gate).
 Flask
 Flask-Bcrypt
 Flask-Caching
@@ -20,6 +20,7 @@ PyYAML
 jsonschema
 Jinja2
 packaging
-delegator.py
 pytest
 waitress
+setuptools
+ruff

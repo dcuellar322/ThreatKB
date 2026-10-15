@@ -1,0 +1,352 @@
+[
+  {
+    "name": "@oxc-project/types",
+    "version": "0.152.0",
+    "published": "2026-09-28T09:49:19.368Z"
+  },
+  {
+    "name": "@rolldown/binding-android-arm-eabi",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:35:33.262Z"
+  },
+  {
+    "name": "@rolldown/binding-android-arm64",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:34:52.399Z"
+  },
+  {
+    "name": "@rolldown/binding-darwin-arm64",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:33:49.362Z"
+  },
+  {
+    "name": "@rolldown/binding-darwin-x64",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:35:08.056Z"
+  },
+  {
+    "name": "@rolldown/binding-freebsd-x64",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:38:13.043Z"
+  },
+  {
+    "name": "@rolldown/binding-linux-arm-gnueabihf",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:34:48.480Z"
+  },
+  {
+    "name": "@rolldown/binding-linux-arm64-gnu",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:34:43.225Z"
+  },
+  {
+    "name": "@rolldown/binding-linux-arm64-musl",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:34:56.001Z"
+  },
+  {
+    "name": "@rolldown/binding-linux-ppc64-gnu",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:39:40.161Z"
+  },
+  {
+    "name": "@rolldown/binding-linux-s390x-gnu",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:37:43.336Z"
+  },
+  {
+    "name": "@rolldown/binding-linux-x64-gnu",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:35:50.441Z"
+  },
+  {
+    "name": "@rolldown/binding-linux-x64-musl",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:36:27.963Z"
+  },
+  {
+    "name": "@rolldown/binding-openharmony-arm64",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:35:57.709Z"
+  },
+  {
+    "name": "@rolldown/binding-win32-arm64-msvc",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:34:36.404Z"
+  },
+  {
+    "name": "@rolldown/binding-win32-x64-msvc",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:35:12.522Z"
+  },
+  {
+    "name": "@rolldown/pluginutils",
+    "version": "1.0.1",
+    "published": "2026-05-13T03:52:29.927Z"
+  },
+  {
+    "name": "@types/react",
+    "version": "19.3.0",
+    "published": "2026-09-09T18:08:49.750Z"
+  },
+  {
+    "name": "@types/react-dom",
+    "version": "19.3.0",
+    "published": "2026-09-09T18:07:51.886Z"
+  },
+  {
+    "name": "@typescript/typescript-aix-ppc64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:49:32.839Z"
+  },
+  {
+    "name": "@typescript/typescript-darwin-arm64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:49:36.897Z"
+  },
+  {
+    "name": "@typescript/typescript-darwin-x64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:49:40.886Z"
+  },
+  {
+    "name": "@typescript/typescript-freebsd-arm64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:49:45.020Z"
+  },
+  {
+    "name": "@typescript/typescript-freebsd-x64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:49:49.189Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-arm",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:49:53.075Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-arm64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:49:57.270Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-loong64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:01.501Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-mips64el",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:05.178Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-ppc64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:09.539Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-riscv64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:13.357Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-s390x",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:17.275Z"
+  },
+  {
+    "name": "@typescript/typescript-linux-x64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:21.639Z"
+  },
+  {
+    "name": "@typescript/typescript-netbsd-arm64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:25.229Z"
+  },
+  {
+    "name": "@typescript/typescript-netbsd-x64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:29.798Z"
+  },
+  {
+    "name": "@typescript/typescript-openbsd-arm64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:33.600Z"
+  },
+  {
+    "name": "@typescript/typescript-openbsd-x64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:37.789Z"
+  },
+  {
+    "name": "@typescript/typescript-sunos-x64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:41.700Z"
+  },
+  {
+    "name": "@typescript/typescript-win32-arm64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:45.825Z"
+  },
+  {
+    "name": "@typescript/typescript-win32-x64",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:50:50.403Z"
+  },
+  {
+    "name": "@vitejs/plugin-react",
+    "version": "6.1.1",
+    "published": "2026-08-28T03:30:56.619Z"
+  },
+  {
+    "name": "csstype",
+    "version": "3.2.3",
+    "published": "2025-11-17T11:42:27.045Z"
+  },
+  {
+    "name": "detect-libc",
+    "version": "2.1.2",
+    "published": "2025-10-05T12:46:33.077Z"
+  },
+  {
+    "name": "fdir",
+    "version": "6.5.0",
+    "published": "2025-08-14T16:56:03.948Z"
+  },
+  {
+    "name": "fsevents",
+    "version": "2.3.3",
+    "published": "2023-08-21T16:24:22.854Z"
+  },
+  {
+    "name": "lightningcss",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:11:09.509Z"
+  },
+  {
+    "name": "lightningcss-android-arm64",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:36.404Z"
+  },
+  {
+    "name": "lightningcss-darwin-arm64",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:38.380Z"
+  },
+  {
+    "name": "lightningcss-darwin-x64",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:40.758Z"
+  },
+  {
+    "name": "lightningcss-freebsd-x64",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:43.067Z"
+  },
+  {
+    "name": "lightningcss-linux-arm-gnueabihf",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:45.198Z"
+  },
+  {
+    "name": "lightningcss-linux-arm64-gnu",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:47.355Z"
+  },
+  {
+    "name": "lightningcss-linux-arm64-musl",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:49.830Z"
+  },
+  {
+    "name": "lightningcss-linux-x64-gnu",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:52.507Z"
+  },
+  {
+    "name": "lightningcss-linux-x64-musl",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:54.935Z"
+  },
+  {
+    "name": "lightningcss-win32-arm64-msvc",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:57.219Z"
+  },
+  {
+    "name": "lightningcss-win32-x64-msvc",
+    "version": "1.33.0",
+    "published": "2026-07-20T05:10:59.727Z"
+  },
+  {
+    "name": "lucide-react",
+    "version": "1.52.0",
+    "published": "2026-10-04T08:17:01.328Z"
+  },
+  {
+    "name": "nanoid",
+    "version": "3.3.19",
+    "published": "2026-09-10T18:00:48.080Z"
+  },
+  {
+    "name": "picocolors",
+    "version": "1.1.1",
+    "published": "2024-10-16T18:20:03.921Z"
+  },
+  {
+    "name": "picomatch",
+    "version": "4.0.7",
+    "published": "2026-08-24T14:36:23.690Z"
+  },
+  {
+    "name": "postcss",
+    "version": "8.5.28",
+    "published": "2026-09-03T15:13:59.819Z"
+  },
+  {
+    "name": "prettier",
+    "version": "3.9.9",
+    "published": "2026-09-23T06:31:34.693Z"
+  },
+  {
+    "name": "react",
+    "version": "19.3.0",
+    "published": "2026-09-09T17:21:30.071Z"
+  },
+  {
+    "name": "react-dom",
+    "version": "19.3.0",
+    "published": "2026-09-09T17:17:39.744Z"
+  },
+  {
+    "name": "rolldown",
+    "version": "1.2.12",
+    "published": "2026-09-30T14:43:47.669Z"
+  },
+  {
+    "name": "scheduler",
+    "version": "0.28.0",
+    "published": "2026-09-09T17:17:30.281Z"
+  },
+  {
+    "name": "source-map-js",
+    "version": "1.2.2",
+    "published": "2026-09-30T14:08:09.382Z"
+  },
+  {
+    "name": "tinyglobby",
+    "version": "0.2.17",
+    "published": "2026-05-30T19:57:21.717Z"
+  },
+  {
+    "name": "typescript",
+    "version": "7.0.2",
+    "published": "2026-07-08T15:55:18.431Z"
+  },
+  {
+    "name": "vite",
+    "version": "8.3.2",
+    "published": "2026-10-01T10:17:44.767Z"
+  }
+]
