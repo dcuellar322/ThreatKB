@@ -46,3 +46,7 @@ not automatically closed, and unlisted issues remain outstanding.
 | #249 | Login restores the requested local route after authentication, clears the saved destination, and returns expired sessions to the login form while preserving the current route. Actual browser login entered the workbench successfully; API invalid-credential regressions pass. |
 | #405 | Each attachment has its own checkbox keyed by persistent file ID, with functional selection updates and a selected-file count. Real browser verification uploaded two files, selected only the first, and deleted it while the second stayed available. The backend two-file deletion regression also passes. |
 | #501 | Record tables provide a persistent Expand text control with an accessible pressed state; expanded cells wrap complete text and remove clipping. Record dialogs expose full source and metadata for editing. Browser verification toggled the table from compact to expanded mode; long values remain available without editing or exporting the record. |
+
+Final bulk-edit review also found legacy category-range reassignment in the batch
+path. The #505 follow-up removes it and verifies that both EventID and UUID stay
+stable when changing a category in bulk.
