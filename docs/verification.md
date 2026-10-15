@@ -69,3 +69,10 @@ GitHub push and PR workflows both passed at commit `5700089`, including the full
 image build, regressions and all three independent pack pipelines. Browser Git
 authoring created and updated a draft as separate commits in the development
 content repository.
+
+Final follow-ups preserve EventID/UUID during bulk category changes and separate
+positive/negative histories. Real queued tests of the browser-created signature
+matched its attached positive sample and passed all 25 goodware files. The mobile
+pass also verified Escape closes navigation, hidden navigation is inert, and the
+390 px page has no horizontal overflow. Failed-login feedback and return to the
+requested Tasks route were exercised in the browser.
