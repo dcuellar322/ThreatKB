@@ -158,7 +158,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
   ]);
   useEffect(() => {
     setSelected(new Set());
-  }, [page, index, size, query, debounced, view, filters, sort, direction]);
+  }, [page, index, size, query, debounced, view, filters, operator, sort, direction]);
   useEffect(() => {
     if (allRef.current)
       allRef.current.indeterminate =
