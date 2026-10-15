@@ -498,10 +498,9 @@ export function Records({ page, version, notify, refresh, user }: any) {
               <summary>Columns</summary>
               <div>
                 {[
-                  ["owner", "Owner"],
+                  ...(editable ? [["owner", "Owner"], ["tags", "Tags"]] : []),
                   ...(page === "yara_rules" ? [["category", "Category"]] : []),
-                  ["tags", "Tags"],
-                  ["updated", "Updated"],
+                  ["updated", page === "releases" ? "Created" : "Updated"],
                   ...definitions.map((d) => ["metadata:" + d.key, d.key]),
                 ].map(([value, label]) => (
                   <label key={value}>
