@@ -904,7 +904,7 @@ export function ImportForm({ notify }: any) {
                   "/whitelist/import-misp",
                   JSON.parse(misp),
                 );
-                notify(r.imported + " warninglist entries imported.");
+                notify(r.added + " warninglist entries imported.");
               } catch (e: any) {
                 notify(e.message, true);
               }
