@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Eye,
   Search,
   Trash2,
 } from "lucide-react";
@@ -13,6 +14,7 @@ import { recordLink } from "../lib/links";
 import { Badge, Dialog, Empty, IconButton, Loading } from "./ui";
 import { Select } from "./Select";
 import { UploadFiles } from "./UploadFiles";
+import { ErrorDetails } from "./ErrorDetails";
 
 export function LegacyTools({ page, version, notify, user }: any) {
   const [rows, setRows] = useState<any[] | null>(null),
@@ -278,7 +280,8 @@ export function LegacyTools({ page, version, notify, user }: any) {
                           )}
                         </div>
                       ) : (
-                        <button
+                        <IconButton
+                          label={`View ${page === "errors" ? "error" : "test"} ${row.id} details`}
                           onClick={async () => {
                             try {
                               setDetail(await api("/" + page + "/" + row.id));
@@ -287,8 +290,8 @@ export function LegacyTools({ page, version, notify, user }: any) {
                             }
                           }}
                         >
-                          Details
-                        </button>
+                          <Eye size={16} />
+                        </IconButton>
                       )}
                     </td>
                   </tr>
@@ -414,17 +417,7 @@ export function LegacyTools({ page, version, notify, user }: any) {
                 </div>
               </>
             ) : (
-              <>
-                <dl className="detail-grid">
-                  <dt>User</dt>
-                  <dd>{detail.user?.email}</dd>
-                  <dt>Date</dt>
-                  <dd>{date(detail.date_created)}</dd>
-                  <dt>Arguments</dt>
-                  <dd>{detail.args || "—"}</dd>
-                </dl>
-                <pre className="source-preview">{detail.stacktrace}</pre>
-              </>
+              <ErrorDetails error={detail} notify={notify} />
             )}
           </div>
           <div className="dialog-footer">
