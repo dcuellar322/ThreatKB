@@ -91,3 +91,13 @@ The October 2026 follow-up passes **71 tests locally and in the production Docke
 The subsequent UI capability comparison against upstream `rc` is recorded in [ui-parity-2026-10-15.md](ui-parity-2026-10-15.md). It restores missing permalink, searchable-control, tag, editor, revision, file, profile and overview workflows. The backend suite now passes 74 tests locally and in the production Docker image; all 87 locked frontend packages meet the original release-age cutoff.
 
 The subsequent form/data-presentation audit is documented in [ui-audit-2026-10-15.md](ui-audit-2026-10-15.md). It includes screenshots of every page and application-dialog family at desktop/mobile widths, isolated CRUD/import/scan/revision/account browser checks, and fixes for selection races, pending chip saves, stale dialog navigation and sample-row presentation. The local backend suite remains at 74 passing tests.
+
+
+## Final end-to-end workflow pass
+
+The subsequent [browser workflow audit](browser-e2e-2026-10-15.md) records the
+full filters/sorting/pagination, artifact, configuration, account, content and
+release checks, plus the fixes found while exercising them. All 80 backend tests
+and the frontend production build pass. Main development processes have been
+restarted with the verified code and the additive task-tag migration; destructive
+browser checks remain confined to the separate QA instance.
