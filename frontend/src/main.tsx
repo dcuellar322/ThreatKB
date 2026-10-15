@@ -1435,11 +1435,7 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
                   aria-label={"Select file " + file.filename}
                   checked={chosen.has(file.id)}
                   onChange={() => {
-                    const next = new Set(chosen);
-                    next.has(file.id)
-                      ? next.delete(file.id)
-                      : next.add(file.id);
-                    setChosen(next);
+                    setChosen(previous=>{const next=new Set(previous);next.has(file.id)?next.delete(file.id):next.add(file.id);return next;});
                   }}
                 />
                 <FileCode2 size={18} />
@@ -1447,7 +1443,7 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
                   {file.filename}
                   <small>{file.sha256 || file.sha1}</small>
                 </span>
-                <a href={base + "/files/" + file.id}>
+                <a aria-label={"Download " + file.filename} href={base + "/files/" + file.id}>
                   <Download size={16} />
                 </a>
               </label>
