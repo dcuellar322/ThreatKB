@@ -21,9 +21,11 @@ def get_all_metadata():
         return Response(json.dumps([metadata.Metadata.get_metadata_dict(filter.upper())]), mimetype="application/json")
 
     q = metadata.Metadata.query
-    q = q.filter_by(active=active_only)
+    from app.compat import strtobool
+    if strtobool(active_only):
+        q = q.filter_by(active=True)
     if artifact_type:
-        q = q.filter_by(artifact_type == artifact_type)
+        q = q.filter_by(artifact_type=int(artifact_type))
 
     if filter:
         return Response(json.dumps([entity.to_dict() for entity in q.all() if entity.to_dict()["type"] == filter]),
@@ -74,7 +76,7 @@ def create_metadata():
         , artifact_type=request.json['artifact_type']
         , type_=type_
         , default=default
-        , show_in_table=0
+        , show_in_table=int(bool(request.json.get('show_in_table', 0)))
         , required=request.json.get("required", 0)
         , export_with_release=request.json.get("export_with_release", 1)
         , created_user_id=current_user.id
@@ -87,6 +89,15 @@ def create_metadata():
     db.session.commit()
 
     return jsonify(entity.to_dict()), 201
+
+
+@app.get('/ThreatKB/metadata/columns')
+@login_required
+def metadata_table_columns():
+    artifact_type = request.args.get('artifact_type', 1, type=int)
+    fields = metadata.Metadata.query.filter_by(artifact_type=artifact_type, active=True, show_in_table=1).order_by(
+        metadata.Metadata.key).all()
+    return jsonify([field.to_dict() for field in fields])
 
 
 @app.put('/ThreatKB/metadata/<int:id>')
