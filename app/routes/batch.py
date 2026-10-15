@@ -11,7 +11,7 @@ from app.routes.tags_mapping import batch_create_tags_mapping, batch_delete_tags
 def batch_delete(batch, artifact, session, entity_mapping, is_yara=False):
     if 'ids' in batch and batch['ids']:
         for b in batch['ids']:
-            entity = artifact.query.get(b)
+            entity = session.get(artifact, b)
             if not entity:
                 abort(404)
             if not current_user.admin and entity.owner_user_id != current_user.id:

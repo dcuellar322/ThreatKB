@@ -1437,7 +1437,13 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
                   aria-label={"Select file " + file.filename}
                   checked={chosen.has(file.id)}
                   onChange={() => {
-                    setChosen(previous=>{const next=new Set(previous);next.has(file.id)?next.delete(file.id):next.add(file.id);return next;});
+                    setChosen((previous) => {
+                      const next = new Set(previous);
+                      next.has(file.id)
+                        ? next.delete(file.id)
+                        : next.add(file.id);
+                      return next;
+                    });
                   }}
                 />
                 <FileCode2 size={18} />
@@ -1445,7 +1451,10 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
                   {file.filename}
                   <small>{file.sha256 || file.sha1}</small>
                 </span>
-                <a aria-label={"Download " + file.filename} href={base + "/files/" + file.id}>
+                <a
+                  aria-label={"Download " + file.filename}
+                  href={base + "/files/" + file.id}
+                >
                   <Download size={16} />
                 </a>
               </label>
@@ -2277,6 +2286,22 @@ function Configuration({ notify, refresh }: any) {
           >
             <GitBranch size={16} />
             Export legacy signatures to Git
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const r = await write("/content/export-indicators", {});
+                notify(
+                  r.exported +
+                    " reviewed indicators exported to Feedpack source.",
+                );
+              } catch (e: any) {
+                notify(e.message, true);
+              }
+            }}
+          >
+            <GitBranch size={16} />
+            Export released indicators to Git
           </button>
         </div>
       </section>

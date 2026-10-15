@@ -1882,4 +1882,9 @@ th {
   font-size: 12px;
 }
 
-.wrap .long-text, .wrap .record-name small {overflow:visible;text-overflow:clip;white-space:pre-wrap;}
+.wrap .long-text,
+.wrap .record-name small {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: pre-wrap;
+}

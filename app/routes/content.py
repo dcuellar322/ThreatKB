@@ -505,3 +505,37 @@ from yaml import YAMLError
 @app.errorhandler(YAMLError)
 def content_validation_error(error):
     return jsonify(error=str(error)), 422
+
+
+@app.post("/ThreatKB/content/export-indicators")
+@login_required
+@admin_only()
+def export_legacy_indicators():
+    from app.models.c2ip import C2ip
+    from app.models.c2dns import C2dns
+    from app.models.cfg_states import Cfg_states
+    from uuid import uuid5, NAMESPACE_URL
+
+    repository()
+    released = Cfg_states.query.filter_by(is_release_state=1).first()
+    if not released:
+        abort(409, description="Configure a release state first.")
+    values = []
+    for model, kind, key in ((C2ip, "ip", "ip"), (C2dns, "domain", "domain_name")):
+        for entity in model.query.filter_by(active=True, state=released.state):
+            values.append(
+                {
+                    "id": str(uuid5(NAMESPACE_URL, f"threatkb:{kind}:{entity.id}")),
+                    "type": kind,
+                    "value": getattr(entity, key),
+                    "status": "released",
+                    "groups": ["default"],
+                    "source": "legacy-threatkb",
+                }
+            )
+    commit_file(
+        content_root() / "indicators.yaml",
+        yaml.safe_dump(values, sort_keys=False),
+        "Export reviewed legacy indicators to independent Feedpack source",
+    )
+    return jsonify(exported=len(values))
