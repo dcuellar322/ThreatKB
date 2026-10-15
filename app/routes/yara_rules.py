@@ -36,6 +36,24 @@ def restore_yara_rule(id):
     return jsonify(entity.to_dict(short=True))
 
 
+@app.post('/ThreatKB/yara_rules/<int:id>/revisions/<int:revision>/restore')
+@login_required
+def restore_signature_revision(id, revision):
+    entity = db.get_or_404(Yara_rule, id)
+    if not current_user.admin and entity.owner_user_id != current_user.id:
+        abort(403)
+    snapshot = Yara_rule_history.query.filter_by(yara_rule_id=id, revision=revision).first_or_404()
+    import json
+    data = json.loads(snapshot.rule_json)
+    data['owner_user_id'] = entity.owner_user_id
+    data.pop('owner_user', None)
+    data['active'] = entity.active
+    data['new_comment'] = f'Restored signature content from revision {revision}.'
+    from app.signature_service import save_signature
+    restored, changed = save_signature(data, entity)
+    return jsonify(restored.to_dict(include_yara_rule_string=True))
+
+
 @app.route('/ThreatKB/yara_rules/merge_signatures', methods=['POST'])
 def merge_signatures():
     signatures = request.json.get('signatures', [])
