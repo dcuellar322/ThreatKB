@@ -1911,3 +1911,16 @@ th {
     flex-shrink: 0;
   }
 }
+
+.review-comment {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.review-comment p {
+  margin: 0 0 5px;
+}
+.review-comment small {
+  color: var(--muted);
+}

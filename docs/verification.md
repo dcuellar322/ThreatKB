@@ -57,10 +57,15 @@ improvement requires real usage and is measured rather than asserted.
 
 ## Final local pass
 
-The full Python suite passed 48 tests without warnings after ORM/API modernization.
-The additional legacy-to-Feedpack selection/export regression passed separately.
+The final container suite passed all 49 tests without warnings, including Git
+authoring, immutable UUIDs, review gates and legacy-to-Feedpack selection/export.
 `uv pip check` reports all 70 installed packages compatible. TypeScript checking and
 production bundling pass. Desktop (1440 px) and mobile (390 px) screenshots were
 inspected; the final visual pass corrected a collapsed mobile heading, enlarged
 touch/input controls and removed hidden navigation from keyboard focus. Generated
 screenshots remain in ignored `output/playwright`.
+
+GitHub push and PR workflows both passed at commit `5700089`, including the full
+image build, regressions and all three independent pack pipelines. Browser Git
+authoring created and updated a draft as separate commits in the development
+content repository.

@@ -173,15 +173,12 @@ function Login({ onLogin, notify }: any) {
         <div>
           <span className="eyebrow">DETECTION ENGINEERING</span>
           <h1>
-            From a signal
-            <br />
-            to a stronger
-            <br />
+            From a signal <br />
+            to a stronger <br />
             <em>defense.</em>
           </h1>
           <p>
-            Your signatures, intelligence and release workflows.
-            <br />
+            Your signatures, intelligence and release workflows. <br />
             One focused workspace.
           </p>
         </div>
@@ -236,8 +233,7 @@ function Login({ onLogin, notify }: any) {
             </button>
           </form>
           <p className="help">
-            Need access? An administrator can recover your account with the
-            local admin command.
+            Need access? Contact your workspace administrator.
           </p>
         </div>
       </section>
@@ -1127,6 +1123,7 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
   const [value, setValue] = useState<any>(initial),
     [tab, setTab] = useState("Content"),
     [states, setStates] = useState<any[]>([]),
+    [definitions, setDefinitions] = useState<any[]>([]),
     [users, setUsers] = useState<any[]>([]),
     [busy, setBusy] = useState(false),
     [files, setFiles] = useState<any[]>(initial.files || []),
@@ -1152,12 +1149,15 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
         (r) => setFollowing(r.length > 0),
       );
     }
+    const artifactType = (
+      { yara_rules: 1, c2dns: 2, c2ips: 3, tasks: 4 } as any
+    )[page];
+    if (artifactType)
+      api("/metadata?artifact_type=" + artifactType).then(setDefinitions);
     api("/cfg_states").then(setStates);
     api("/users").then((r) => setUsers(r.filter((u: any) => u.id)));
     if (isRule && !initial.new) {
-      api("/yara_rules/" + initial.id + "/sample-results?show_all=true").then(
-        setResults,
-      );
+      api("/yara_rules/" + initial.id + "/sample-results").then(setResults);
       api("/files?entity_type=1&entity_id=" + initial.id).then(setFiles);
     }
   }, []);
@@ -1342,27 +1342,61 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
                       }
                     />
                   </label>
-                  {Object.entries(value.metadata_values || {}).map(
-                    ([name, item]: any) => (
-                      <label key={name}>
-                        {name}
-                        <input
-                          value={item?.value ?? ""}
-                          onChange={(e) =>
-                            field("metadata_values", {
-                              ...value.metadata_values,
-                              [name]: { ...item, value: e.target.value },
-                            })
-                          }
-                        />
-                      </label>
-                    ),
-                  )}
+                  {definitions
+                    .filter((d: any) => d.active)
+                    .map((definition: any) => {
+                      const item = value.metadata_values?.[definition.key];
+                      const change = (v: any) =>
+                        field("metadata_values", {
+                          ...value.metadata_values,
+                          [definition.key]: { ...item, value: v },
+                        });
+                      return (
+                        <label key={definition.id}>
+                          {definition.key}
+                          {definition.choices?.length ? (
+                            <select
+                              value={item?.value ?? definition.default ?? ""}
+                              onChange={(e) => change(e.target.value)}
+                            >
+                              <option value="">Choose a value</option>
+                              {definition.choices.map((c: any) => (
+                                <option key={c.id} value={c.choice}>
+                                  {c.choice}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              required={!!definition.required}
+                              value={item?.value ?? definition.default ?? ""}
+                              type={
+                                definition.type === "number" ? "number" : "text"
+                              }
+                              onChange={(e) => change(e.target.value)}
+                            />
+                          )}
+                        </label>
+                      );
+                    })}
                   <div className="span2">
                     {isRule && !initial.new && (
                       <ConfidenceSchedule ruleId={initial.id} notify={notify} />
                     )}
                   </div>
+                  {!!initial.comments?.length && (
+                    <section className="span2">
+                      <h3>Review discussion</h3>
+                      {initial.comments.map((comment: any) => (
+                        <article className="review-comment" key={comment.id}>
+                          <p>{comment.comment}</p>
+                          <small>
+                            {comment.user?.email} · {date(comment.date_created)}
+                          </small>
+                        </article>
+                      ))}
+                    </section>
+                  )}
                   <label className="span2">
                     Draft comment <small>Saved with your changes</small>
                     <textarea
@@ -1514,7 +1548,49 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
                 Run sample test
               </button>
             </div>
-            <h3>Match history</h3>
+            <button
+              onClick={async () => {
+                try {
+                  const r = await write("/jobs", {
+                    kind: "test_rule",
+                    payload: { rule_id: initial.id, negative: true },
+                  });
+                  notify("Goodware test queued: " + r.id.slice(0, 8));
+                } catch (e: any) {
+                  notify(e.message, true);
+                }
+              }}
+            >
+              Run goodware test
+            </button>
+            <div className="section-top">
+              <h3>Match history</h3>
+              <button
+                onClick={async () =>
+                  setResults(
+                    await api("/yara_rules/" + initial.id + "/sample-results"),
+                  )
+                }
+              >
+                Refresh outcomes
+              </button>
+            </div>
+            <label className="check-label">
+              <input
+                type="checkbox"
+                onChange={async (e) =>
+                  setResults(
+                    await api(
+                      "/yara_rules/" +
+                        initial.id +
+                        "/sample-results?show_all=" +
+                        e.target.checked,
+                    ),
+                  )
+                }
+              />
+              Include files that have never matched
+            </label>
             {results?.files?.map((r: any) => (
               <article
                 className={
