@@ -2859,6 +2859,18 @@ label.file-row {
 .error-trace-toolbar .icon-button {
   border-color: transparent;
 }
+.error-copy-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.error-copy-failure {
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+  line-height: 1.5;
+}
 .error-trace {
   margin: 0;
   padding: 14px;

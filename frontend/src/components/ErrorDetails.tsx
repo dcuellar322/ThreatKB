@@ -1,4 +1,5 @@
-import { AlertCircle, Copy } from "lucide-react";
+import { useEffect, useId, useState } from "react";
+import { AlertCircle, Check, Copy } from "lucide-react";
 import { date } from "../lib/format";
 import { IconButton } from "./ui";
 
@@ -15,8 +16,14 @@ function argumentsText(value: any) {
   }
 }
 
-export function ErrorDetails({ error, notify }: any) {
+export function ErrorDetails({ error }: any) {
   const heading = useId();
+  const [copyState, setCopyState] = useState("idle");
+  useEffect(() => {
+    if (copyState !== "copied") return;
+    const timer = setTimeout(() => setCopyState("idle"), 2000);
+    return () => clearTimeout(timer);
+  }, [copyState]);
   const traceback = error.stacktrace || "";
   const summary = traceback
     .trim()
@@ -76,23 +83,35 @@ export function ErrorDetails({ error, notify }: any) {
       <section className="error-trace-panel">
         <div className="error-trace-toolbar">
           <h3 id={heading}>Traceback</h3>
-          <IconButton
-            label="Copy error report"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(report);
-                notify("Error report copied.");
-              } catch {
-                notify(
-                  "Could not copy the report. Select the traceback to copy it manually.",
-                  true,
-                );
-              }
-            }}
-          >
-            <Copy size={16} />
-          </IconButton>
+          <div className="error-copy-action">
+            <span className="muted" role="status">
+              {copyState === "copied" ? "Copied" : ""}
+            </span>
+            <IconButton
+              label="Copy error report"
+              title={copyState === "copied" ? "Copied" : "Copy error report"}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(report);
+                  setCopyState("copied");
+                } catch {
+                  setCopyState("failed");
+                }
+              }}
+            >
+              {copyState === "copied" ? (
+                <Check size={16} />
+              ) : (
+                <Copy size={16} />
+              )}
+            </IconButton>
+          </div>
         </div>
+        {copyState === "failed" && (
+          <p className="error-copy-failure" role="alert">
+            Could not copy the report. Select the traceback to copy it manually.
+          </p>
+        )}
         <pre
           className="error-trace"
           role="region"
@@ -105,4 +124,3 @@ export function ErrorDetails({ error, notify }: any) {
     </div>
   );
 }
-import { useId } from "react";

@@ -417,7 +417,7 @@ export function LegacyTools({ page, version, notify, user }: any) {
                 </div>
               </>
             ) : (
-              <ErrorDetails error={detail} notify={notify} />
+              <ErrorDetails error={detail} />
             )}
           </div>
           <div className="dialog-footer">
