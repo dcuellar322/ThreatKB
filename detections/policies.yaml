@@ -1,12 +1,12 @@
 groups:
   default:
     categories:
-    - '*'
+      - "*"
     collections:
-    - internal
+      - internal
 max_detection_rate: 1000
 promotion_wait_minutes: 30
 require_goodware: true
 require_samples: true
 required_consumers:
-- local
+  - local

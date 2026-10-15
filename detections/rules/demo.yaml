@@ -5,11 +5,11 @@ status: released
 strings: $marker = "THREATKB_DEMO_MARKER"
 condition: $marker
 tags:
-- source:synthetic
-- purpose:verification
+  - source:synthetic
+  - purpose:verification
 references:
   public:
     samples:
-    - aa56108a66ac411627c7f489035833a7b2a82a992c95abf257e0967b88815519
+      - aa56108a66ac411627c7f489035833a7b2a82a992c95abf257e0967b88815519
 testing_strategy:
-- match_all_referenced_samples
+  - match_all_referenced_samples

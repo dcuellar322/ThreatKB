@@ -1,1 +1,12 @@
-{"name":"threatkb","version":"2.0.0","private":true,"scripts":{"dev":"npm --prefix frontend run dev","build":"npm --prefix frontend run build"},"engines":{"node":">=24"}}
+{
+  "name": "threatkb",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -151,3 +151,40 @@ def test_feedpack_is_independent_of_invalid_signature_yaml(tmp_path):
         tmp_path / "builds", kind="feedpack"
     )
     assert manifest["valid"] and manifest["indicators"] == 1
+
+
+def test_promotion_keeps_reviewed_policy_and_exposes_persistent_alarm(tmp_path):
+    root, corpus = content(tmp_path)
+    repo = Repository(root, corpus)
+    manifest = repo.build(tmp_path / "builds")
+    review = {"author": "a", "reviewer": "b", "source_digest": repo.digest()}
+    channels = tmp_path / "channels"
+    start = datetime.now(timezone.utc) - timedelta(minutes=31)
+    repo.publish_testing(manifest, channels, start, review=review)
+    # A later mutable configuration cannot weaken the policy for this release.
+    repo.policy["required_consumers"] = []
+    repo.policy["max_detection_rate"] = 999999
+    with pytest.raises(ContentError, match="Missing telemetry"):
+        repo.promote(channels, "sigpack", "default")
+    report = {
+        "window_start": start.isoformat(),
+        "window_end": datetime.now(timezone.utc).isoformat(),
+        "detections": 0,
+        "errors": 1,
+    }
+    repo.telemetry(channels, "sigpack", "default", manifest["id"], "local", report)
+    with pytest.raises(ContentError, match="alarm"):
+        repo.promote(channels, "sigpack", "default")
+    import json
+
+    state = json.loads((channels / "sigpack/default/testing.json").read_text())
+    assert state["promotion_block"]["alarm"]
+    since = state["promotion_block"]["since"]
+    with pytest.raises(ContentError):
+        repo.promote(channels, "sigpack", "default")
+    assert (
+        json.loads((channels / "sigpack/default/testing.json").read_text())[
+            "promotion_block"
+        ]["since"]
+        == since
+    )

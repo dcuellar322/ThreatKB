@@ -1,5 +1,3 @@
 #!/bin/sh
 set -eu
-.venv/bin/python -m threatkb_content --root detections ids
-git add detections/rules
-.venv/bin/python -m threatkb_content --root detections check --corpus detections/samples --goodware detections/goodware
+exec .venv/bin/python -m scripts.precommit_content --root detections

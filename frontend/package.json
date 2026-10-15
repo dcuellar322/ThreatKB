@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "format": "prettier --write src vite.config.ts"
+    "format": "prettier --write src vite.config.ts ../detections ../.github/workflows ../docker-compose.yml ../package.json",
+    "format:check": "prettier --check src vite.config.ts ../detections ../.github/workflows ../docker-compose.yml ../package.json",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@codemirror/commands": "6.11.1",

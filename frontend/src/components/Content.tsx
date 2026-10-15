@@ -394,6 +394,31 @@ export function Content({ version, notify, refresh }: any) {
           Record independent review
         </button>
       </div>
+      {!!data.channels.length && (
+        <section className="panel" aria-label="Content release channels">
+          {data.channels.map((release: any) => (
+            <article
+              className="activity-row content-channel-row"
+              key={release.status + release.manifest.id}
+            >
+              <div>
+                <strong>
+                  {release.manifest.kind} · {release.manifest.group}
+                </strong>
+                <small>
+                  {release.promotion_block?.message ||
+                    release.manifest.id.slice(0, 8)}
+                </small>
+              </div>
+              <Badge
+                value={
+                  release.promotion_block?.alarm ? "Alarm" : release.status
+                }
+              />
+            </article>
+          ))}
+        </section>
+      )}
       <section className="panel">
         {!data.builds.length ? (
           <Empty text="No content builds yet." />

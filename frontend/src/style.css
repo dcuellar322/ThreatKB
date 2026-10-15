@@ -630,6 +630,7 @@ tr:hover .row-actions button {
   background: #f3f3f5;
   font-weight: 600;
 }
+.badge.alarm,
 .badge.failed,
 .badge.regressed,
 .badge.retired,
@@ -2775,4 +2776,11 @@ label.file-row {
   padding: 0;
   margin: 0;
   min-width: 0;
+}
+
+.activity-row.content-channel-row > .badge {
+  display: inline-flex;
+}
+.content-channel-row:first-child {
+  border-top: 0;
 }

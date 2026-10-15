@@ -42,12 +42,16 @@ def artifact_notifications():
         or_(bookmarked, *owned),
         or_(ActivityLog.user_id != current_user.id, ActivityLog.user_id.is_(None)),
     )
+    from app.content_alerts import unread_content_alarms
+
+    alarms = unread_content_alarms(current_user)
     if request.args.get("summary") == "true":
-        return jsonify(unread_count=query.count(), after_id=after)
+        return jsonify(unread_count=query.count() + len(alarms), after_id=after)
     return jsonify(
-        unread_count=query.count(),
+        unread_count=query.count() + len(alarms),
         after_id=after,
-        data=[
+        data=alarms
+        + [
             item.to_dict()
             for item in query.options(joinedload(ActivityLog.user))
             .order_by(ActivityLog.id.desc())
@@ -68,5 +72,16 @@ def clear_artifact_notifications():
         )
         db.session.add(cursor)
     cursor.value = str(last_id)
+    from datetime import datetime, timezone
+    from app.content_alerts import CURSOR_PREFIX
+
+    key = CURSOR_PREFIX + str(current_user.id)
+    content_cursor = db.session.get(Cfg_settings, key)
+    if content_cursor is None:
+        content_cursor = Cfg_settings(
+            key=key, public=False, description="Last cleared content alarm"
+        )
+        db.session.add(content_cursor)
+    content_cursor.value = datetime.now(timezone.utc).isoformat()
     db.session.commit()
     return jsonify(after_id=last_id, unread_count=0)

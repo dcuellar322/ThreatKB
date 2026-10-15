@@ -196,13 +196,15 @@ def content_overview():
     releases = []
     for path in channels().glob("*/*/*.json"):
         value = json.loads(path.read_text())
-        releases.append(value)
+        if value["manifest"]["group"] == group:
+            releases.append(value)
     from collections import Counter
 
-    history = [
-        json.loads(path.read_text())
-        for path in (channels() / "history").glob("*-production.json")
-    ]
+    history = []
+    for path in (channels() / "history").glob("*-production.json"):
+        value = json.loads(path.read_text())
+        if value["manifest"]["group"] == group:
+            history.append(value)
     monthly = Counter(
         item["promoted_at"][:7]
         for item in history
@@ -221,7 +223,11 @@ def content_overview():
         groups=repo.groups,
         categories=repo.categories,
         source_digest=repo.digest(),
-        builds=[json.loads(path.read_text()) for path in recent],
+        builds=[
+            value
+            for path in recent
+            if (value := json.loads(path.read_text()))["group"] == group
+        ],
         channels=releases,
         metrics={
             "sigpack_releases_by_month": dict(sorted(monthly.items())),

@@ -178,7 +178,14 @@ class Repository:
         for folder, dirs, names in os.walk(root):
             dirs[:] = [name for name in dirs if name != ".git"]
             for name in names:
-                if name.rsplit(".", 1)[-1] in ("yaml", "yml", "yar", "yara"):
+                if name.rsplit(".", 1)[-1] in (
+                    "yaml",
+                    "yml",
+                    "yar",
+                    "yara",
+                    "json",
+                    "csv",
+                ):
                     path = os.path.join(folder, name)
                     if path == os.path.join(root, "review.yaml"):
                         continue
@@ -385,17 +392,24 @@ class Repository:
                 )
             )
         elif kind == "feedpack":
-            indicators = load(self.root / "indicators.yaml", []) or []
+            if (self.root / "intelligence/pipeline.yaml").exists():
+                from .intelligence import assess_repository
+
+                assessment = assess_repository(self.root)
+                atomic(destination / "assessment.json", assessment)
+                indicators = assessment["released"]
+            else:
+                indicators = load(self.root / "indicators.yaml", []) or []
             selected = []
             for item in indicators:
                 if group not in item.get("groups", ["default"]):
                     continue
-                if item["type"] == "ip":
-                    ipaddress.ip_address(item["value"])
-                elif item["type"] != "domain" or not re.fullmatch(
-                    r"[A-Za-z0-9_.-]+", item["value"]
-                ):
-                    raise ContentError("Invalid indicator")
+                from .intelligence import normalize
+
+                try:
+                    item = {**item, "value": normalize(item["type"], item["value"])}
+                except (ValueError, TypeError, KeyError, UnicodeError) as error:
+                    raise ContentError(f"Invalid indicator: {error}") from error
                 if item.get("status", "released") == "released":
                     selected.append(item)
             (destination / "indicators.json").write_text(json.dumps(selected, indent=2))
@@ -459,8 +473,10 @@ class Repository:
                     archive.write(path, path.relative_to(destination))
         return manifest
 
-    def review_valid(self, manifest):
-        review = load(self.root / "review.yaml", {}) or {}
+    def review_valid(self, manifest, review=None):
+        review = (
+            (load(self.root / "review.yaml", {}) or {}) if review is None else review
+        )
         if (
             review.get("source_digest") != manifest["source_digest"]
             or not review.get("reviewer")
@@ -469,13 +485,18 @@ class Repository:
             raise ContentError(
                 "An independent review bound to this content digest is required"
             )
-        allowed = self.groups[manifest["group"]].get("reviewers", [])
+        key = "github_reviewers" if review.get("provider") == "github" else "reviewers"
+        allowed = self.groups[manifest["group"]].get(key, [])
         if allowed and str(review["reviewer"]) not in map(str, allowed):
             raise ContentError("Reviewer is not allowed for this group")
         return review
 
-    def publish_testing(self, manifest, channels, now=None):
-        review = self.review_valid(manifest)
+    def publish_testing(self, manifest, channels, now=None, *, review=None):
+        review = self.review_valid(manifest, review)
+        if manifest.get("source_digest") != self.digest():
+            raise ContentError(
+                "Build source differs from the current reviewed checkout"
+            )
         if not manifest.get("valid"):
             raise ContentError("Validation must pass before release")
         now = now or utcnow()
@@ -486,6 +507,14 @@ class Repository:
             "published_at": now.isoformat(),
             "telemetry": {},
             "status": "testing",
+            "promotion_policy": {
+                key: self.policy.get(key, default)
+                for key, default in (
+                    ("promotion_wait_minutes", 30),
+                    ("required_consumers", ["local"]),
+                    ("max_detection_rate", 1000),
+                )
+            },
         }
         with lock(base):
             atomic(base / "testing.json", state)
@@ -518,7 +547,7 @@ class Repository:
                     or end > now
                 ):
                     raise ValueError()
-            except (KeyError, TypeError, ValueError):
+            except KeyError, TypeError, ValueError:
                 raise ContentError(
                     "Telemetry requires an elapsed, timezone-aware observation window"
                 )
@@ -529,6 +558,28 @@ class Repository:
     def promote(self, channels, kind, group, now=None):
         now = now or utcnow()
         base = Path(channels) / kind / group
+        identity = json.loads((base / "testing.json").read_text())["manifest"]["id"]
+        try:
+            return self._promote(channels, kind, group, now)
+        except ContentError as error:
+            base = Path(channels) / kind / group
+            with lock(base):
+                state = json.loads((base / "testing.json").read_text())
+                previous = state.get("promotion_block", {})
+                if state["manifest"]["id"] == identity and previous.get(
+                    "message"
+                ) != str(error):
+                    state["promotion_block"] = {
+                        "message": str(error),
+                        "since": now.isoformat(),
+                        "alarm": str(error)
+                        == "Telemetry alarm blocks production promotion",
+                    }
+                    atomic(base / "testing.json", state)
+            raise
+
+    def _promote(self, channels, kind, group, now):
+        base = Path(channels) / kind / group
         with lock(base):
             state = json.loads((base / "testing.json").read_text())
             production = base / "production.json"
@@ -536,11 +587,12 @@ class Repository:
                 existing = json.loads(production.read_text())
                 if existing["manifest"]["id"] == state["manifest"]["id"]:
                     return existing
-            minutes = self.policy.get("promotion_wait_minutes", 30)
+            policy = state.get("promotion_policy", self.policy)
+            minutes = policy.get("promotion_wait_minutes", 30)
             published = datetime.fromisoformat(state["published_at"])
             if now < published + timedelta(minutes=minutes):
                 raise ContentError("Testing observation window is still open")
-            for consumer in self.policy.get("required_consumers", ["local"]):
+            for consumer in policy.get("required_consumers", ["local"]):
                 report = state["telemetry"].get(consumer)
                 if not report:
                     raise ContentError(f"Missing telemetry from {consumer}")
@@ -562,10 +614,12 @@ class Repository:
                     report["errors"]
                     or report.get("alarms")
                     or report["detections"] / duration
-                    > self.policy.get("max_detection_rate", 1000)
+                    > policy.get("max_detection_rate", 1000)
                 ):
                     raise ContentError("Telemetry alarm blocks production promotion")
             self.review_valid(state["manifest"])
+            state.pop("promotion_block", None)
+            atomic(base / "testing.json", state)
             state.update(status="production", promoted_at=now.isoformat())
             atomic(base / "production.json", state)
             atomic(

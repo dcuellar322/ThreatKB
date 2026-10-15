@@ -116,5 +116,54 @@ def promote(root, kind, group, channels):
     )
 
 
+@cli.command("evaluate-iocs")
+@click.option(
+    "--input", "input_path", type=click.Path(exists=True, path_type=Path), required=True
+)
+@click.option(
+    "--source",
+    required=True,
+    help="Configured source identity; overrides untrusted input labels",
+)
+@click.option("--sources", type=click.Path(exists=True, path_type=Path), required=True)
+@click.option("--policy", type=click.Path(exists=True, path_type=Path))
+@click.option("--enrichment", type=click.Path(exists=True, path_type=Path))
+@click.option("--decisions", type=click.Path(exists=True, path_type=Path))
+@click.option("--previous", type=click.Path(exists=True, path_type=Path))
+@click.option("--output", type=click.Path(path_type=Path), required=True)
+@click.option("--strict/--allow-invalid", default=True)
+def evaluate_iocs(
+    input_path, source, sources, policy, enrichment, decisions, previous, output, strict
+):
+    """Normalize, enrich, assess and export reviewed indicators without Flask/MySQL."""
+    from .intelligence import read_input, evaluate
+    from .engine import atomic
+
+    records = read_input(input_path)
+    observations = [
+        {**row, "source": source} if isinstance(row, dict) else row for row in records
+    ]
+    if previous:
+        observations = json.loads(previous.read_text())["observations"] + observations
+    report = evaluate(
+        observations,
+        load(sources),
+        load(policy) if policy else {},
+        load(enrichment) if enrichment else [],
+        load(decisions) if decisions else {},
+    )
+    output.mkdir(parents=True, exist_ok=True)
+    atomic(output / "assessment.json", report)
+    exported = output / "indicators.yaml"
+    temporary = exported.with_suffix(".yaml.tmp")
+    temporary.write_text(yaml.safe_dump(report["released"], sort_keys=False))
+    temporary.replace(exported)
+    click.echo(json.dumps(report["summary"]))
+    if strict and report["invalid"]:
+        raise click.ClickException(
+            "Malformed observations were quarantined; inspect assessment.json"
+        )
+
+
 if __name__ == "__main__":
     cli()

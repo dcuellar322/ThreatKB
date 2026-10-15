@@ -10,7 +10,12 @@ from app.models.users import KBUser
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
+    previous_instance = app.instance_path
+    app.instance_path = str(tmp_path / "instance")
+    from pathlib import Path
+
+    Path(app.instance_path).mkdir()
     app.config.update(TESTING=True)
     with app.app_context():
         db.create_all()
@@ -35,6 +40,7 @@ def client():
         db.session.remove()
         db.drop_all()
         cache.clear()
+    app.instance_path = previous_instance
 
 
 @pytest.fixture
