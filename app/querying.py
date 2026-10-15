@@ -328,7 +328,12 @@ def filter_page(**options):
 def apply_sort(query, model, key, direction, kind=None):
     if direction not in ("ASC", "DESC"):
         abort(400, description="Choose ASC or DESC sorting.")
-    if key in ("owner_user.email", "user.email"):
+    if key == "yara_rule_name" and model.__tablename__ == "yara_testing_history":
+        from app.models.yara_rule import Yara_rule
+
+        query = query.outerjoin(Yara_rule, Yara_rule.id == model.yara_rule_id)
+        column = Yara_rule.name
+    elif key in ("owner_user.email", "user.email"):
         from sqlalchemy.orm import aliased
 
         foreign = getattr(

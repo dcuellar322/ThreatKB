@@ -166,3 +166,78 @@ def test_test_history_sorting_rejects_sql_and_checks_access(authenticated):
     )
     assert authenticated.get("/ThreatKB/tests?page_size=100000").status_code == 400
     assert authenticated.get("/ThreatKB/tests/9999").status_code == 404
+
+
+def test_test_history_sorts_by_signature_name_with_stable_page_boundaries(
+    authenticated,
+):
+    from datetime import datetime
+    from app.models.yara_rule import Yara_testing_history
+
+    fixtures()
+    for identity in (2, 1, 2):
+        db.session.add(
+            Yara_testing_history(
+                yara_rule_id=identity,
+                revision=1,
+                test_type="POSITIVE",
+                start_time=datetime.now(),
+                status="COMPLETE",
+                total_files=1,
+                files_tested=1,
+                files_matched=0,
+                avg_millis_per_file=0,
+                user_id=1,
+            )
+        )
+    db.session.commit()
+    response = authenticated.get(
+        "/ThreatKB/tests?sort_by=yara_rule_name&sort_dir=ASC&page_size=2"
+    )
+    assert response.status_code == 200
+    assert [row["yara_rule_name"] for row in response.json["data"]] == [
+        "Query_000",
+        "Query_001",
+    ]
+    assert [row["id"] for row in response.json["data"]] == [2, 1]
+    second = authenticated.get(
+        "/ThreatKB/tests?sort_by=yara_rule_name&sort_dir=ASC&page_size=2&page_number=1"
+    )
+    assert [row["id"] for row in second.json["data"]] == [3]
+    reverse = authenticated.get("/ThreatKB/tests?sort_by=yara_rule_name&sort_dir=DESC")
+    assert [row["id"] for row in reverse.json["data"]] == [3, 1, 2]
+
+
+def test_overview_restores_scoped_ownership_and_category_aggregates(authenticated):
+    from app.models.users import KBUser
+
+    fixtures()
+    other = KBUser(
+        email="other-owner@example.test", password="unused", active=True, admin=False
+    )
+    db.session.add(other)
+    db.session.flush()
+    db.session.execute(
+        Yara_rule.__table__.update()
+        .where(Yara_rule.id == 1)
+        .values(owner_user_id=other.id)
+    )
+    db.session.commit()
+    summary = authenticated.get("/ThreatKB/dashboard").json
+    assert summary["counts"]["signatures"] == 60
+    assert summary["categories"] == [{"category": "Uncategorized", "count": 60}]
+    assert {
+        owner["email"]: owner["counts"]["signatures"] for owner in summary["ownership"]
+    } == {"analyst@example.test": 59, "other-owner@example.test": 1}
+    db.session.get(KBUser, 1).admin = False
+    db.session.commit()
+    scoped = authenticated.get("/ThreatKB/dashboard").json
+    assert scoped["counts"]["signatures"] == 59
+    assert scoped["ownership"] == [
+        {
+            "email": "analyst@example.test",
+            "counts": {"signatures": 59, "ips": 0, "domains": 0, "tasks": 0},
+        }
+    ]
+    assert scoped["categories"] == [{"category": "Uncategorized", "count": 59}]
+    assert scoped["releases"] == []
