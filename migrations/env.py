@@ -1,5 +1,6 @@
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
 from logging.config import fileConfig
 import logging
 
@@ -19,7 +20,10 @@ logger = logging.getLogger("alembic.env")
 from flask import current_app
 
 config.set_main_option(
-    "sqlalchemy.url", current_app.config.get("SQLALCHEMY_DATABASE_URI")
+    "sqlalchemy.url",
+    make_url(current_app.config["SQLALCHEMY_DATABASE_URI"])
+    .render_as_string(hide_password=False)
+    .replace("%", "%%"),
 )
 target_metadata = current_app.extensions["migrate"].db.metadata
 

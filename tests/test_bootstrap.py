@@ -41,6 +41,41 @@ def test_entrypoint_stops_when_migration_fails(tmp_path):
     assert result.returncode == 17
 
 
+def test_migration_connection_preserves_percent_characters_in_database_url(tmp_path):
+    import sqlite3
+    import sys
+    from urllib.parse import quote
+
+    path = tmp_path / "percent%database.sqlite"
+    environment = {
+        **os.environ,
+        "THREATKB_DATABASE_URL": "sqlite:///" + quote(str(path), safe="/"),
+        "THREATKB_INSTANCE_PATH": str(tmp_path / "instance"),
+        "THREATKB_SECRET_KEY": "isolated-migration-test",
+    }
+    environment.pop("THREATKB_DATABASE_HOST", None)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "flask",
+            "--app",
+            "app",
+            "db",
+            "upgrade",
+            "2221286081e8",
+        ],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT version_num FROM alembic_version").fetchone()
+        assert connection.execute("SELECT COUNT(*) FROM kb_users").fetchone() == (0,)
+
+
 def test_container_roles_use_explicit_celery_app_and_persistent_scheduler(tmp_path):
     command = tmp_path / "celery"
     command.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
