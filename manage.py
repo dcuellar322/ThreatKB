@@ -4,10 +4,6 @@ from flask_migrate import Migrate
 
 from app import app, db
 
-app.config.from_object('config')
-
-migrate = Migrate(app, db)
-
 cli = FlaskGroup(app)
 
 if __name__ == '__main__':
