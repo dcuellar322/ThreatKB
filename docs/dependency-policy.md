@@ -43,3 +43,9 @@ evidence, and run the age checker and CI. Do not update a mutable tag while leav
 its old evidence. Host-installed Docker, uv, Node and GitHub's hosted-runner OS are
 execution tools outside these application/image locks; their versions are not
 claimed to satisfy this project's release-age policy.
+
+Intel macOS source builds additionally use pinned maturin/cffi backends and the
+Rust 1.97.1 toolchain (released 2026-07-16). The combined evidence now covers
+72 Python distributions, 87 npm distributions, and seven infrastructure/toolchain
+records. A fresh installer must build successfully without relying on the original
+virtual environment. See the native prerequisites in the local guide.

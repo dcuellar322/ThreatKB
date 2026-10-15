@@ -1,75 +1,40 @@
 # ThreatKB modernization
 
-Started 2026-10-15. Dependency cutoff: 2026-10-05T00:00:00Z (stable releases only).
-
-## Delivery sequence
-
-1. Restore Python 3.14 startup, modern dependency resolution, local database and login.
-2. Address each open upstream issue independently, recording verification and commits.
-3. Replace AngularJS/Bower with a maintained frontend and verify key workflows.
-4. Complete Flask modernization, configuration, task integration and API checks.
-5. Implement the Detection Signature Management Uplift plan in phases.
-6. Complete responsive, accessible UI/UX review and end-to-end validation.
-
-## Baseline
-
-- Origin was InQuest/ThreatKB; the verified personal fork is dcuellar322/ThreatKB.
-- Existing staged changes in search pagination and IP comment caching belong to the user.
-- Local MySQL is 5.7.44; preserve its data before any server migration.
-- Legacy services: Flask API, SQLAlchemy/MySQL, Celery/Redis, filesystem samples,
-  GeoLite databases, optional Slack notifications and analyst-defined scripts.
-- Existing UI: AngularJS, Bower and Grunt, with locally missing/unreliable assets.
-- Upstream open issue inventory is preserved in `upstream-issues.json`.
-
-## Uplift acceptance checklist
-
-- [x] Document footprint and migration/rollback procedures.
-- [x] Independent detection, intelligence and software content pipelines.
-- [x] Git-backed YAML signatures and import/export from the legacy store.
-- [x] Jinja macro lists, filters and bounded expansion with compilation checks.
-- [x] Category-derived names, rich metadata tags and separate workflow state.
-- [x] UUID identifiers stable across renames; UUID-based heater/cooler pairings.
-- [x] Sample-hash references, positive and goodware corpus validation.
-- [x] Optional external collections with severity/confidence and update tracking.
-- [x] CI lint, build, test and independent review gates.
-- [x] Testing and production channels, timed promotion and telemetry alarm gates.
-- [x] Metrics for release frequency and operational throughput.
-
-External TAC product deployment, customer instances, private corpora and production
-telemetry require those systems to be available; do not report simulated checks as
-production verification.
+The modernization branch runs Python 3.14.7, Flask 3, React and MySQL 26.7. It
+preserves legacy management workflows while adding standalone detection and IOC
+content tooling. [Design acceptance](design-acceptance.md) is the authoritative
+implemented-versus-remaining matrix; local capabilities are not a claim of
+completed customer deployment or organizational cutover.
 
 ## Upstream synchronization
 
-Both upstream branches were fetched on 2026-10-15. Upstream master at `83fde23`
-(2026-08-12) is newer by commit date; rc at `d57fa30` (2025-07-08) has ten commits
-absent from master, while master has three absent from rc. Both histories were
-merged into this modernization branch. The personal fork's master was fast-forwarded
-by 113 commits and its rc branch now matches upstream rc. No force pushes were used.
-An idempotent migration adds the upstream ports column only when absent and never
-drops externally maintained values on downgrade.
+Upstream master `83fde23` and rc `d57fa30` are both ancestors of
+`codex/2026-modernization`. Master and rc had divergent commits and both histories
+were merged. The fork's master was fast-forwarded by 113 commits and its rc branch
+synchronized without force pushes. Forty currently open upstream issues have
+recorded resolutions in [issue-resolution.md](issue-resolution.md), including the
+approved DFI exception. They remain open upstream. The PR remains a draft for
+independent review.
 
-## Detection-as-code engine
+## Maintained capabilities
 
-The standalone threatkb_content package validates YAML/UUIDs, unique names and
-pairings; renders bounded Jinja macro lists; derives category prefixes and rich
-metadata; compiles dependencies; and verifies referenced SHA-256 samples/goodware.
-Policy groups filter content before build. Sigpack, Feedpack and Codepack builds
-are independent and carry manifests with file hashes and Git provenance. Optional
-external collections require a pinned local Git checkout and remain separate
-namespaces. Collection fetching is an explicit Git operation, never implicit code
-execution. Testing-channel publication requires a review for the exact source
-digest by someone other than its author. Production promotion requires an elapsed
-observation window and recent complete telemetry without errors, alarms or an
-excessive detection rate. Tests exercise both blocked and successful transitions.
+- Modern local/container startup, fail-fast migrations and administrator recovery.
+- Preserved record, metadata, tag, revision, task, file, script, import and account
+  workflows, with desktop/mobile browser evidence and permission checks.
+- Git/YAML signatures, bounded macros, stable UUIDs, sample/goodware tests,
+  pairings, policy groups and optional pinned external collections.
+- Standalone IOC assessment/enrichment/review and independent content builders.
+- Independent CI jobs, retained artifacts, formatting/lint/age checks, a staged
+  content hook, and optional reviewed testing publication.
+- Testing/production channel engine with review-bound policy, telemetry gates,
+  persistent alarms, metrics and rollback through new builds.
 
-These are local tooling and integration contracts. Deployment to TAC/customer
-systems, production telemetry ingestion and the organization's release-frequency
-outcome cannot be verified without those external systems. The code does not
-fabricate those signals or automatically approve its own content.
+Runtime, development, source-build and infrastructure inputs follow the
+[ten-day policy](dependency-policy.md). Main local data and the original MySQL
+snapshot are retained. DFI is disabled by agreement, and real consumer deployment,
+private corpora/collections, external telemetry/escalation and measured release
+frequency remain explicit acceptance items.
 
-## Verification and remaining external integration
-
-See `verification.md` for reproducible local evidence and `issue-resolution.md`
-for the complete upstream issue matrix. Checklist marks refer to implemented local
-capabilities; the external acceptance items remain explicit in those documents.
+Read [local-development.md](local-development.md), [detection-as-code.md](detection-as-code.md),
+[intelligence-pipeline.md](intelligence-pipeline.md), [content-delivery.md](content-delivery.md),
+and [verification.md](verification.md) for commands and evidence.

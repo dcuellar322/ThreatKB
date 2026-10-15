@@ -1,103 +1,88 @@
 # Modernization verification — 2026-10-15
 
-## Local evidence
+## Current repository evidence
 
-- Personal fork master fast-forwarded 113 commits; rc synchronized; both divergent
-  histories merged into `codex/2026-modernization` without force pushes.
-- Python 3.14.7, Flask 3.1.3, SQLAlchemy 2.1.3, YARA 4.5.4 and React 19.3.0.
-  Every one of 70 Python and 70 npm locked releases predates 2026-10-05 UTC.
-- Full application image built successfully. Its isolated regression suite passed
-  48 tests at the container checkpoint; subsequent changes add export coverage.
-- Container boot against empty `threatkb_fresh_2026` applied the complete historical
-  migration chain, created an administrator, and returned HTTP 200 for health,
-  the React entrypoint, login and the authenticated empty dashboard.
-- Restored local MySQL migrated to 26.7.0 on port 3307. Original 5.7 data on port
-  3306 and its logical backup were retained.
-- Seed: 2,500 synthetic signatures, 10,000 benchmark IPs, 5,000 test domains,
-  400 tasks, SHA-256 sample corpus, YAML Git repository and 25 goodware fixtures.
-- Real Redis/Celery validation job `300a72db-c343-4ce6-9188-d586c9b69eae`
-  passed 1,250 eligible signatures, 1,250 positive samples and 25 goodware files.
-  Separate Sigpack, Feedpack and Codepack jobs all completed successfully.
-- Native YARA compilation of the restored active rules succeeded after preserving
-  and disabling three preexisting invalid drafts in the development copy.
-- Browser checks covered login, signature creation/search, transactional draft
-  comment save, two independent uploads, selection/deletion of one attachment,
-  sample-test queueing and full-text expansion. Responsive and Git editor checks
-  are recorded in the final pass below.
+- **106 backend/content tests pass locally and in the verification container**, including dependency-age policy,
+  staged-index preservation, IOC assessment, reviewed publication, frozen promotion
+  policy, alarm visibility and the prior application/query/permission regressions.
+- Frontend type checking/build and Prettier checks pass. Python correctness lint,
+  formatting and shell syntax checks pass. Thirty-two legacy invalid string escapes
+  were corrected with parsed-AST equivalence verified; regex values are unchanged.
+- Live registry audits cover **72 Python distributions and 87 npm distributions**.
+  Container/action/Rust evidence covers seven infrastructure records. Every selected
+  input predates the conservative 2026-10-05 UTC cutoff. See
+  [dependency-policy.md](dependency-policy.md).
+- The rebuilt production stack boots from empty, separate MySQL/Redis/workspace
+  volumes on ports 15080/13307/16380. Authenticated TCP readiness avoids the MySQL
+  initialization race. Migrations, admin bootstrap, health, frontend and login pass.
+  Database fields preserve reserved password characters; Redis has a persistent
+  data volume alongside MySQL and the application workspace.
+- A real Celery validation job on that isolated stack completes successfully against
+  generated samples and 25 goodware fixtures. Scheduler state is on the persistent
+  workspace volume. Runtime UID is 1000; pytest, Ruff and GCC are absent from the
+  production image.
+- A separate native checkout/venv installs from the locks, builds cryptography/YARA,
+  compiles the frontend, checks dependency compatibility and applies migrations.
+  It uses the isolated MySQL database, not the main development database.
+- CI now separates quality, application and per-pack jobs with retained artifacts
+  and an always-run `verify` aggregate. Reviewed testing publication is implemented,
+  tested at a mocked GitHub boundary, and remains opt-in; no release was published.
 
-## Operational footprint
+The maintenance browser check also verifies creating a task through the fresh
+native installation, reopening its permalink, persistent release alarms at desktop
+and 390px widths, notification clearing without clearing the channel alarm, and
+the preserved main-app login/content page after the image replacement. It found
+and fixed a shared mobile rule hiding the alarm badge. No page errors or horizontal
+page overflow were observed. Four screenshots and a gallery are available locally
+under `output/playwright/maintenance-2026-10-15/`; generated browser evidence is
+intentionally excluded from Git.
 
-The web workbench manages legacy signatures, IP/domain indicators, tasks, owners,
-metadata, workflow states, macros, comments, revisions, bookmarks and releases.
-The optional YAML editor commits into a separate content Git repository. The CLI
-can validate and build content independently of Flask and the database.
+## Existing application and browser evidence
 
-MySQL persists operational records and job outcomes. Redis carries Celery work;
-the worker performs validation/scans/builds and beat applies confidence schedules
-and promotion checks. Sample storage and content/build/channel files live under
-the ignored instance directory. Optional GeoLite databases enrich IPs. Analyst
-scripts and explicitly configured postprocessors run locally with timeouts.
-No email/Slack messages were sent during verification.
+The preceding [end-to-end audit](browser-e2e-2026-10-15.md) records table filters,
+sorting/pagination, artifact CRUD/merge/revisions, metadata, files, imports, account
+credentials/keys, roles, content builds/review and releases. It includes desktop and
+mobile navigation across all 18 pages, rapid permalink reopening, failure recovery,
+and 46 selected screenshots. The earlier [UI audit](ui-audit-2026-10-15.md) covers
+all page and dialog families. Browser mutations use separate databases/instance
+paths/queues. Chromium is the verified browser; Safari/Firefox are not claimed.
 
-The original usability and runtime failures are mapped individually to their
-fixes and evidence in `issue-resolution.md`. Installation/rollback and process
-commands are in `local-development.md`; content workflow and consumer contracts
-are in `detection-as-code.md`.
+The prior work also verified a fresh complete migration chain, legacy export,
+immutable UUIDs, all three content builders and hundreds of synthetic content/sample
+checks. [2026-review.md](2026-review.md) records query measurements and limitations:
+seeded signature listing falls from 203 SQL calls / 915 ms to 9 calls / 37 ms; IP
+listing falls from 128 calls / 444 ms to 8 calls / 40 ms. Macro expansion reuses one
+batched query instead of 101 calls for fifty rules. Those measurements describe
+that fixture/run, not a production latency guarantee.
 
-## External acceptance
+## Preserved local runtime and rollback
 
-The DFI container image/registry was not supplied and the old pp-dev wrapper is
-absent. The user authorized skipping DFI on 2026-10-15. It is disabled by default
-and uploads report configured DFI steps as skipped. Command adapters and explicit
-enable/failure behavior are tested; vendor image compatibility is outside the
-accepted local scope (#470). No unavailable production TAC/customer endpoint, collection
-checkout or private corpus is treated as tested. Receiving-system UUID support,
-channel polling, telemetry reporting and alert delivery require integration there.
-Production promotion blocks without independent review and complete elapsed
-telemetry; development does not manufacture those signals. Actual release-frequency
-improvement requires real usage and is measured rather than asserted.
+Upstream master `83fde23` and rc `d57fa30` are both included in the draft
+modernization PR. All 40 open upstream issues have recorded resolutions, with the
+explicit DFI exception; upstream issue state was not changed. The fork's protected
+master requires `verify`, independent approval after the last push, resolved
+conversations and stale approval dismissal, including for administrators.
 
-## Final local pass
+The main development web/worker/scheduler use preserved MySQL 26.7 data on port
+3307 and Redis 8.10.2 on port 6380. Container image replacement retained the same
+software versions, backed up the databases/Redis, retained stopped rollback
+containers, and added a persistent Redis volume. Original MySQL 5.7 and the
+pre-modernization logical snapshot remain available. See the
+[local guide](local-development.md) for exact backup/rollback details.
 
-The final container suite passed all 50 tests without warnings, including Git
-authoring, immutable UUIDs, review gates and legacy-to-Feedpack selection/export.
-`uv pip check` reports all 70 installed packages compatible. TypeScript checking and
-production bundling pass. Desktop (1440 px) and mobile (390 px) screenshots were
-inspected; the final visual pass corrected a collapsed mobile heading, enlarged
-touch/input controls and removed hidden navigation from keyboard focus. Generated
-screenshots remain in ignored `output/playwright`.
+## External acceptance remains explicit
 
-GitHub push and PR workflows both passed at commit `5700089`, including the full
-image build, regressions and all three independent pack pipelines. Browser Git
-authoring created and updated a draft as separate commits in the development
-content repository.
+The vendor DFI integration is skipped under the user's authorization; default
+uploads report that skip and explicitly enabled adapter failures remain errors.
+No vendor image compatibility, private corpus coverage, customer/TAC deployment,
+collection-update operation or external enrichment accuracy is claimed.
 
-Final follow-ups preserve EventID/UUID during bulk category changes and separate
-positive/negative histories. Real queued tests of the browser-created signature
-matched its attached positive sample and passed all 25 goodware files. The mobile
-pass also verified Escape closes navigation, hidden navigation is inert, and the
-390 px page has no horizontal overflow. Failed-login feedback and return to the
-requested Tasks route were exercised in the browser.
-
-Fork master now requires the `verify` status check, an independent PR approval
-(including approval after the last push), resolved review conversations and stale
-approval dismissal. These rules apply to administrators; force pushes and branch
-deletion are disabled. The modernization PR remains a draft for independent review.
-
-## Performance and UI review follow-up
-
-The October 2026 follow-up passes **71 tests locally and in the production Docker image**. All independent Sigpack, Feedpack and Codepack pipelines pass in that image. MySQL migrations were applied to the main development database and a separate browser-QA database. The frontend production build and unused-declaration checks pass. Real-browser workflows and before/after query measurements are recorded in [2026-review.md](2026-review.md); screenshots remain local under `output/playwright/`.
-
-The subsequent UI capability comparison against upstream `rc` is recorded in [ui-parity-2026-10-15.md](ui-parity-2026-10-15.md). It restores missing permalink, searchable-control, tag, editor, revision, file, profile and overview workflows. The backend suite now passes 74 tests locally and in the production Docker image; all 87 locked frontend packages meet the original release-age cutoff.
-
-The subsequent form/data-presentation audit is documented in [ui-audit-2026-10-15.md](ui-audit-2026-10-15.md). It includes screenshots of every page and application-dialog family at desktop/mobile widths, isolated CRUD/import/scan/revision/account browser checks, and fixes for selection races, pending chip saves, stale dialog navigation and sample-row presentation. The local backend suite remains at 74 passing tests.
-
-
-## Final end-to-end workflow pass
-
-The subsequent [browser workflow audit](browser-e2e-2026-10-15.md) records the
-full filters/sorting/pagination, artifact, configuration, account, content and
-release checks, plus the fixes found while exercising them. All 80 backend tests
-and the frontend production build pass. Main development processes have been
-restarted with the verified code and the additive task-tag migration; destructive
-browser checks remain confined to the separate QA instance.
+The generic pack builders, IOC assessment and local channel engine are implemented.
+GitHub testing publication requires explicit activation and a real independently
+approved merge in the intended content repository. Receiving systems still need
+UUID/pack compatibility, frequent polling, telemetry delivery and external alarm
+routing. Production promotion blocks without real elapsed telemetry; no operational
+signals or release-frequency improvement are fabricated. Authoritative migration
+away from legacy signature management and the target doubling of release frequency
+require real team cutover and usage. [design-acceptance.md](design-acceptance.md)
+records the implemented-versus-remaining matrix.

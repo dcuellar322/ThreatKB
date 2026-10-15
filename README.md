@@ -1,57 +1,86 @@
 # ThreatKB
 
 A detection engineering workbench for YARA signatures, IP/domain intelligence,
-analyst reviews and versioned content releases. This maintained fork replaces the
-AngularJS/Bower frontend with React and runs on Python 3.14, Flask 3 and modern MySQL.
+analyst reviews and versioned content releases. This fork runs Python 3.14.7,
+Flask 3 and React, with MySQL 26.7 and Redis 8.10.2.
 
-## Run locally
+## Run with Docker
 
 ```sh
-uv venv --python 3.14
-uv pip sync --python .venv/bin/python requirements.txt
-npm --prefix frontend ci --ignore-scripts
-npm run build
-export THREATKB_DATABASE_URL='mysql+pymysql://USER:PASSWORD@127.0.0.1:3307/threatkb?charset=utf8mb4'
-export REDIS_BROKER_URL='redis://127.0.0.1:6380/0'
-.venv/bin/flask --app app db upgrade
-.venv/bin/flask --app app admin-user --email you@example.com
-LISTEN_PORT=5080 sh run_web.sh
+cp .env.example .env
+# Replace the credential/signing-key placeholders in .env.
+docker compose up -d --build --wait
+docker compose exec web flask --app app admin-user --email you@example.com
 ```
 
-Open http://127.0.0.1:5080. Run `sh run_agent.sh` and `sh run_scheduler.sh` in
-separate terminals for queued jobs, scheduled confidence changes and promotion
-checks. The administrator command prompts for a password. For a fresh Docker
-installation, configure the required environment variables described in the
-[local guide](docs/local-development.md), then run `docker compose up --build`.
+Open http://127.0.0.1:5080. The admin command prompts for a password. Compose
+starts the web app, worker and scheduler after authenticated database readiness;
+its named volumes retain database data, files, Git content and scheduler state.
+Native MySQL on port 3306 is not reused. Set `WEB_PORT`, `MYSQL_PORT` and
+`REDIS_PORT` to run a separate stack without port conflicts.
 
-## Detection as code
+## Run natively
 
-The standalone `threatkb_content` package validates Git-backed YAML signatures,
-assigns stable UUIDs, expands bounded Jinja macros, verifies sample/goodware corpora
-and produces independent Sigpack, Feedpack and Codepack artifacts. Content review
-and elapsed telemetry gates protect testing-to-production promotion. The web
-editor is optional; the CLI needs neither MySQL nor the web application.
+Install uv, Node.js/npm, libmagic, OpenSSL, pkg-config and C build tools. Intel macOS
+also needs Rust/rustup to compile the pinned cryptography release; the repository
+pins the Rust toolchain. Configure native database/Redis URLs in `.env`, then:
+
+```sh
+sh install.sh
+.venv/bin/flask --app app admin-user --email you@example.com
+sh run_web.sh
+# Separate terminals:
+sh run_agent.sh
+sh run_scheduler.sh
+```
+
+The installer selects Python 3.14.7, syncs pinned build/development dependencies,
+builds the frontend and applies migrations. The local worker uses the solo pool
+on macOS and prefork on Linux. Native Windows uses WSL2; `install.bat` delegates
+to WSL. See the [local guide](docs/local-development.md) for prerequisites,
+CLI-only installation, configuration, synthetic data, backups and rollback.
+
+## Detection and intelligence as code
+
+The standalone `threatkb_content` package needs neither Flask services nor MySQL.
+It validates Git-backed YAML signatures, assigns stable UUIDs, expands bounded
+macros, verifies sample/goodware corpora and builds independent packs. Optional
+IOC assessment normalizes observations, applies source trust/expiry/allowlist
+policy, attaches local enrichment and exports independently reviewed indicators.
 
 ```sh
 .venv/bin/python -m threatkb_content --root detections check --corpus detections/samples --goodware detections/goodware
+.venv/bin/python -m threatkb_content --root detections build --kind feedpack
 .venv/bin/python -m threatkb_content --root detections build --kind sigpack --corpus detections/samples --goodware detections/goodware
 ```
 
-See the [content workflow](docs/detection-as-code.md) for schemas, macros,
-collections, reviewer policies, independent pack builds, channels and rollback.
-The included example and development seeds contain harmless synthetic content.
+The public example and development seeds are harmless synthetic content. The web
+editor remains optional. See [content authoring](docs/detection-as-code.md),
+[IOC assessment](docs/intelligence-pipeline.md), and
+[CI/testing publication](docs/content-delivery.md).
 
 ## Maintenance and verification
 
-- [Local services, migration, seed data and rollback](docs/local-development.md)
-- [Modernization scope and upstream synchronization](docs/modernization.md)
-- [Individual upstream issue resolutions](docs/issue-resolution.md)
-- [Verification evidence and external integration limits](docs/verification.md)
+```sh
+.venv/bin/python -m pytest -q
+PATH="$PWD/.venv/bin:$PATH" sh scripts/check_backend.sh
+npm run format:check --prefix frontend
+npm run build
+```
 
-Run `.venv/bin/python -m pytest -q` for isolated backend/content regressions and
-`npm run build` for TypeScript and production frontend checks. Registry release
-dates for every dependency pin are recorded under `docs/*dependency-audit.json`.
-CI builds the full image and runs application and independent content checks.
+- [Ten-day dependency/build-input policy](docs/dependency-policy.md)
+- [Design acceptance and remaining integration work](docs/design-acceptance.md)
+- [Upstream issue resolutions](docs/issue-resolution.md)
+- [Verification evidence](docs/verification.md)
+- [Browser workflow audit](docs/browser-e2e-2026-10-15.md)
+
+CI has separate application, quality and per-pack jobs. A failing Sigpack job
+cannot cancel Feedpack or Codepack; successful packs are retained as artifacts.
+The protected branch's required `verify` check aggregates every job. Optional
+GitHub testing publication requires approval of the final merged PR head and
+validates source/pack checksums before any external write. Production promotion
+still requires real elapsed telemetry; external product integration is not
+claimed complete.
 
 Original project: [InQuest/ThreatKB](https://github.com/InQuest/ThreatKB).
 YARA parsing uses [Plyara](https://github.com/plyara/plyara).

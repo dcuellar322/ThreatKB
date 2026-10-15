@@ -87,3 +87,22 @@ TAC consumers, ten-minute channel polling, telemetry delivery and alert escalati
 Optional vendor DFI preprocessing is disabled by user choice. No TAC/customer
 endpoints, private collection checkouts or production corpora were available locally. The application
 provides tested contracts and blocks promotion when required telemetry is missing.
+
+## Maintenance follow-up
+
+The optional staged-content hook now validates the Git index snapshot and preserves
+unrelated/unfinished worktree edits. CI jobs are independent, retain pack artifacts,
+and enforce formatting and dependency ages. Reviewed GitHub testing publication is
+implemented but requires explicit activation and a real approved merge; see
+[content-delivery.md](content-delivery.md).
+
+Repositories may opt into `intelligence/pipeline.yaml` for standalone provenance,
+normalization, policy, local enrichment, review and quarantine before Feedpack
+creation. Existing `indicators.yaml` exports remain the fallback. Raw CSV/JSON
+inputs are included in the content digest. See [intelligence-pipeline.md](intelligence-pipeline.md).
+
+Promotion freezes wait/consumer/rate policy at testing publication. Block reasons
+persist in channel state; actual telemetry alarms appear in the workbench and in
+notifications for authorized groups. Clearing notifications does not clear the
+underlying alarm. Operational telemetry and external notification routing still
+require their actual integrations.
