@@ -63,9 +63,11 @@ def restore_signature_revision(id, revision):
     entity = db.get_or_404(Yara_rule, id)
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
-    snapshot = Yara_rule_history.query.filter_by(
-        yara_rule_id=id, revision=revision
-    ).first_or_404()
+    snapshot = (
+        Yara_rule_history.query.filter_by(yara_rule_id=id, revision=revision)
+        .order_by(Yara_rule_history.id.desc())
+        .first_or_404()
+    )
     import json
 
     data = json.loads(snapshot.rule_json)
@@ -326,6 +328,7 @@ def get_yara_rule_string_from_revision(yara_rule_id, revision):
     revision_entity = (
         Yara_rule_history.query.filter_by(yara_rule_id=yara_rule_id)
         .filter_by(revision=revision)
+        .order_by(Yara_rule_history.id.desc())
         .first()
     )
 
