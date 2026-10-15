@@ -40,3 +40,15 @@ uv pip compile requirements.in --python-version 3.14 --exclude-newer 2026-10-06T
 ```
 
 `docs/python-dependency-audit.json` records the registry release date of every pin.
+
+## Synthetic development data
+
+Run `.venv/bin/flask --app app seed-dev --email you@example.com`. By default this
+adds 2,500 signatures, 10,000 benchmark-network IPs, 5,000 `.example.test` domains,
+and 400 tasks. It is repeatable: matching synthetic records are not duplicated and
+existing records are not removed. Every synthetic signature has a benign sample
+in `instance/dev-corpus`, with a SHA-256 reference in its YAML representation.
+`instance/dev-content` is a separate local Git repository containing the generated
+YAML signatures. Its first seed is committed automatically. Counts are configurable
+with `--rules`, `--ips`, `--domains`, and `--tasks`. These are synthetic fixtures,
+not intelligence or production-quality detections.

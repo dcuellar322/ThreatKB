@@ -278,3 +278,4 @@ from app import commands
 from app.routes import scanner
 
 from app.routes import scheduled_confidence
+from app import dev_seed
