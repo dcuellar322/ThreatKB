@@ -578,7 +578,14 @@ export function ArtifactEditor({
                             [definition.key]: { ...item, value: v },
                           });
                         return (
-                          <label key={definition.id}>
+                          <label
+                            key={definition.id}
+                            className={
+                              definition.type === "multiline_comment"
+                                ? "span2"
+                                : undefined
+                            }
+                          >
                             {definition.key}
                             {definition.choices?.length ? (
                               <Select
