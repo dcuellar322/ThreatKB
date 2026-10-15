@@ -1084,6 +1084,9 @@ dialog::backdrop {
   overflow-wrap: anywhere;
   max-width: 400px;
 }
+.dialog-footer > .dialog-danger {
+  margin-right: auto;
+}
 .dialog-footer button {
   min-height: 33px;
 }
@@ -1236,7 +1239,6 @@ dialog > form {
 }
 .detail-list dt {
   color: var(--muted);
-  text-transform: capitalize;
 }
 .detail-list dd {
   margin: 0;
@@ -2345,7 +2347,7 @@ label > .select-control {
   margin: 8px 0 16px;
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 10px;
+  padding: 0;
 }
 .file-group-row {
   display: flex;
@@ -2353,8 +2355,7 @@ label > .select-control {
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid var(--line);
-  padding: 7px 0;
-  margin-top: 7px;
+  padding: 9px 12px;
 }
 .file-group-row code {
   overflow-wrap: anywhere;
@@ -2527,9 +2528,19 @@ details.import-panel > summary {
   > summary:hover {
   background: #f5f5f7;
 }
-.import-options[open] > summary,
-.disclosure[open] > summary {
+:is(
+    .import-options,
+    .disclosure,
+    .sample-folders,
+    .activity-distribution,
+    details.import-panel
+  )[open]
+  > summary {
+  background: #fafafa;
   border-bottom: 1px solid var(--line);
+}
+.sample-folders[open] > .file-group-row:first-of-type {
+  border-top: 0;
 }
 .import-options > :not(summary),
 .disclosure > :not(summary) {
@@ -2729,4 +2740,22 @@ label.file-row {
 }
 .sample-history-options {
   margin: 12px 0;
+}
+
+@media (max-width: 700px) {
+  .release-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .release-footer > a {
+    justify-self: end;
+  }
+  .release-footer > .dialog-danger {
+    order: 1;
+    justify-self: start;
+  }
+  .release-footer > button:last-child {
+    order: 2;
+    justify-self: end;
+  }
 }

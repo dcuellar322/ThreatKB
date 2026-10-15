@@ -1176,12 +1176,37 @@ export function Records({ page, version, notify, refresh, user }: any) {
       )}
       {extra && (
         <Dialog
-          wide
           title={extra.name || extra.kind || "Activity details"}
           onClose={() => setExtra(null)}
         >
           <div className="dialog-body">
             <DetailList
+              order={
+                page === "jobs"
+                  ? [
+                      "status",
+                      "progress",
+                      "kind",
+                      "created_at",
+                      "started_at",
+                      "finished_at",
+                      "created_user_id",
+                      "error",
+                      "id",
+                    ]
+                  : page === "releases"
+                    ? [
+                        "name",
+                        "is_test_release",
+                        "num_signatures",
+                        "num_ips",
+                        "num_dns",
+                        "created_user",
+                        "date_created",
+                        "id",
+                      ]
+                    : ["activity_text", "user", "activity_date"]
+              }
               value={Object.fromEntries(
                 Object.entries(extra).filter(
                   ([key]) => !["result", "payload"].includes(key),
@@ -1210,38 +1235,45 @@ export function Records({ page, version, notify, refresh, user }: any) {
               </details>
             )}
           </div>
-          {page === "releases" && (
-            <div className="dialog-footer">
-              <button
-                className="text-danger"
-                onClick={async () => {
-                  if (!confirm("Delete this release?")) return;
-                  try {
-                    await api("/releases/" + extra.id, { method: "DELETE" });
-                    setExtra(null);
-                    refresh();
-                    notify("Release deleted.");
-                  } catch (e: any) {
-                    notify(e.message, true);
-                  }
-                }}
-              >
-                Delete release
-              </button>
-              <a
-                className="button"
-                href={base + "/releases/" + extra.id + "/release_notes"}
-              >
-                Download notes
-              </a>
-              <a
-                className="button"
-                href={base + "/releases/" + extra.id + "/artifact_export"}
-              >
-                Download release
-              </a>
-            </div>
-          )}
+          <div
+            className={
+              "dialog-footer" + (page === "releases" ? " release-footer" : "")
+            }
+          >
+            {page === "releases" && (
+              <>
+                <button
+                  className="text-danger dialog-danger"
+                  onClick={async () => {
+                    if (!confirm("Delete this release?")) return;
+                    try {
+                      await api("/releases/" + extra.id, { method: "DELETE" });
+                      setExtra(null);
+                      refresh();
+                      notify("Release deleted.");
+                    } catch (e: any) {
+                      notify(e.message, true);
+                    }
+                  }}
+                >
+                  Delete release
+                </button>
+                <a
+                  className="button"
+                  href={base + "/releases/" + extra.id + "/release_notes"}
+                >
+                  Download notes
+                </a>
+                <a
+                  className="button"
+                  href={base + "/releases/" + extra.id + "/artifact_export"}
+                >
+                  Download release
+                </a>
+              </>
+            )}
+            <button onClick={() => setExtra(null)}>Close</button>
+          </div>
         </Dialog>
       )}
     </>
@@ -1276,7 +1308,7 @@ function BulkEditor({
   };
   return (
     <Dialog
-      title={"Edit " + count + " records"}
+      title={"Edit " + count + (count === 1 ? " record" : " records")}
       onClose={onClose}
       dirty={!!(state || owner !== "unchanged" || category || tags || replace)}
       busy={busy}

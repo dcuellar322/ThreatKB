@@ -8,6 +8,9 @@ export function date(value: any) {
     : parsed.toLocaleString(undefined, {
         month: "short",
         day: "numeric",
+        ...(parsed.getFullYear() !== new Date().getFullYear()
+          ? { year: "numeric" as const }
+          : {}),
         hour: "numeric",
         minute: "2-digit",
       });

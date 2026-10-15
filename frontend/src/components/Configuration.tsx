@@ -386,100 +386,88 @@ export function Configuration({
                       <label
                         key={key}
                         className={
-                          type === "check"
-                            ? "check-label"
-                            : type === "code" || type === "textarea"
-                              ? "span2"
-                              : ""
+                          type === "textarea" ||
+                          ["Tags", "Macros", "Whitelist", "States"].includes(
+                            tab,
+                          ) ||
+                          (tab === "Metadata" &&
+                            ["key", "default", "choices"].includes(key)) ||
+                          (tab === "Users" &&
+                            ["email", "password"].includes(key)) ||
+                          (tab === "Settings" && key === "description") ||
+                          (tab === "Categories" && key === "category") ||
+                          (tab === "Scripts" &&
+                            ["interpreter", "match_regex"].includes(key))
+                            ? "span2"
+                            : ""
                         }
                       >
-                        {type === "check" ? (
-                          <>
+                        <>
+                          {label}
+                          {Array.isArray(type) ? (
+                            <Select {...input}>
+                              {type.map((option) => {
+                                const [text, val] = option.split("|");
+                                return (
+                                  <option key={option} value={val ?? text}>
+                                    {text}
+                                  </option>
+                                );
+                              })}
+                            </Select>
+                          ) : type === "textarea" ? (
+                            <textarea {...input} rows={3} />
+                          ) : (
                             <input
-                              type="checkbox"
-                              checked={!!value[key]}
-                              onChange={(e) =>
-                                setValue({ ...value, [key]: e.target.checked })
+                              {...input}
+                              type={type}
+                              pattern={
+                                tab === "Sources" && key === "name"
+                                  ? "[A-Za-z0-9_.\\-]{1,64}"
+                                  : undefined
+                              }
+                              title={
+                                tab === "Sources" && key === "name"
+                                  ? "Use letters, numbers, periods, underscores or hyphens (up to 64 characters)."
+                                  : undefined
+                              }
+                              min={
+                                tab === "Sources" && key === "max_delay_minutes"
+                                  ? 1
+                                  : undefined
+                              }
+                              max={
+                                tab === "Sources" && key === "max_delay_minutes"
+                                  ? 10080
+                                  : undefined
+                              }
+                              required={
+                                [
+                                  "key",
+                                  "tag",
+                                  "name",
+                                  "email",
+                                  "state",
+                                  "category",
+                                  "whitelist_artifact",
+                                ].includes(key) ||
+                                (key === "password" && edit.new)
+                              }
+                              autoComplete={
+                                type === "password"
+                                  ? "new-password"
+                                  : tab === "Users" && key === "email"
+                                    ? "username"
+                                    : undefined
+                              }
+                              readOnly={
+                                !edit.new &&
+                                (["key", "tag"].includes(key) ||
+                                  (tab === "Sources" && key === "name"))
                               }
                             />
-                            {label}
-                          </>
-                        ) : (
-                          <>
-                            {label}
-                            {Array.isArray(type) ? (
-                              <Select {...input}>
-                                {type.map((option) => {
-                                  const [text, val] = option.split("|");
-                                  return (
-                                    <option key={option} value={val ?? text}>
-                                      {text}
-                                    </option>
-                                  );
-                                })}
-                              </Select>
-                            ) : type === "code" ? (
-                              <CodeEditor label={label} {...input} />
-                            ) : type === "textarea" ? (
-                              <textarea
-                                {...input}
-                                rows={type === "code" ? 12 : 3}
-                                className=""
-                              />
-                            ) : (
-                              <input
-                                {...input}
-                                type={type}
-                                pattern={
-                                  tab === "Sources" && key === "name"
-                                    ? "[A-Za-z0-9_.\\-]{1,64}"
-                                    : undefined
-                                }
-                                title={
-                                  tab === "Sources" && key === "name"
-                                    ? "Use letters, numbers, periods, underscores or hyphens (up to 64 characters)."
-                                    : undefined
-                                }
-                                min={
-                                  tab === "Sources" &&
-                                  key === "max_delay_minutes"
-                                    ? 1
-                                    : undefined
-                                }
-                                max={
-                                  tab === "Sources" &&
-                                  key === "max_delay_minutes"
-                                    ? 10080
-                                    : undefined
-                                }
-                                required={
-                                  [
-                                    "key",
-                                    "tag",
-                                    "name",
-                                    "email",
-                                    "state",
-                                    "category",
-                                    "whitelist_artifact",
-                                  ].includes(key) ||
-                                  (key === "password" && edit.new)
-                                }
-                                autoComplete={
-                                  type === "password"
-                                    ? "new-password"
-                                    : tab === "Users" && key === "email"
-                                      ? "username"
-                                      : undefined
-                                }
-                                readOnly={
-                                  !edit.new &&
-                                  (["key", "tag"].includes(key) ||
-                                    (tab === "Sources" && key === "name"))
-                                }
-                              />
-                            )}
-                          </>
-                        )}
+                          )}
+                        </>
                       </label>
                     );
                   })}
@@ -513,7 +501,7 @@ export function Configuration({
               {!edit.new && tab !== "Sources" && (
                 <button
                   type="button"
-                  className="text-danger"
+                  className="text-danger dialog-danger"
                   onClick={async () => {
                     if (!confirm("Delete this definition?")) return;
                     try {
@@ -890,20 +878,25 @@ export function ImportForm({ notify }: any) {
             onChange={(e) => setMisp(e.target.value)}
           />
         </label>
-        <button
-          type="button"
-          disabled={!misp.trim()}
-          onClick={async () => {
-            try {
-              const r = await write("/whitelist/import-misp", JSON.parse(misp));
-              notify(r.imported + " warninglist entries imported.");
-            } catch (e: any) {
-              notify(e.message, true);
-            }
-          }}
-        >
-          Import warninglist
-        </button>
+        <div className="form-actions">
+          <button
+            type="button"
+            disabled={!misp.trim()}
+            onClick={async () => {
+              try {
+                const r = await write(
+                  "/whitelist/import-misp",
+                  JSON.parse(misp),
+                );
+                notify(r.imported + " warninglist entries imported.");
+              } catch (e: any) {
+                notify(e.message, true);
+              }
+            }}
+          >
+            Import warninglist
+          </button>
+        </div>
       </details>
     </form>
   );

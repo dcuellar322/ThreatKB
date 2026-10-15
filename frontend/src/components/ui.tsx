@@ -1,4 +1,4 @@
-import { date } from "../lib/format";
+import { date, fmt } from "../lib/format";
 import { useEffect, useLayoutEffect, useRef, useState, useId } from "react";
 import { X, Loader2, Maximize2, Minimize2 } from "lucide-react";
 
@@ -155,39 +155,84 @@ export function Dialog({
   );
 }
 
-export function DetailList({ value }: { value: Record<string, any> }) {
+const detailLabels: Record<string, string> = {
+  activity_text: "Activity",
+  activity_date: "Date",
+  created_at: "Created",
+  date_created: "Created",
+  started_at: "Started",
+  finished_at: "Finished",
+  created_user: "Created by",
+  created_user_id: "Created by (user ID)",
+  is_test_release: "Test release",
+  num_signatures: "Signatures",
+  num_ips: "IP indicators",
+  num_dns: "Domain indicators",
+};
+
+export function DetailList({
+  value,
+  order = [],
+}: {
+  value: Record<string, any>;
+  order?: string[];
+}) {
+  const keys = [
+    ...new Set([...order.filter((key) => key in value), ...Object.keys(value)]),
+  ];
   return (
     <dl className="detail-list">
-      {Object.entries(value).map(([key, item]) => (
-        <div key={key}>
-          <dt>
-            {key.replaceAll("_", " ").replace(/^./, (s) => s.toUpperCase())}
-          </dt>
-          <dd>
-            {item == null || item === "" ? (
-              "—"
-            ) : typeof item === "boolean" ? (
-              item ? (
-                "Yes"
+      {keys.map((key) => {
+        const item = value[key];
+        return (
+          <div key={key}>
+            <dt>
+              {detailLabels[key] ||
+                key
+                  .replaceAll("_", " ")
+                  .replace(
+                    /\b(id|ids|ip|ips|dns|asn|uuid|url|sha1|sha256|md5)\b/gi,
+                    (word) => word.toUpperCase(),
+                  )
+                  .replace(/^./, (s) => s.toUpperCase())}
+            </dt>
+            <dd>
+              {item == null || item === "" ? (
+                "—"
+              ) : typeof item === "boolean" ? (
+                item ? (
+                  "Yes"
+                ) : (
+                  "No"
+                )
+              ) : key === "status" ? (
+                <Badge value={item} />
+              ) : key === "is_test_release" ? (
+                item ? (
+                  "Yes"
+                ) : (
+                  "No"
+                )
+              ) : key === "progress" && typeof item === "number" ? (
+                `${fmt(item)}%`
+              ) : Number.isInteger(item) && !/(^|_)id$/.test(key) ? (
+                fmt(item)
+              ) : typeof item === "object" && item.email ? (
+                item.email
+              ) : typeof item === "object" ? (
+                <pre className="detail-value">
+                  {JSON.stringify(item, null, 2)}
+                </pre>
+              ) : typeof item === "string" &&
+                /^\d{4}-\d{2}-\d{2}T/.test(item) ? (
+                <time title={item}>{date(item)}</time>
               ) : (
-                "No"
-              )
-            ) : key === "status" ? (
-              <Badge value={item} />
-            ) : typeof item === "object" && item.email ? (
-              item.email
-            ) : typeof item === "object" ? (
-              <pre className="detail-value">
-                {JSON.stringify(item, null, 2)}
-              </pre>
-            ) : typeof item === "string" && /^\d{4}-\d{2}-\d{2}T/.test(item) ? (
-              <time title={item}>{date(item)}</time>
-            ) : (
-              String(item)
-            )}
-          </dd>
-        </div>
-      ))}
+                String(item)
+              )}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }

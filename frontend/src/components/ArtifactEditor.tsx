@@ -190,35 +190,32 @@ export function ArtifactEditor({
         }
         onClose={onClose}
       >
-        <div className="tabs">
-          {(isRule
-            ? initial.new
-              ? ["Content"]
-              : ["Content", "Source", "Revisions", "Samples & files"]
-            : ["Content"]
-          ).map((t) => (
-            <button
-              key={t}
-              className={tab === t ? "active" : ""}
-              onClick={async () => {
-                setTab(t);
-                if (t === "Source") {
-                  try {
-                    setSource(
-                      await write("/yara_rules/copy", {
-                        copy: { ids: [initial.id] },
-                      }),
-                    );
-                  } catch (e: any) {
-                    notify(e.message, true);
+        {isRule && !initial.new && (
+          <div className="tabs">
+            {["Content", "Source", "Revisions", "Samples & files"].map((t) => (
+              <button
+                key={t}
+                className={tab === t ? "active" : ""}
+                onClick={async () => {
+                  setTab(t);
+                  if (t === "Source") {
+                    try {
+                      setSource(
+                        await write("/yara_rules/copy", {
+                          copy: { ids: [initial.id] },
+                        }),
+                      );
+                    } catch (e: any) {
+                      notify(e.message, true);
+                    }
                   }
-                }
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="dialog-body">
           {tab === "Content" ? (
             <form id="artifact-form" onSubmit={save}>
@@ -354,15 +351,6 @@ export function ArtifactEditor({
                         </Select>
                       </label>
                     )}
-                    <label>
-                      Description
-                      <textarea
-                        aria-label="Description"
-                        rows={3}
-                        value={value.description || ""}
-                        onChange={(e) => field("description", e.target.value)}
-                      />
-                    </label>
                     {page === "c2ips" && (
                       <>
                         <label>
@@ -414,7 +402,7 @@ export function ArtifactEditor({
                       </label>
                     )}
                     {(page === "c2ips" || page === "c2dns") && (
-                      <label>
+                      <label className={page === "c2ips" ? "span2" : ""}>
                         Expiration (UTC)
                         <input
                           aria-label="Expiration (UTC)"
@@ -429,6 +417,15 @@ export function ArtifactEditor({
                         />
                       </label>
                     )}
+                    <label className={page === "tasks" ? "span2" : ""}>
+                      Description
+                      <textarea
+                        aria-label="Description"
+                        rows={3}
+                        value={value.description || ""}
+                        onChange={(e) => field("description", e.target.value)}
+                      />
+                    </label>
                     {page === "tasks" ? (
                       <label className="span2">
                         Final artifact
@@ -1096,13 +1093,15 @@ export function ArtifactEditor({
           )}
         </div>
         <div className="dialog-footer artifact-footer">
-          <span className="muted">
-            {initial.uuid
-              ? initial.uuid
-              : initial.id
-                ? "Record #" + initial.id
-                : ""}
-          </span>
+          {!initial.new && (
+            <span className="muted">
+              {initial.uuid
+                ? initial.uuid
+                : initial.id
+                  ? "Record #" + initial.id
+                  : ""}
+            </span>
+          )}
           <div className="button-row">
             {!initial.new && (
               <button
