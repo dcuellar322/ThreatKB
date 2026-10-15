@@ -228,6 +228,8 @@ def update_c2ip(id_or_ip):
     entity.save_metadata(request.json.get("metadata_values", {}))
 
     entity = c2ip.C2ip.query.get(entity.id)
+    if request.json.get('new_comment'):
+        create_comment(request.json['new_comment'], ENTITY_MAPPING["IP"], entity.id, current_user.id)
     return jsonify(entity.to_dict()), 200
 
 

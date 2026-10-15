@@ -63,6 +63,16 @@ def create_comment(comment, entity_type, entity_id, user_id):
     return jsonify(entity.to_dict())
 
 
+def persist_draft_comment(text, entity_type, entity_id):
+    if text is None or text == '':
+        return
+    if not isinstance(text, str) or len(text) > 100000:
+        abort(400, description='Comment must be text under 100,000 characters.')
+    if text.strip():
+        db.session.add(comments.Comments(comment=text.strip(), entity_type=entity_type,
+                                         entity_id=entity_id, user_id=current_user.id))
+
+
 @app.route('/ThreatKB/comments/<int:id>', methods=['DELETE'])
 @auto.doc()
 @login_required

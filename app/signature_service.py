@@ -81,6 +81,9 @@ def save_signature(data, entity=None):
     changed = creating or any(getattr(entity, field) != value for field, value in values.items()) or \
         sorted(old_tags) != new_tags or old_metadata != metadata_values
     if not changed:
+        from app.routes.comments import persist_draft_comment
+        persist_draft_comment(data.get('new_comment'), 1, entity.id)
+        db.session.commit()
         return entity, False
     try:
         from app.detection import validate_signature
@@ -113,6 +116,8 @@ def save_signature(data, entity=None):
             db.session.flush()
         db.session.add(Tags_mapping(source_table='yara_rules', source_id=entity.id, tag_id=tag.id))
     db.session.flush()
+    from app.routes.comments import persist_draft_comment
+    persist_draft_comment(data.get('new_comment'), 1, entity.id)
     db.session.add(Yara_rule_history(yara_rule_id=entity.id, revision=entity.revision,
         date_created=datetime.now(), state=entity.state, user_id=current_user.id,
         rule_json=json.dumps(entity.to_revision_dict())))

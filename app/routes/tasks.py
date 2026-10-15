@@ -111,6 +111,9 @@ def create_tasks():
         owner_user_id=task_owner(data, current_user.id)
     )
     db.session.add(entity)
+    db.session.flush()
+    from app.routes.comments import persist_draft_comment
+    persist_draft_comment(data.get('new_comment'), ENTITY_MAPPING['TASK'], entity.id)
     db.session.commit()
 
     return jsonify(entity.to_dict()), 201
@@ -134,6 +137,9 @@ def update_tasks(id):
         request.json['state']
     entity.modified_user_id = current_user.id
     entity.owner_user_id = task_owner(request.json, entity.owner_user_id)
+
+    from app.routes.comments import persist_draft_comment
+    persist_draft_comment(request.json.get('new_comment'), ENTITY_MAPPING['TASK'], entity.id)
 
     db.session.commit()
 
