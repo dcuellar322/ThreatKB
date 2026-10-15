@@ -1,0 +1,19 @@
+name: Verify application and detection content
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, 2026-07-20
+      - name: Build Python 3.14 and React application
+        run: docker build -t threatkb:ci .
+      - name: Isolated backend and release-gate tests
+        run: docker run --rm --entrypoint python threatkb:ci -m pytest -q
+      - name: Independent Sigpack pipeline
+        run: docker run --rm --entrypoint python threatkb:ci -m threatkb_content --root detections build --kind sigpack --corpus detections/samples --goodware detections/goodware --output /tmp/sigpack
+      - name: Independent Feedpack pipeline
+        run: docker run --rm --entrypoint python threatkb:ci -m threatkb_content --root detections build --kind feedpack --output /tmp/feedpack
+      - name: Independent Codepack pipeline
+        run: docker run --rm --entrypoint python threatkb:ci -m threatkb_content --root detections build --kind codepack --output /tmp/codepack
