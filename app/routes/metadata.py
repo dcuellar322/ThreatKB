@@ -89,6 +89,53 @@ def create_metadata():
     return jsonify(entity.to_dict()), 201
 
 
+@app.put('/ThreatKB/metadata/<int:id>')
+@login_required
+@admin_only()
+def update_metadata_definition(id):
+    """Edit a metadata definition and its enumeration without orphaning values."""
+    entity = db.get_or_404(metadata.Metadata, id)
+    data = request.get_json()
+    type_ = data.get('type', entity.type_)
+    if type_ not in {'string', 'integer', 'date', 'multiline_comment', 'select'}:
+        abort(400, description='Unsupported metadata type.')
+    choices = data.get('choices', [choice.choice for choice in entity.choices])
+    if isinstance(choices, str):
+        choices = [choice.strip() for choice in choices.split(',') if choice.strip()]
+    if not isinstance(choices, list) or any(not isinstance(value, str) for value in choices):
+        abort(400, description='Choices must be a list of strings.')
+    choices = list(dict.fromkeys(choices))
+    values = metadata.MetadataMapping.query.filter_by(metadata_id=id).all()
+    if type_ == 'select':
+        if not choices:
+            abort(400, description='Select fields require at least one choice.')
+        if any(item.value and item.value not in choices for item in values):
+            abort(409, description='An existing artifact uses a choice you are removing.')
+    try:
+        for item in values:
+            if item.value and type_ == 'integer':
+                int(item.value)
+            if item.value and type_ == 'date':
+                parser.parse(item.value)
+    except (TypeError, ValueError):
+        abort(409, description='Existing values cannot be converted to the requested type.')
+    entity.type_ = type_
+    for field in ('key', 'default', 'active', 'required', 'show_in_table', 'export_with_release'):
+        if field in data:
+            setattr(entity, field, data[field])
+    for choice in list(entity.choices):
+        if choice.choice not in choices:
+            db.session.delete(choice)
+    existing = {choice.choice for choice in entity.choices}
+    for choice in choices:
+        if choice not in existing:
+            db.session.add(metadata.MetadataChoices(choice=choice, metadata_id=id,
+                                                    created_user_id=current_user.id))
+    db.session.commit()
+    db.session.expire(entity, ['choices'])
+    return jsonify(entity.to_dict())
+
+
 @app.route('/ThreatKB/metadata', methods=['DELETE'])
 @auto.doc()
 @login_required
