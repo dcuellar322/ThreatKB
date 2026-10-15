@@ -251,10 +251,27 @@ function App() {
     ),
     [notice, setNotice] = useState<any>(null),
     [mobile, setMobile] = useState(false),
+    [narrow, setNarrow] = useState(
+      window.matchMedia("(max-width: 800px)").matches,
+    ),
     [notifications, setNotifications] = useState<any>(null),
     [unread, setUnread] = useState(0),
     [version, setVersion] = useState(0),
     [query, setQuery] = useState("");
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 800px)");
+    const change = () => setNarrow(media.matches);
+    media.addEventListener("change", change);
+    return () => media.removeEventListener("change", change);
+  }, []);
+  useEffect(() => {
+    if (!mobile) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobile(false);
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [mobile]);
   const notify = (message: string, error = false) => {
     setNotice({ message, error });
     setTimeout(() => setNotice(null), 7000);
@@ -326,7 +343,10 @@ function App() {
   const refresh = () => setVersion((v) => v + 1);
   return (
     <div className="app-shell">
-      <aside className={mobile ? "sidebar visible" : "sidebar"}>
+      <aside
+        inert={narrow && !mobile}
+        className={mobile ? "sidebar visible" : "sidebar"}
+      >
         <button className="brand" onClick={() => go("dashboard")}>
           <span className="brand-icon">
             <Shield size={24} />
@@ -627,8 +647,7 @@ function Dashboard({ version, go }: any) {
             <Package size={28} />
           </div>
           <h2>
-            Confidence before
-            <br />
+            Confidence before <br />
             production.
           </h2>
           <p>

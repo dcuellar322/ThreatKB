@@ -1,6 +1,6 @@
 # ThreatKB modernization
 
-Started 2026-10-15. Dependency cutoff: 2026-10-05 (stable releases only).
+Started 2026-10-15. Dependency cutoff: 2026-10-05T00:00:00Z (stable releases only).
 
 ## Delivery sequence
 
@@ -23,17 +23,17 @@ Started 2026-10-15. Dependency cutoff: 2026-10-05 (stable releases only).
 
 ## Uplift acceptance checklist
 
-- [ ] Document footprint and migration/rollback procedures.
-- [ ] Independent detection, intelligence and software content pipelines.
-- [ ] Git-backed YAML signatures and import/export from the legacy store.
-- [ ] Jinja macro lists, filters and bounded expansion with compilation checks.
-- [ ] Category-derived names, rich metadata tags and separate workflow state.
-- [ ] UUID identifiers stable across renames; UUID-based heater/cooler pairings.
-- [ ] Sample-hash references, positive and goodware corpus validation.
-- [ ] Optional external collections with severity/confidence and update tracking.
-- [ ] CI lint, build, test and independent review gates.
-- [ ] Testing and production channels, timed promotion and telemetry alarm gates.
-- [ ] Metrics for release frequency and operational throughput.
+- [x] Document footprint and migration/rollback procedures.
+- [x] Independent detection, intelligence and software content pipelines.
+- [x] Git-backed YAML signatures and import/export from the legacy store.
+- [x] Jinja macro lists, filters and bounded expansion with compilation checks.
+- [x] Category-derived names, rich metadata tags and separate workflow state.
+- [x] UUID identifiers stable across renames; UUID-based heater/cooler pairings.
+- [x] Sample-hash references, positive and goodware corpus validation.
+- [x] Optional external collections with severity/confidence and update tracking.
+- [x] CI lint, build, test and independent review gates.
+- [x] Testing and production channels, timed promotion and telemetry alarm gates.
+- [x] Metrics for release frequency and operational throughput.
 
 External TAC product deployment, customer instances, private corpora and production
 telemetry require those systems to be available; do not report simulated checks as
@@ -67,3 +67,9 @@ These are local tooling and integration contracts. Deployment to TAC/customer
 systems, production telemetry ingestion and the organization's release-frequency
 outcome cannot be verified without those external systems. The code does not
 fabricate those signals or automatically approve its own content.
+
+## Verification and remaining external integration
+
+See `verification.md` for reproducible local evidence and `issue-resolution.md`
+for the complete upstream issue matrix. Checklist marks refer to implemented local
+capabilities; the external acceptance items remain explicit in those documents.

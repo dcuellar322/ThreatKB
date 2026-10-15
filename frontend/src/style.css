@@ -1888,3 +1888,26 @@ th {
   text-overflow: clip;
   white-space: pre-wrap;
 }
+
+@media (max-width: 800px) {
+  .release-card h2 {
+    padding-right: 40px;
+    line-height: 1.35;
+  }
+  button,
+  .button {
+    min-height: 44px;
+  }
+  input:not([type="checkbox"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  .sidebar nav {
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .sidebar nav button {
+    flex-shrink: 0;
+  }
+}

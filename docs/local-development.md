@@ -36,7 +36,7 @@ The entrypoint exits on migration errors instead of starting a broken web server
 ## Dependency refresh
 
 ```sh
-uv pip compile requirements.in --python-version 3.14 --exclude-newer 2026-10-06T00:00:00Z --upgrade -o requirements.txt
+uv pip compile requirements.in --python-version 3.14 --exclude-newer 2026-10-05T00:00:00Z --upgrade -o requirements.txt
 ```
 
 `docs/python-dependency-audit.json` records the registry release date of every pin.
@@ -63,3 +63,32 @@ network disabled, receives the sample path under `/work`, and writes extracted
 files into the mounted work directory. The external image must support that
 entrypoint contract. No DFI image was available in this local installation, so
 only the command adapter and error paths have been verified so far.
+
+## Workbench, worker and scheduler
+
+```sh
+npm --prefix frontend ci --ignore-scripts
+npm run build
+LISTEN_PORT=5080 sh run_web.sh
+# Separate terminals:
+sh run_agent.sh
+sh run_scheduler.sh
+```
+
+Open http://127.0.0.1:5080. For frontend development, `npm run dev` proxies API
+requests to port 5080. The local restored workspace uses Redis at port 6380; the
+Compose deployment uses its private `redis:6379` service. Configure
+`REDIS_BROKER_URL` in your ignored environment or config file. Workers and beat
+share the same database, instance paths and signing key as the web process.
+
+Three preexisting invalid draft signatures in the restored copy (IDs 8–10) were
+disabled, preserving their source and adding audit comments, so active compilation
+can succeed. Repair them before restoring them. This affects only the new local
+MySQL copy. The original database and its backup retain their original contents.
+
+The development seed also provides 25 harmless goodware files under
+`instance/dev-goodware`. Production validation needs a representative private
+corpus; these fixtures prove mechanics and regression behavior only.
+
+For the content schema, independent builders, review/promotion commands, consumer
+contracts and rollback procedure, see [detection-as-code.md](detection-as-code.md).

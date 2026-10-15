@@ -1,35 +1,57 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/InQuest/ThreatKB/rc/.github/wiki/inquest_logo.svg" />
-</p>
+# ThreatKB
 
-### NOTE: THIS REPO IS IN AN ALPHA STATE
+A detection engineering workbench for YARA signatures, IP/domain intelligence,
+analyst reviews and versioned content releases. This maintained fork replaces the
+AngularJS/Bower frontend with React and runs on Python 3.14, Flask 3 and modern MySQL.
 
-ThreatKB is a knowledge base workflow management dashboard for YARA rules and C2 artifacts. Rules are categorized and used to denote intent, severity, and confidence in accumulated artifacts.
+## Run locally
 
-To start using ThreatKB, check out our [wiki](https://github.com/InQuest/ThreatKB/wiki).
+```sh
+uv venv --python 3.14
+uv pip sync --python .venv/bin/python requirements.txt
+npm --prefix frontend ci --ignore-scripts
+npm run build
+export THREATKB_DATABASE_URL='mysql+pymysql://USER:PASSWORD@127.0.0.1:3307/threatkb?charset=utf8mb4'
+export REDIS_BROKER_URL='redis://127.0.0.1:6380/0'
+.venv/bin/flask --app app db upgrade
+.venv/bin/flask --app app admin-user --email you@example.com
+LISTEN_PORT=5080 sh run_web.sh
+```
 
----
+Open http://127.0.0.1:5080. Run `sh run_agent.sh` and `sh run_scheduler.sh` in
+separate terminals for queued jobs, scheduled confidence changes and promotion
+checks. The administrator command prompts for a password. For a fresh Docker
+installation, configure the required environment variables described in the
+[local guide](docs/local-development.md), then run `docker compose up --build`.
 
-Installing by Docker is the currently recommended way of setting up ThreatKB, directions are included as the first link in the wiki. Installation by source is included in the wiki as well.
+## Detection as code
 
-## Table of Contents
+The standalone `threatkb_content` package validates Git-backed YAML signatures,
+assigns stable UUIDs, expands bounded Jinja macros, verifies sample/goodware corpora
+and produces independent Sigpack, Feedpack and Codepack artifacts. Content review
+and elapsed telemetry gates protect testing-to-production promotion. The web
+editor is optional; the CLI needs neither MySQL nor the web application.
 
-* [Home](https://github.com/InQuest/ThreatKB/wiki)
-* [Setup ThreatKB](https://github.com/InQuest/ThreatKB/wiki/Setup)
-  + [Pre-requisites](https://github.com/InQuest/ThreatKB/wiki/Setup#pre-requisites)
-  + [System Prep](https://github.com/InQuest/ThreatKB/wiki/Setup#system-prep)
-  + [Application Install](https://github.com/InQuest/ThreatKB/wiki/Setup#application-install)
-* [Getting Started](https://github.com/InQuest/ThreatKB/wiki/Getting-Started)
-  + [Running ThreatKB](https://github.com/InQuest/ThreatKB/wiki/Getting-Started#running-threatkb)
-  + [Admin User Creation](https://github.com/InQuest/ThreatKB/wiki/Getting-Started#admin-user-creation)
-* [Docker Installation](https://github.com/InQuest/ThreatKB/wiki/Docker)
-* [Database Structure](https://github.com/InQuest/ThreatKB/wiki/Database-Structure)
-* [Documentation](https://github.com/InQuest/ThreatKB/wiki/Documentation)
-* [FAQ](https://github.com/InQuest/ThreatKB/wiki/Frequently-Asked-Questions)
+```sh
+.venv/bin/python -m threatkb_content --root detections check --corpus detections/samples --goodware detections/goodware
+.venv/bin/python -m threatkb_content --root detections build --kind sigpack --corpus detections/samples --goodware detections/goodware
+```
 
-## Thank You
-ThreatKB utilizes Plyara to parse YARA rules into Python dictionaries. A huge thank you to the Plyara team! Links to the project are below:
+See the [content workflow](docs/detection-as-code.md) for schemas, macros,
+collections, reviewer policies, independent pack builds, channels and rollback.
+The included example and development seeds contain harmless synthetic content.
 
-- [Plyara](https://github.com/plyara/plyara) ([LICENSE](https://github.com/plyara/plyara/blob/master/LICENSE))
+## Maintenance and verification
 
-When a release is created, the system first pulls all signatures that are in the release state. Then, it gathers all signatures that are in the staging state and checks their revision history for the most recently released revision that is in the release state. If it finds it, it will include it in the release. If it does not find any previously released revisions, it will skip the signature.
+- [Local services, migration, seed data and rollback](docs/local-development.md)
+- [Modernization scope and upstream synchronization](docs/modernization.md)
+- [Individual upstream issue resolutions](docs/issue-resolution.md)
+- [Verification evidence and external integration limits](docs/verification.md)
+
+Run `.venv/bin/python -m pytest -q` for isolated backend/content regressions and
+`npm run build` for TypeScript and production frontend checks. Registry release
+dates for every dependency pin are recorded under `docs/*dependency-audit.json`.
+CI builds the full image and runs application and independent content checks.
+
+Original project: [InQuest/ThreatKB](https://github.com/InQuest/ThreatKB).
+YARA parsing uses [Plyara](https://github.com/plyara/plyara).
