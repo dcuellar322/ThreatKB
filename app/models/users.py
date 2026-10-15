@@ -65,4 +65,4 @@ class KBUser(db.Model):
         except BadSignature:
             return None  # invalid token
         user = KBUser.query.get(data['id'])
-        return user
+        return user if user and user.active else None

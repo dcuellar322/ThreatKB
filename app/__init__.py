@@ -234,7 +234,8 @@ def setup_logging():
 @login_manager.user_loader
 def load_user(userid):
     app.logger.debug("load_user called with user_id: '%s'" % (str(userid)))
-    return users.KBUser.query.get(int(userid))
+    user = db.session.get(users.KBUser, int(userid))
+    return user if user and user.active else None
 
 
 @login_manager.request_loader

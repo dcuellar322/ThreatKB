@@ -86,8 +86,12 @@ def delete_user_by_id(user_id):
     user = KBUser.query.get(user_id)
     if not user:
         abort(404)
+    if user.id == current_user.id:
+        abort(409, description="Use another administrator to deactivate your account.")
 
     user.active = 0
+    for model in (yara_rule.Yara_rule, c2dns.C2dns, c2ip.C2ip, tasks.Tasks):
+        model.query.filter_by(owner_user_id=user_id).update({"owner_user_id": None})
     db.session.query(access_keys.AccessKeys).filter(access_keys.AccessKeys.user_id == user.id).update(
         {"status": "inactive", "deleted": datetime.datetime.now()})
     db.session.add(user)

@@ -4,6 +4,7 @@ os.environ["THREATKB_DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["THREATKB_SECRET_KEY"] = "isolated-test-secret"
 
 import pytest
+from flask import request_started, g
 from app import app, db, cache, bcrypt
 from app.models.users import KBUser
 
@@ -18,7 +19,13 @@ def client():
                       admin=True, active=True)
         db.session.add(user)
         db.session.commit()
+        # Tests retain an app context for direct database assertions. Reset the
+        # login cache on each request to reproduce real per-request contexts.
+        def reset_login_cache(sender, **kwargs):
+            g.pop('_login_user', None)
+        request_started.connect(reset_login_cache, app)
         yield app.test_client()
+        request_started.disconnect(reset_login_cache, app)
         db.session.remove()
         db.drop_all()
         cache.clear()

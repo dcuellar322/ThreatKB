@@ -15,3 +15,4 @@ not automatically closed, and unlisted issues remain outstanding.
 | #487 | JSON ingestion accepts shared tags as strings or tag dictionaries and associates them with every imported rule. Rich machine tags survive round-trip; ingestion regression passes. |
 | #113 | Persistent per-rule confidence schedule supports create/edit/cancel. A Celery beat task applies due changes once; a CLI command supports local/manual runs. UTC timestamp, range and ownership checks enforced. Due/application/cancellation regression passes. |
 | #214 | Metadata definitions and enum choices are editable through PUT by ID. Removing a choice in use or converting incompatible stored values returns 409. Choice addition and data protection regressions pass. |
+| #244 | Admins can deactivate users while preserving historical attribution. Deactivation releases ownership, revokes access keys, and invalidates existing sessions. Self-deactivation is prevented. Multi-session regression passes. |
