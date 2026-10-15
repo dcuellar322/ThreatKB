@@ -1,0 +1,1168 @@
+import { useState, useEffect } from "react";
+import {
+  FileCode2,
+  Bell,
+  Check,
+  Upload,
+  Download,
+  Play,
+  Trash2,
+  History,
+  Loader2,
+} from "lucide-react";
+import { api, base, write } from "../lib/api";
+import { date } from "../lib/format";
+import { entityNames } from "../lib/navigation";
+import { Badge, Empty, Dialog } from "./ui";
+export function ArtifactEditor({
+  page,
+  initial,
+  onClose,
+  onSaved,
+  notify,
+  user,
+}: any) {
+  const [value, setValue] = useState<any>(initial),
+    [tab, setTab] = useState("Content"),
+    [states, setStates] = useState<any[]>([]),
+    [definitions, setDefinitions] = useState<any[]>([]),
+    [users, setUsers] = useState<any[]>([]),
+    [busy, setBusy] = useState(false),
+    [files, setFiles] = useState<any[]>(initial.files || []),
+    [chosen, setChosen] = useState<Set<number>>(new Set()),
+    [results, setResults] = useState<any>(null),
+    [following, setFollowing] = useState(false),
+    [categories, setCategories] = useState<any[]>([]),
+    [countries, setCountries] = useState<any[]>([]),
+    [discussion, setDiscussion] = useState<any[]>(initial.comments || []),
+    [source, setSource] = useState(""),
+    [compare, setCompare] = useState<any>(null),
+    [merging, setMerging] = useState(false),
+    [mergeQuery, setMergeQuery] = useState(""),
+    [destinations, setDestinations] = useState<any[]>([]),
+    [destination, setDestination] = useState("");
+  const dirty = JSON.stringify(value) !== JSON.stringify(initial);
+  const close = () => {
+    if (!busy && (!dirty || confirm("Discard unsaved changes?"))) onClose();
+  };
+  useEffect(() => {
+    const before = (event: BeforeUnloadEvent) => {
+      if (dirty) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", before);
+    return () => window.removeEventListener("beforeunload", before);
+  }, [dirty]);
+  useEffect(() => {
+    if (!merging) return;
+    const timer = setTimeout(
+      () =>
+        api(
+          "/yara_rules?short=true&page_size=20&include_comments=false&include_metadata=false&searches=" +
+            encodeURIComponent(JSON.stringify({ name: mergeQuery })),
+        ).then((r) =>
+          setDestinations(r.data.filter((row: any) => row.id !== initial.id)),
+        ),
+      200,
+    );
+    return () => clearTimeout(timer);
+  }, [merging, mergeQuery]);
+  const isRule = page === "yara_rules",
+    key = isRule
+      ? "name"
+      : page === "c2ips"
+        ? "ip"
+        : page === "c2dns"
+          ? "domain_name"
+          : page === "tasks"
+            ? "title"
+            : "name";
+  useEffect(() => {
+    if (!initial.new) {
+      const type = ({ yara_rules: 1, c2dns: 2, c2ips: 3, tasks: 4 } as any)[
+        page
+      ];
+      api("/bookmarks?entity_type=" + type + "&entity_id=" + initial.id).then(
+        (r) => setFollowing(r.length > 0),
+      );
+    }
+    const artifactType = (
+      { yara_rules: 1, c2dns: 2, c2ips: 3, tasks: 4 } as any
+    )[page];
+    if (artifactType)
+      api("/metadata?artifact_type=" + artifactType).then(setDefinitions);
+    api("/cfg_states?counts=false").then((rows) => {
+      setStates(rows);
+      if (initial.new && !initial.state)
+        setValue((v: any) => ({
+          ...v,
+          state:
+            rows.find((r: any) => r.is_staging_state)?.state ||
+            rows[0]?.state ||
+            "",
+        }));
+    });
+    if (page === "yara_rules")
+      api("/cfg_category_range_mapping").then(setCategories);
+    if (page === "c2ips") api("/countries").then(setCountries);
+    api("/users").then((r) => setUsers(r.filter((u: any) => u.id)));
+    if (isRule && !initial.new) {
+      api("/yara_rules/" + initial.id + "/sample-results").then(setResults);
+      api("/files?entity_type=1&entity_id=" + initial.id).then(setFiles);
+    }
+  }, []);
+  const field = (name: string, v: any) =>
+    setValue((x: any) => ({ ...x, [name]: v }));
+  async function save(e: any) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const payload = {
+        ...value,
+        asn: value.asn || "",
+        state:
+          typeof value.state === "object" ? value.state.state : value.state,
+        category:
+          typeof value.category === "object"
+            ? value.category.category
+            : value.category,
+      };
+      await write(
+        "/" + page + (initial.new ? "" : "/" + initial.id),
+        payload,
+        initial.new ? "POST" : "PUT",
+      );
+      notify(initial.new ? "Record created." : "Changes saved.");
+      onSaved();
+    } catch (err: any) {
+      notify(err.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      {" "}
+      <Dialog
+        wide
+        dirty={dirty}
+        busy={busy}
+        title={
+          initial.new
+            ? "New " + (entityNames[page] || "release")
+            : initial.name || initial.ip || initial.domain_name || initial.title
+        }
+        onClose={onClose}
+      >
+        <div className="tabs">
+          {(isRule
+            ? initial.new
+              ? ["Content"]
+              : ["Content", "Source", "Revisions", "Samples & files"]
+            : ["Content"]
+          ).map((t) => (
+            <button
+              key={t}
+              className={tab === t ? "active" : ""}
+              onClick={async () => {
+                setTab(t);
+                if (t === "Source") {
+                  try {
+                    setSource(
+                      await write("/yara_rules/copy", {
+                        copy: { ids: [initial.id] },
+                      }),
+                    );
+                  } catch (e: any) {
+                    notify(e.message, true);
+                  }
+                }
+              }}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="dialog-body">
+          {tab === "Content" ? (
+            <form id="artifact-form" onSubmit={save}>
+              <div className="form-grid">
+                <label className="span2">
+                  {isRule
+                    ? "Rule name"
+                    : key === "ip"
+                      ? "IP address"
+                      : key === "domain_name"
+                        ? "Domain name"
+                        : "Name"}
+                  <input
+                    required
+                    value={value[key] || ""}
+                    onChange={(e) => field(key, e.target.value)}
+                  />
+                </label>
+                {initial.release && (
+                  <label className="check-label">
+                    <input
+                      type="checkbox"
+                      checked={!!value.is_test_release}
+                      onChange={(e) =>
+                        field("is_test_release", e.target.checked ? 1 : 0)
+                      }
+                    />
+                    Test release
+                  </label>
+                )}
+                {!initial.release && (
+                  <>
+                    <label>
+                      Workflow state
+                      <select
+                        aria-label="Workflow state"
+                        required
+                        value={
+                          typeof value.state === "object"
+                            ? value.state.state
+                            : value.state || ""
+                        }
+                        onChange={(e) => field("state", e.target.value)}
+                      >
+                        <option value="">Choose a state</option>
+                        {value.state &&
+                          !states.some(
+                            (s: any) =>
+                              s.state ===
+                              (typeof value.state === "object"
+                                ? value.state.state
+                                : value.state),
+                          ) && (
+                            <option
+                              value={
+                                typeof value.state === "object"
+                                  ? value.state.state
+                                  : value.state
+                              }
+                            >
+                              {typeof value.state === "object"
+                                ? value.state.state
+                                : value.state}
+                            </option>
+                          )}
+                        {states.map((s) => (
+                          <option key={s.id}>{s.state}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Owner
+                      <select
+                        aria-label="Owner"
+                        value={
+                          value.owner_user?.id || value.owner_user_id || ""
+                        }
+                        onChange={(e) =>
+                          field(
+                            "owner_user",
+                            e.target.value
+                              ? { id: Number(e.target.value) }
+                              : null,
+                          )
+                        }
+                      >
+                        <option value="">Unassigned</option>
+                        {value.owner_user?.id &&
+                          !users.some(
+                            (u: any) => u.id === value.owner_user.id,
+                          ) && (
+                            <option value={value.owner_user.id}>
+                              {value.owner_user.email}
+                            </option>
+                          )}
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.email}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {isRule && (
+                      <label className="span2">
+                        Category
+                        <select
+                          aria-label="Category"
+                          value={
+                            typeof value.category === "object"
+                              ? value.category.category
+                              : value.category || ""
+                          }
+                          onChange={(e) => field("category", e.target.value)}
+                        >
+                          {!categories.some(
+                            (c) =>
+                              c.category ===
+                              (typeof value.category === "object"
+                                ? value.category.category
+                                : value.category),
+                          ) && (
+                            <option>
+                              {typeof value.category === "object"
+                                ? value.category.category
+                                : value.category || "Uncategorized"}
+                            </option>
+                          )}
+                          {categories.map((category) => (
+                            <option key={category.id}>
+                              {category.category}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <label>
+                      Description
+                      <textarea
+                        aria-label="Description"
+                        rows={3}
+                        value={value.description || ""}
+                        onChange={(e) => field("description", e.target.value)}
+                      />
+                    </label>
+                    {page === "c2ips" && (
+                      <>
+                        <label>
+                          ASN
+                          <input
+                            aria-label="ASN"
+                            value={value.asn || ""}
+                            onChange={(e) => field("asn", e.target.value)}
+                          />
+                        </label>
+                        <label>
+                          Country
+                          <select
+                            aria-label="Country"
+                            value={value.country?.countryCode2 || ""}
+                            onChange={(e) =>
+                              field(
+                                "country",
+                                e.target.value
+                                  ? { countryCode2: e.target.value }
+                                  : null,
+                              )
+                            }
+                          >
+                            <option value="">Unknown</option>
+                            {countries.map((country) => (
+                              <option
+                                key={country.countryCode2}
+                                value={country.countryCode2}
+                              >
+                                {country.countryName}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </>
+                    )}
+                    {page === "c2dns" && (
+                      <label>
+                        Match type
+                        <select
+                          aria-label="Match type"
+                          value={value.match_type || "exact"}
+                          onChange={(e) => field("match_type", e.target.value)}
+                        >
+                          <option value="exact">Exact</option>
+                          <option value="wildcard">Wildcard</option>
+                        </select>
+                      </label>
+                    )}
+                    {(page === "c2ips" || page === "c2dns") && (
+                      <label>
+                        Expiration (UTC)
+                        <input
+                          aria-label="Expiration (UTC)"
+                          type="datetime-local"
+                          value={value.expiration_timestamp?.slice(0, 16) || ""}
+                          onChange={(e) =>
+                            field(
+                              "expiration_timestamp",
+                              e.target.value || null,
+                            )
+                          }
+                        />
+                      </label>
+                    )}
+                    {page === "tasks" ? (
+                      <label className="span2">
+                        Final artifact
+                        <textarea
+                          aria-label="Final artifact"
+                          rows={2}
+                          value={value.final_artifact || ""}
+                          onChange={(e) =>
+                            field("final_artifact", e.target.value)
+                          }
+                        />
+                      </label>
+                    ) : (
+                      <label>
+                        References
+                        <textarea
+                          aria-label="References"
+                          rows={2}
+                          value={value.references || ""}
+                          onChange={(e) => field("references", e.target.value)}
+                        />
+                      </label>
+                    )}
+                    {isRule && (
+                      <>
+                        <label>
+                          Strings
+                          <textarea
+                            aria-label="Strings"
+                            className="code-input"
+                            spellCheck={false}
+                            rows={7}
+                            value={String(value.strings || "").replace(
+                              /^\s*strings:\s*/,
+                              "",
+                            )}
+                            onChange={(e) => field("strings", e.target.value)}
+                          />
+                        </label>
+                        <label>
+                          Condition
+                          <textarea
+                            aria-label="Condition"
+                            className="code-input"
+                            spellCheck={false}
+                            rows={4}
+                            value={String(value.condition || "").replace(
+                              /^\s*condition:\s*/,
+                              "",
+                            )}
+                            onChange={(e) => field("condition", e.target.value)}
+                          />
+                        </label>
+                        <label className="span2">
+                          Imports
+                          <textarea
+                            aria-label="Imports"
+                            className="code-input"
+                            rows={2}
+                            value={value.imports || ""}
+                            onChange={(e) => field("imports", e.target.value)}
+                          />
+                        </label>
+                      </>
+                    )}
+                    {isRule && (
+                      <>
+                        <label>
+                          MITRE tactics
+                          <input
+                            aria-label="MITRE tactics"
+                            value={(value.mitre_tactics || []).join(", ")}
+                            onChange={(e) =>
+                              field(
+                                "mitre_tactics",
+                                e.target.value
+                                  .split(",")
+                                  .map((v) => v.trim())
+                                  .filter(Boolean),
+                              )
+                            }
+                          />
+                        </label>
+                        <label>
+                          MITRE techniques
+                          <input
+                            aria-label="MITRE techniques"
+                            value={(value.mitre_techniques || []).join(", ")}
+                            onChange={(e) =>
+                              field(
+                                "mitre_techniques",
+                                e.target.value
+                                  .split(",")
+                                  .map((v) => v.trim())
+                                  .filter(Boolean),
+                              )
+                            }
+                          />
+                        </label>
+                        <label className="span2">
+                          MITRE sub-techniques
+                          <input
+                            value={(value.mitre_sub_techniques || []).join(
+                              ", ",
+                            )}
+                            onChange={(e) =>
+                              field(
+                                "mitre_sub_techniques",
+                                e.target.value
+                                  .split(",")
+                                  .map((v) => v.trim())
+                                  .filter(Boolean),
+                              )
+                            }
+                          />
+                        </label>
+                      </>
+                    )}
+                    <label className="span2">
+                      Tags <small>Separate with commas</small>
+                      <input
+                        aria-label="Tags"
+                        value={(value.tags || [])
+                          .map((t: any) => (typeof t === "string" ? t : t.text))
+                          .join(", ")}
+                        onChange={(e) =>
+                          field(
+                            "tags",
+                            e.target.value
+                              .split(",")
+                              .map((t) => t.trim())
+                              .filter(Boolean),
+                          )
+                        }
+                      />
+                    </label>
+                    {definitions
+                      .filter((d: any) => d.active)
+                      .map((definition: any) => {
+                        const item = value.metadata_values?.[definition.key];
+                        const change = (v: any) =>
+                          field("metadata_values", {
+                            ...value.metadata_values,
+                            [definition.key]: { ...item, value: v },
+                          });
+                        return (
+                          <label key={definition.id}>
+                            {definition.key}
+                            {definition.choices?.length ? (
+                              <select
+                                value={item?.value ?? definition.default ?? ""}
+                                onChange={(e) => change(e.target.value)}
+                              >
+                                <option value="">Choose a value</option>
+                                {definition.choices.map((c: any) => (
+                                  <option key={c.id} value={c.choice}>
+                                    {c.choice}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                required={!!definition.required}
+                                value={item?.value ?? definition.default ?? ""}
+                                type={
+                                  ["number", "integer"].includes(
+                                    definition.type,
+                                  )
+                                    ? "number"
+                                    : "text"
+                                }
+                                onChange={(e) => change(e.target.value)}
+                              />
+                            )}
+                          </label>
+                        );
+                      })}
+                    <div className="span2">
+                      {isRule && !initial.new && (
+                        <ConfidenceSchedule
+                          ruleId={initial.id}
+                          notify={notify}
+                        />
+                      )}
+                    </div>
+                    {!!discussion.length && (
+                      <section className="span2">
+                        <h3>Review discussion</h3>
+                        {discussion.map((comment: any) => (
+                          <article className="review-comment" key={comment.id}>
+                            <p>{comment.comment}</p>
+                            {user?.admin && (
+                              <button
+                                type="button"
+                                className="text-danger"
+                                onClick={async () => {
+                                  if (!confirm("Delete this comment?")) return;
+                                  try {
+                                    await api("/comments/" + comment.id, {
+                                      method: "DELETE",
+                                    });
+                                    setDiscussion((old) =>
+                                      old.filter((c) => c.id !== comment.id),
+                                    );
+                                    notify("Comment deleted.");
+                                  } catch (e: any) {
+                                    notify(e.message, true);
+                                  }
+                                }}
+                              >
+                                Delete comment
+                              </button>
+                            )}
+                            <small>
+                              {comment.user?.email} ·{" "}
+                              {date(comment.date_created)}
+                            </small>
+                          </article>
+                        ))}
+                      </section>
+                    )}
+                    <label className="span2">
+                      Draft comment <small>Saved with your changes</small>
+                      <textarea
+                        aria-label="Draft comment"
+                        rows={3}
+                        value={value.new_comment || ""}
+                        onChange={(e) => field("new_comment", e.target.value)}
+                        placeholder="Add review context…"
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+            </form>
+          ) : tab === "Source" ? (
+            <label>
+              YARA source
+              <textarea
+                aria-label="YARA source"
+                className="code-input source-editor"
+                readOnly
+                value={source}
+              />
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(source);
+                  notify("YARA copied.");
+                }}
+              >
+                Copy YARA
+              </button>
+            </label>
+          ) : tab === "Revisions" ? (
+            <div>
+              {compare && (
+                <div>
+                  <div className="section-top">
+                    <h3>
+                      Revision {compare.revision} and current revision{" "}
+                      {initial.revision}
+                    </h3>
+                    <button onClick={() => setCompare(null)}>
+                      Close comparison
+                    </button>
+                  </div>
+                  <div className="revision-compare">
+                    <pre>{compare.source}</pre>
+                    <pre>{compare.current}</pre>
+                  </div>
+                </div>
+              )}
+
+              {initial.revisions?.length ? (
+                initial.revisions.map((r: any) => (
+                  <article className="activity-row" key={r.revision}>
+                    <span className="event-icon">
+                      <History size={17} />
+                    </span>
+                    <div>
+                      <strong>Revision {r.revision}</strong>
+                      <small>
+                        {date(r.date_created)} · {r.user?.email}
+                      </small>
+                      <p>{r.releases || "Not included in a release"}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const [source, current] = await Promise.all([
+                            api(
+                              "/yara_rules/" +
+                                initial.id +
+                                "/revision/" +
+                                r.revision,
+                            ),
+                            write("/yara_rules/copy", {
+                              copy: { ids: [initial.id] },
+                            }),
+                          ]);
+                          setCompare({ revision: r.revision, source, current });
+                        } catch (e: any) {
+                          notify(e.message, true);
+                        }
+                      }}
+                    >
+                      Compare with current
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          if (
+                            !confirm(
+                              "Restore revision " +
+                                r.revision +
+                                " as a new revision?",
+                            )
+                          )
+                            return;
+                          await write(
+                            "/yara_rules/" +
+                              initial.id +
+                              "/revisions/" +
+                              r.revision +
+                              "/restore",
+                            {},
+                          );
+                          notify("Revision restored as a new revision.");
+                          onSaved();
+                        } catch (e: any) {
+                          notify(e.message, true);
+                        }
+                      }}
+                    >
+                      Restore
+                    </button>
+                  </article>
+                ))
+              ) : (
+                <Empty text="No revisions yet." />
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="section-top">
+                <h3>Attached samples</h3>
+                <label className="button">
+                  <Upload size={15} />
+                  Upload file
+                  <input
+                    type="file"
+                    hidden
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const body = new FormData();
+                      body.append("file", file);
+                      body.append("entity_type", "1");
+                      body.append("entity_id", initial.id);
+                      try {
+                        const upload = await api("/file_upload", {
+                          method: "POST",
+                          body,
+                        });
+                        setFiles(
+                          await api(
+                            "/files?entity_type=1&entity_id=" + initial.id,
+                          ),
+                        );
+                        notify(
+                          Object.keys(upload.postprocessing_skipped || {})
+                            .length
+                            ? "Sample uploaded. Optional DFI preprocessing was skipped."
+                            : "Sample uploaded.",
+                        );
+                      } catch (err: any) {
+                        notify(err.message, true);
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              {files.map((file) => (
+                <label className="file-row" key={file.id}>
+                  <input
+                    type="checkbox"
+                    aria-label={"Select file " + file.filename}
+                    checked={chosen.has(file.id)}
+                    onChange={() => {
+                      setChosen((previous) => {
+                        const next = new Set(previous);
+                        next.has(file.id)
+                          ? next.delete(file.id)
+                          : next.add(file.id);
+                        return next;
+                      });
+                    }}
+                  />
+                  <FileCode2 size={18} />
+                  <span>
+                    {file.filename}
+                    <small>{file.sha256 || file.sha1}</small>
+                  </span>
+                  <a
+                    aria-label={"Download " + file.filename}
+                    href={base + "/files/" + file.id}
+                  >
+                    <Download size={16} />
+                  </a>
+                </label>
+              ))}
+              {!files.length && <Empty text="No samples attached." />}
+              <div className="button-row">
+                <button
+                  disabled={!chosen.size}
+                  onClick={async () => {
+                    try {
+                      if (!confirm("Delete selected files?")) return;
+                      for (const id of chosen)
+                        await api("/files/" + id, { method: "DELETE" });
+                      setFiles(files.filter((f) => !chosen.has(f.id)));
+                      setChosen(new Set());
+                      notify("Selected files deleted.");
+                    } catch (e: any) {
+                      notify(e.message, true);
+                    }
+                  }}
+                >
+                  <Trash2 size={15} />
+                  Delete selected ({chosen.size})
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const r = await write("/jobs", {
+                        kind: "test_rule",
+                        payload: { rule_id: initial.id, negative: false },
+                      });
+                      notify("Sample test queued: " + r.id.slice(0, 8));
+                    } catch (e: any) {
+                      notify(e.message, true);
+                    }
+                  }}
+                >
+                  <Play size={15} />
+                  Run sample test
+                </button>
+              </div>
+              <button
+                onClick={async () => {
+                  try {
+                    const r = await write("/jobs", {
+                      kind: "test_rule",
+                      payload: { rule_id: initial.id, negative: true },
+                    });
+                    notify("Goodware test queued: " + r.id.slice(0, 8));
+                  } catch (e: any) {
+                    notify(e.message, true);
+                  }
+                }}
+              >
+                Run goodware test
+              </button>
+              <div className="section-top">
+                <h3>Match history</h3>
+                <button
+                  onClick={async () =>
+                    setResults(
+                      await api(
+                        "/yara_rules/" + initial.id + "/sample-results",
+                      ),
+                    )
+                  }
+                >
+                  Refresh outcomes
+                </button>
+              </div>
+              <label className="check-label">
+                <input
+                  type="checkbox"
+                  onChange={async (e) =>
+                    setResults(
+                      await api(
+                        "/yara_rules/" +
+                          initial.id +
+                          "/sample-results?show_all=" +
+                          e.target.checked,
+                      ),
+                    )
+                  }
+                />
+                Include files that have never matched
+              </label>
+              {results?.files?.map((r: any) => (
+                <article
+                  className={
+                    "file-row " + (r.status === "regressed" ? "regressed" : "")
+                  }
+                  key={r.path}
+                >
+                  <Badge value={r.status} />
+                  <span>
+                    {r.path.split("/").pop()}
+                    <small>{r.sha256}</small>
+                  </span>
+                </article>
+              ))}
+            </>
+          )}
+        </div>
+        <div className="dialog-footer">
+          <span className="muted">
+            {initial.uuid
+              ? initial.uuid
+              : initial.id
+                ? "Record #" + initial.id
+                : ""}
+          </span>
+          <div className="button-row">
+            {!initial.new && (
+              <button
+                onClick={async () => {
+                  try {
+                    const type = {
+                      yara_rules: 1,
+                      c2dns: 2,
+                      c2ips: 3,
+                      tasks: 4,
+                    }[page as "yara_rules"];
+                    if (following)
+                      await api(
+                        "/bookmarks?entity_type=" +
+                          type +
+                          "&entity_id=" +
+                          initial.id,
+                        { method: "DELETE" },
+                      );
+                    else
+                      await write("/bookmarks", {
+                        entity_type: type,
+                        entity_id: initial.id,
+                      });
+                    setFollowing(!following);
+                    notify(
+                      following
+                        ? "Stopped following."
+                        : "Following this record.",
+                    );
+                  } catch (e: any) {
+                    notify(e.message, true);
+                  }
+                }}
+              >
+                <Bell size={16} />
+                {following ? "Unfollow" : "Follow"}
+              </button>
+            )}
+            {isRule && (initial.active === false || initial.active === 0) && (
+              <button
+                onClick={async () => {
+                  await write("/yara_rules/" + initial.id + "/restore", {});
+                  onSaved();
+                  notify("Signature restored.");
+                }}
+              >
+                Restore signature
+              </button>
+            )}
+            {!initial.new && !initial.release && (
+              <button
+                className="text-danger"
+                onClick={async () => {
+                  if (!confirm("Deactivate this record?")) return;
+                  try {
+                    await api("/" + page + "/" + initial.id, {
+                      method: "DELETE",
+                    });
+                    notify("Record deactivated.");
+                    onSaved();
+                  } catch (e: any) {
+                    notify(e.message, true);
+                  }
+                }}
+              >
+                Deactivate
+              </button>
+            )}
+            {isRule && !initial.new && (
+              <button onClick={() => setMerging(true)}>Merge into…</button>
+            )}
+            {!isRule &&
+              !initial.new &&
+              (initial.active === false || initial.active === 0) && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await write(
+                        "/artifacts/" +
+                          ({ c2ips: 3, c2dns: 2, tasks: 4 } as any)[page] +
+                          "/" +
+                          initial.id +
+                          "/restore",
+                        {},
+                      );
+                      onSaved();
+                      notify("Record restored.");
+                    } catch (e: any) {
+                      notify(e.message, true);
+                    }
+                  }}
+                >
+                  Restore record
+                </button>
+              )}
+            <button onClick={close}>Close</button>
+            {tab === "Content" && (
+              <button
+                className="primary"
+                type="submit"
+                form="artifact-form"
+                disabled={busy}
+              >
+                {busy ? (
+                  <Loader2 className="spin" size={16} />
+                ) : (
+                  <Check size={16} />
+                )}
+                Save changes
+              </button>
+            )}
+          </div>
+        </div>
+      </Dialog>
+      {merging && (
+        <Dialog
+          title="Merge into another signature"
+          onClose={() => setMerging(false)}
+        >
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                await write("/yara_rules/merge_signatures_by_id", {
+                  merge_from_id: initial.id,
+                  merge_to_id: Number(destination),
+                });
+                setMerging(false);
+                onSaved();
+                notify("Signature merged.");
+              } catch (error: any) {
+                notify(error.message, true);
+              }
+            }}
+          >
+            <div className="dialog-body">
+              <label>
+                Find destination
+                <input
+                  aria-label="Find destination"
+                  value={mergeQuery}
+                  onChange={(e) => setMergeQuery(e.target.value)}
+                />
+              </label>
+              <label>
+                Destination signature
+                <select
+                  aria-label="Destination signature"
+                  required
+                  value={destination}
+                  onChange={(e) => setDestination(e.target.value)}
+                >
+                  <option value="">Choose a signature</option>
+                  {destinations.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="dialog-footer">
+              <button type="button" onClick={() => setMerging(false)}>
+                Cancel
+              </button>
+              <button className="primary" disabled={!destination}>
+                Merge signatures
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+    </>
+  );
+}
+export function ConfidenceSchedule({ ruleId, notify }: any) {
+  const [due, setDue] = useState(""),
+    [confidence, setConfidence] = useState(90),
+    [schedule, setSchedule] = useState<any>(null);
+  useEffect(() => {
+    api("/yara_rules/" + ruleId + "/confidence-schedule").then(setSchedule);
+  }, [ruleId]);
+  return (
+    <fieldset className="schedule">
+      <legend>Scheduled confidence change</legend>
+      {schedule && (
+        <p className="muted">
+          Confidence {schedule.confidence} · {date(schedule.due_at)}{" "}
+          {schedule.applied_at ? "· Applied" : "· Scheduled"}
+        </p>
+      )}
+      <div className="form-grid">
+        <label>
+          Confidence
+          <input
+            aria-label="Confidence"
+            type="number"
+            min="0"
+            max="100"
+            value={confidence}
+            onChange={(e) => setConfidence(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          Apply on
+          <input
+            aria-label="Apply on"
+            type="datetime-local"
+            value={due}
+            onChange={(e) => setDue(e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="button-row">
+        <button
+          type="button"
+          disabled={!due}
+          onClick={async () => {
+            try {
+              setSchedule(
+                await write(
+                  "/yara_rules/" + ruleId + "/confidence-schedule",
+                  { confidence, due_at: new Date(due).toISOString() },
+                  "PUT",
+                ),
+              );
+              notify("Confidence change scheduled.");
+            } catch (e: any) {
+              notify(e.message, true);
+            }
+          }}
+        >
+          Schedule change
+        </button>
+        {schedule && !schedule.applied_at && (
+          <button
+            type="button"
+            onClick={async () => {
+              await api("/yara_rules/" + ruleId + "/confidence-schedule", {
+                method: "DELETE",
+              });
+              setSchedule(null);
+              notify("Scheduled change canceled.");
+            }}
+          >
+            Cancel scheduled change
+          </button>
+        )}
+      </div>
+    </fieldset>
+  );
+}
