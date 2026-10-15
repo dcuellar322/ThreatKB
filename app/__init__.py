@@ -33,13 +33,11 @@ app.config.update(
 )
 if os.path.exists("config.py"):
     app.config.from_object("config")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-    "THREATKB_DATABASE_URL", app.config["SQLALCHEMY_DATABASE_URI"]
+from app.database_config import database_url
+
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url(
+    app.config["SQLALCHEMY_DATABASE_URI"], os.environ
 )
-if app.config["SQLALCHEMY_DATABASE_URI"].startswith("mysql://"):
-    app.config["SQLALCHEMY_DATABASE_URI"] = (
-        "mysql+pymysql://" + app.config["SQLALCHEMY_DATABASE_URI"][8:]
-    )
 app.config["SECRET_KEY"] = os.getenv("THREATKB_SECRET_KEY")
 if not app.config["SECRET_KEY"]:
     from pathlib import Path

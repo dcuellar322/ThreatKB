@@ -19,3 +19,5 @@ app/static/lib
 
 .ruff_cache
 .pytest_cache
+
+.build-tools

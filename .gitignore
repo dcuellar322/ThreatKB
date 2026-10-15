@@ -84,3 +84,5 @@ output/playwright/
 
 !.env.example
 .ruff_cache/
+
+.build-tools/

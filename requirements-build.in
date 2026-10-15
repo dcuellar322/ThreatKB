@@ -1,3 +1,6 @@
 setuptools
 wheel
 packaging
+
+maturin>=1.14.1,<2
+cffi

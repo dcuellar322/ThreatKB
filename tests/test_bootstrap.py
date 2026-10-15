@@ -3,6 +3,32 @@ import os
 import subprocess
 
 
+def test_database_credentials_are_not_interpreted_as_url_syntax():
+    from app.database_config import database_url
+    from sqlalchemy.engine import make_url
+
+    password = "qa:p@ss/word#with%escapes?"
+    result = database_url(
+        "sqlite:///:memory:",
+        {
+            "THREATKB_DATABASE_HOST": "db",
+            "THREATKB_DATABASE_USER": "analyst@example.test",
+            "THREATKB_DATABASE_PASSWORD": password,
+            "THREATKB_DATABASE_URL": "mysql://ignored:ignored@localhost/ignored",
+        },
+    )
+    decoded = make_url(result.render_as_string(hide_password=False))
+    assert decoded.password == password
+    assert decoded.username == "analyst@example.test"
+    assert decoded.host == "db"
+    assert decoded.database == "threatkb"
+    assert (
+        database_url("mysql://u:p@localhost/kb", {})
+        == "mysql+pymysql://u:p@localhost/kb"
+    )
+    assert database_url("sqlite:///:memory:", {}) == "sqlite:///:memory:"
+
+
 def test_entrypoint_stops_when_migration_fails(tmp_path):
     command = tmp_path / "flask"
     command.write_text("#!/bin/sh\nexit 17\n")

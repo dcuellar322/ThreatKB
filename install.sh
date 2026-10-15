@@ -6,13 +6,22 @@ if [ -f .env ]; then
     . ./.env
     set +a
 fi
+# rustup is commonly installed outside the shell PATH on Intel macOS.
+if ! command -v cargo >/dev/null 2>&1 && [ -x "$HOME/.cargo/bin/cargo" ]; then
+    PATH="$HOME/.cargo/bin:$PATH"
+    export PATH
+fi
+CARGO_HOME=${CARGO_HOME:-$PWD/.build-tools/cargo}
+CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$PWD/.build-tools/cargo-target}
+export CARGO_HOME CARGO_TARGET_DIR
 if command -v uv >/dev/null 2>&1; then
-    uv venv --python 3.14 --allow-existing .venv
+    uv venv --python 3.14.7 --allow-existing .venv
     uv pip install --python .venv/bin/python --only-binary=:all: -r requirements-build.txt
     uv pip sync --python .venv/bin/python --no-build-isolation requirements-build.txt requirements-dev.txt
     uv pip check --python .venv/bin/python
 else
     python3.14 -m venv .venv
+    .venv/bin/python -c 'import sys; sys.exit(0 if sys.version_info[:3] == (3, 14, 7) else "Use Python 3.14.7, or install uv to select the pinned interpreter.")'
     .venv/bin/python -m pip install --only-binary=:all: -r requirements-build.txt
     .venv/bin/python -m pip install --no-build-isolation -r requirements-dev.txt
     .venv/bin/python -m pip check

@@ -68,13 +68,13 @@ def upgrade():
                 "modified_time": date_modified,
             },
             {
-                "whitelist_artifact": "(^|[\.\/])google\.com($|[\/\\]",
+                "whitelist_artifact": "(^|[\\.\\/])google\\.com($|[\\/\\]",
                 "notes": "Google DNS",
                 "created_time": date_created,
                 "modified_time": date_modified,
             },
             {
-                "whitelist_artifact": "(^|[\.\/])microsoft\.com($|[\/\\]",
+                "whitelist_artifact": "(^|[\\.\\/])microsoft\\.com($|[\\/\\]",
                 "notes": "Microsoft DNS",
                 "created_time": date_created,
                 "modified_time": date_modified,

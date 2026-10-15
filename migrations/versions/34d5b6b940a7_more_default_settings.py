@@ -27,7 +27,7 @@ def upgrade():
         [
             {
                 "key": "IMPORT_IP_REGEX",
-                "value": "(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,3})?)",
+                "value": r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,3})?)",
                 "public": True,
                 "date_created": date_created,
                 "description": "Regex to parse IP addresses from import text.",
@@ -43,7 +43,7 @@ def upgrade():
             },
             {
                 "key": "IMPORT_SIG_SPLIT_REGEX",
-                "value": "\n[\t\s]*\}[\s\t]*(rule[\t\s][^\r\n]+(?:\{|[\r\n][\r\n\s\t]*\{))",
+                "value": "\n[\t\\s]*\\}[\\s\t]*(rule[\t\\s][^\r\n]+(?:\\{|[\r\n][\r\n\\s\t]*\\{))",
                 "public": True,
                 "description": "Regex to split yara rules when multiple are included in import text.",
                 "date_created": date_created,
@@ -51,7 +51,7 @@ def upgrade():
             },
             {
                 "key": "IMPORT_SIG_PARSE_REGEX",
-                "value": """^[\t\s]*rule[\t\s][^\r\n]+(?:\{|[\r\n][\r\n\s\t]*\{).*?condition:.*?\r?\n?[\t\s]*\}[\s\t]*(?:$|\r?\n)""",
+                "value": """^[\t\\s]*rule[\t\\s][^\r\n]+(?:\\{|[\r\n][\r\n\\s\t]*\\{).*?condition:.*?\r?\n?[\t\\s]*\\}[\\s\t]*(?:$|\r?\n)""",
                 "public": True,
                 "description": "Regex to parse out yara rules from import text.",
                 "date_created": date_created,

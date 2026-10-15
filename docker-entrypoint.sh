@@ -7,7 +7,7 @@ role=${THREATKB_ROLE:-web}
 if [ "${RUN_AGENT:-0}" = "1" ]; then role=worker; fi
 case "$role" in
     worker)
-        exec celery -A app.celeryapp:celery worker --loglevel="${LOG_LEVEL:-info}" --concurrency="${CELERY_CONCURRENCY:-2}"
+        exec celery -A app.celeryapp:celery worker --pool="${CELERY_POOL:-prefork}" --loglevel="${LOG_LEVEL:-info}" --concurrency="${CELERY_CONCURRENCY:-2}"
         ;;
     scheduler)
         instance=${THREATKB_INSTANCE_PATH:-/opt/threatkb/instance}

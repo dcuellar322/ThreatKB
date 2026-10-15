@@ -46,5 +46,12 @@
     "commit": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     "published": "2026-04-10T17:31:14Z",
     "source": "https://github.com/actions/upload-artifact/releases/tag/v7.0.1"
+  },
+  {
+    "kind": "toolchain",
+    "name": "rust",
+    "version": "1.97.1",
+    "published": "2026-07-16T12:29:15Z",
+    "source": "https://github.com/rust-lang/rust/releases/tag/1.97.1"
   }
 ]

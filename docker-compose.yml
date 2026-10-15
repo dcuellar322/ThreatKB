@@ -12,7 +12,10 @@ services:
       - mysql_2026:/var/lib/mysql
     healthcheck:
       test:
-        ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql --protocol=TCP -h 127.0.0.1 -u $$MYSQL_USER -D $$MYSQL_DATABASE --batch --execute='SELECT 1'"]
+        [
+          "CMD-SHELL",
+          "MYSQL_PWD=$$MYSQL_PASSWORD mysql --protocol=TCP -h 127.0.0.1 -u $$MYSQL_USER -D $$MYSQL_DATABASE --batch --execute='SELECT 1'",
+        ]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -20,6 +23,8 @@ services:
     ports:
       - "127.0.0.1:${REDIS_PORT:-6380}:6379"
     image: redis:8.10.2@sha256:6f81e8915c60b065a524e6967e0ad1c639ba6efa84d669f823683ea04d9150ee
+    volumes:
+      - redis_2026:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -32,7 +37,10 @@ services:
     ports:
       - "127.0.0.1:${WEB_PORT:-5080}:5000"
     environment: &app_environment
-      THREATKB_DATABASE_URL: mysql+pymysql://threatkb:${SQL_PASSWORD}@db:3306/threatkb?charset=utf8mb4
+      THREATKB_DATABASE_HOST: db
+      THREATKB_DATABASE_USER: threatkb
+      THREATKB_DATABASE_PASSWORD: ${SQL_PASSWORD:?Set SQL_PASSWORD}
+      THREATKB_DATABASE_NAME: threatkb
       THREATKB_INSTANCE_PATH: /opt/threatkb/instance
       THREATKB_SECRET_KEY: ${THREATKB_SECRET_KEY:?Set THREATKB_SECRET_KEY}
       REDIS_BROKER_URL: redis://redis:6379/0
@@ -86,4 +94,5 @@ services:
         condition: service_healthy
 volumes:
   mysql_2026:
+  redis_2026:
   workspace:

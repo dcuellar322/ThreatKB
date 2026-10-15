@@ -40,6 +40,7 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=6 CMD pytho
 ENTRYPOINT ["/bin/sh", "/opt/threatkb/docker-entrypoint.sh"]
 
 FROM application AS verification
+ENV PYTEST_ADDOPTS="-o cache_dir=/tmp/threatkb-pytest-cache" RUFF_CACHE_DIR=/tmp/threatkb-ruff-cache
 USER root
 COPY requirements-dev.txt ./
 RUN pip install --no-cache-dir --only-binary=:all: -r requirements-dev.txt

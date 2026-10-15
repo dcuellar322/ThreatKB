@@ -153,6 +153,13 @@ def validate_infrastructure(root, cutoff):
         for stamp in snapshots
     ):
         raise ValueError("Debian package snapshots must predate the cutoff.")
+    import tomllib
+
+    toolchain = tomllib.loads((root / "rust-toolchain.toml").read_text())["toolchain"][
+        "channel"
+    ]
+    if toolchain != references[("toolchain", "rust")]["version"]:
+        raise ValueError("Rust toolchain differs from its age evidence.")
     return len(references)
 
 
