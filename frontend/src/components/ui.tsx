@@ -1,3 +1,4 @@
+import { date } from "../lib/format";
 import { useEffect, useRef, useState, useId } from "react";
 import { X, Loader2, Maximize2, Minimize2 } from "lucide-react";
 
@@ -45,6 +46,9 @@ export function Loading() {
     </div>
   );
 }
+let dialogLocks = 0;
+let previousOverflow = "";
+
 export function Dialog({
   title,
   children,
@@ -61,17 +65,46 @@ export function Dialog({
       onClose();
   };
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
     ref.current?.showModal();
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (dialogLocks++ === 0) {
+      previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
     const target = ref.current?.querySelector<HTMLInputElement>(
-      "input:not([type=checkbox]):not([type=file]),textarea,select",
+      "input:not([type=checkbox]):not([type=file]):not([type=hidden]),textarea,[role=combobox]",
     );
     target?.focus();
     return () => {
-      document.body.style.overflow = previous;
+      if (--dialogLocks === 0) document.body.style.overflow = previousOverflow;
+      queueMicrotask(() => {
+        if (previousFocus?.isConnected) previousFocus.focus();
+      });
     };
   }, []);
+  useEffect(() => {
+    const topmost = () =>
+      [...document.querySelectorAll("dialog[open]")].at(-1) === ref.current;
+    const navigate = (event: Event) => {
+      if (
+        topmost() &&
+        (busy || (dirty && !window.confirm("Discard unsaved changes?")))
+      )
+        event.preventDefault();
+    };
+    const unload = (event: BeforeUnloadEvent) => {
+      if (dirty || busy) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("threatkb:before-navigate", navigate);
+    window.addEventListener("beforeunload", unload);
+    return () => {
+      window.removeEventListener("threatkb:before-navigate", navigate);
+      window.removeEventListener("beforeunload", unload);
+    };
+  }, [dirty, busy]);
   return (
     <dialog
       ref={ref}
@@ -101,5 +134,42 @@ export function Dialog({
       </div>
       {children}
     </dialog>
+  );
+}
+
+export function DetailList({ value }: { value: Record<string, any> }) {
+  return (
+    <dl className="detail-list">
+      {Object.entries(value).map(([key, item]) => (
+        <div key={key}>
+          <dt>
+            {key.replaceAll("_", " ").replace(/^./, (s) => s.toUpperCase())}
+          </dt>
+          <dd>
+            {item == null || item === "" ? (
+              "—"
+            ) : typeof item === "boolean" ? (
+              item ? (
+                "Yes"
+              ) : (
+                "No"
+              )
+            ) : key === "status" ? (
+              <Badge value={item} />
+            ) : typeof item === "object" && item.email ? (
+              item.email
+            ) : typeof item === "object" ? (
+              <pre className="detail-value">
+                {JSON.stringify(item, null, 2)}
+              </pre>
+            ) : typeof item === "string" && /^\d{4}-\d{2}-\d{2}T/.test(item) ? (
+              <time title={item}>{date(item)}</time>
+            ) : (
+              String(item)
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }

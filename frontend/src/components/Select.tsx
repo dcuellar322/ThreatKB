@@ -114,7 +114,7 @@ export function Select({
         list.scrollTop =
           option.offsetTop + option.offsetHeight - list.clientHeight;
     }
-  }, [active, id]);
+  }, [active, id, query]);
   const choose = (option: any) => {
     if (!option || option.disabled) return;
     onChange?.({
@@ -199,21 +199,17 @@ export function Select({
                 close(true);
               }
               if (e.key === "Tab") close(true);
-              if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+              if (["ArrowDown", "ArrowUp"].includes(e.key)) {
                 e.preventDefault();
-                setActive((n) =>
-                  e.key === "Home"
-                    ? 0
-                    : e.key === "End"
-                      ? matches.length - 1
-                      : Math.max(
-                          0,
-                          Math.min(
-                            matches.length - 1,
-                            n + (e.key === "ArrowDown" ? 1 : -1),
-                          ),
-                        ),
-                );
+                const step = e.key === "ArrowDown" ? 1 : -1;
+                let next = active + step;
+                while (
+                  next >= 0 &&
+                  next < matches.length &&
+                  matches[next].disabled
+                )
+                  next += step;
+                if (next >= 0 && next < matches.length) setActive(next);
               }
               if (e.key === "Enter") {
                 e.preventDefault();

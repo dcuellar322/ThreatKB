@@ -1,4 +1,4 @@
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { api } from "../lib/api";
@@ -70,6 +70,14 @@ export function TagInput({
     setActive(-1);
     setFocused(false);
   };
+  useEffect(() => {
+    const form = root.current?.closest("form");
+    const commitPending = () => {
+      if (query.trim()) flushSync(() => add(query));
+    };
+    form?.addEventListener("submit", commitPending, true);
+    return () => form?.removeEventListener("submit", commitPending, true);
+  }, [query, value]);
   return (
     <div
       ref={root}
@@ -127,6 +135,7 @@ export function TagInput({
             if (e.key === "Escape" && focused) {
               e.preventDefault();
               e.stopPropagation();
+              if (query.trim()) add(query);
               setFocused(false);
             }
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {

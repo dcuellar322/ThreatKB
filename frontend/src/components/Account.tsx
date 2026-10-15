@@ -4,10 +4,11 @@ import { api, base, write } from "../lib/api";
 import { date } from "../lib/format";
 
 import { Empty } from "./ui";
-export function Account({ user, notify, onUser }: any) {
+export function Account({ user, notify, onUser, version }: any) {
   const pictureInput = useRef<HTMLInputElement>(null);
   const [keys, setKeys] = useState<any[]>([]),
     [secret, setSecret] = useState<any>(null),
+    [keyBusy, setKeyBusy] = useState<number | string | null>(null),
     [password, setPassword] = useState(""),
     [profile, setProfile] = useState({
       first_name: user.first_name || "",
@@ -15,10 +16,26 @@ export function Account({ user, notify, onUser }: any) {
       email: user.email,
     }),
     [pictureVersion, setPictureVersion] = useState(0);
-  const reload = () => api("/access_keys").then(setKeys);
+  const reload = () =>
+    api("/access_keys")
+      .then(setKeys)
+      .catch((e: any) => notify(e.message, true));
   useEffect(() => {
     reload();
-  }, []);
+  }, [version]);
+  async function changeKey(key: any, status: string) {
+    if (keyBusy !== null) return;
+    if (status === "deleted" && !confirm("Revoke this access key?")) return;
+    setKeyBusy(key.id);
+    try {
+      await write("/access_keys/" + key.id, { status }, "PUT");
+      await reload();
+    } catch (e: any) {
+      notify(e.message, true);
+    } finally {
+      setKeyBusy(null);
+    }
+  }
   return (
     <div className="split-panels">
       <section className="panel import-panel">
@@ -127,6 +144,15 @@ export function Account({ user, notify, onUser }: any) {
             }
           }}
         >
+          <input
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            name="username"
+            autoComplete="username"
+            value={user.email}
+            readOnly
+          />
           <label>
             New password
             <input
@@ -156,12 +182,17 @@ export function Account({ user, notify, onUser }: any) {
           secret before closing this view.
         </p>
         <button
+          disabled={keyBusy !== null}
           onClick={async () => {
+            if (keyBusy !== null) return;
+            setKeyBusy("new");
             try {
               setSecret(await write("/access_keys", {}));
-              reload();
+              await reload();
             } catch (e: any) {
               notify(e.message, true);
+            } finally {
+              setKeyBusy(null);
             }
           }}
         >
@@ -190,28 +221,17 @@ export function Account({ user, notify, onUser }: any) {
               </small>
             </div>
             <button
-              disabled={key.status === "deleted"}
-              onClick={async () => {
-                await write(
-                  "/access_keys/" + key.id,
-                  { status: key.status === "active" ? "inactive" : "active" },
-                  "PUT",
-                );
-                reload();
-              }}
+              disabled={key.status === "deleted" || keyBusy !== null}
+              onClick={() =>
+                changeKey(key, key.status === "active" ? "inactive" : "active")
+              }
             >
               {key.status === "active" ? "Disable" : "Enable"}
             </button>
             <button
-              disabled={key.status === "deleted"}
-              onClick={async () => {
-                await write(
-                  "/access_keys/" + key.id,
-                  { status: "deleted" },
-                  "PUT",
-                );
-                reload();
-              }}
+              className="text-danger"
+              disabled={key.status === "deleted" || keyBusy !== null}
+              onClick={() => changeKey(key, "deleted")}
             >
               Revoke
             </button>
@@ -221,13 +241,13 @@ export function Account({ user, notify, onUser }: any) {
     </div>
   );
 }
-export function Following({ notify }: any) {
+export function Following({ notify, version }: any) {
   const [items, setItems] = useState<any[]>([]);
   useEffect(() => {
     api("/bookmarks")
       .then(setItems)
       .catch((e: any) => notify(e.message, true));
-  }, []);
+  }, [version]);
   return (
     <section className="panel">
       {items.length ? (

@@ -2425,3 +2425,308 @@ button[hidden] {
 .cell-select .badge {
   font-size: 11px;
 }
+
+/* Form hierarchy and disclosure controls share the same compact visual language. */
+.form-section {
+  min-width: 0;
+  margin: 4px 0 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.form-section > legend {
+  padding: 0 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #404047;
+}
+.config-options {
+  margin-top: 22px;
+}
+.config-options .check-label {
+  min-height: 28px;
+}
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.import-file {
+  align-self: flex-start;
+  flex-direction: row;
+}
+.import-file:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.import-options,
+.disclosure {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  min-width: 0;
+}
+.import-options > summary,
+.disclosure > summary,
+.sample-folders > summary,
+.activity-distribution > summary,
+details.import-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  list-style: none;
+  padding: 11px 12px;
+  min-height: 40px;
+  font-weight: 500;
+}
+:is(
+    .import-options,
+    .disclosure,
+    .sample-folders,
+    .activity-distribution,
+    details.import-panel
+  )
+  > summary::-webkit-details-marker {
+  display: none;
+}
+:is(
+    .import-options,
+    .disclosure,
+    .sample-folders,
+    .activity-distribution,
+    details.import-panel
+  )
+  > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+:is(
+    .import-options,
+    .disclosure,
+    .sample-folders,
+    .activity-distribution,
+    details.import-panel
+  )[open]
+  > summary::before {
+  transform: rotate(45deg);
+}
+:is(
+    .import-options,
+    .disclosure,
+    .sample-folders,
+    .activity-distribution,
+    details.import-panel
+  )
+  > summary:hover {
+  background: #f5f5f7;
+}
+.import-options[open] > summary,
+.disclosure[open] > summary {
+  border-bottom: 1px solid var(--line);
+}
+.import-options > :not(summary),
+.disclosure > :not(summary) {
+  margin: 12px;
+}
+.import-options > .form-grid {
+  padding: 0;
+}
+.import-options > label {
+  margin-bottom: 12px;
+}
+.import-options > button {
+  margin-top: 0;
+}
+.git-exports {
+  margin-top: 16px;
+}
+details.import-panel {
+  padding: 0;
+}
+details.import-panel > :not(summary) {
+  margin: 14px;
+}
+.activity-distribution {
+  padding: 0;
+}
+.activity-distribution .distribution-list {
+  padding: 0 12px 12px;
+}
+.detail-section {
+  margin-top: 18px;
+}
+.detail-value {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.detail-list dd {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.result-counts {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+}
+.result-counts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.result-counts dd {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 5px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.import-result {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+@media (max-width: 800px) {
+  .config-fields .span2 {
+    grid-column: 1/-1;
+  }
+  .config-options .check-label {
+    min-height: 34px;
+  }
+  .config-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .section-top {
+    flex-wrap: wrap;
+  }
+  .section-top > .button-row {
+    width: 100%;
+  }
+  .section-top > .button-row > input {
+    flex: 1;
+    width: 120px;
+  }
+  .section-top > .button-row > .primary {
+    flex-shrink: 0;
+  }
+  .form-actions > button {
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+dialog.expanded > form {
+  flex: 1;
+}
+button.dropzone {
+  width: 100%;
+  white-space: normal;
+}
+.import-panel form > button {
+  align-self: flex-start;
+}
+input:read-only {
+  background: #f6f6f7;
+  border-color: #d8d8de;
+}
+.import-preview .check-label {
+  overflow-wrap: anywhere;
+}
+fieldset.selection-bar {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+.artifact-footer > .button-row {
+  width: 100%;
+}
+.record-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-right: auto;
+}
+.record-actions-toggle {
+  display: none;
+}
+@media (max-width: 700px) {
+  .artifact-footer > .muted {
+    display: none;
+  }
+  .artifact-footer .record-actions-toggle {
+    display: inline-flex;
+    margin-right: auto;
+  }
+  .record-actions-toggle[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+  }
+  .record-actions {
+    display: none;
+    order: 3;
+    flex-basis: 100%;
+    margin: 4px 0 0;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+  .record-actions.open {
+    display: flex;
+  }
+  .record-actions .revision-option {
+    order: 1;
+    justify-content: flex-start;
+  }
+}
+.test-results {
+  max-height: min(55dvh, 480px);
+  margin-top: 12px;
+}
+.test-results td {
+  vertical-align: top;
+  white-space: normal;
+}
+.test-results td:first-child {
+  min-width: 240px;
+  overflow-wrap: anywhere;
+}
+.test-results td pre {
+  max-width: 320px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+label.file-row {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+.file-row > .badge {
+  flex: 0 0 auto;
+}
+.file-row > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sample-actions {
+  margin: 14px 0 20px;
+}
+.sample-history-options {
+  margin: 12px 0;
+}

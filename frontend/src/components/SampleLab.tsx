@@ -1,10 +1,18 @@
-import { useState } from "react";
-import { ScanLine, FileCode2, Plus, ArrowUpRight, Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  ScanLine,
+  FileCode2,
+  Plus,
+  ArrowUpRight,
+  Upload,
+  X,
+} from "lucide-react";
 import { api, write } from "../lib/api";
 import { fmt } from "../lib/format";
 
-import { Badge, Empty } from "./ui";
+import { Badge, Empty, IconButton } from "./ui";
 export function SampleLab({ notify }: any) {
+  const input = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]),
     [result, setResult] = useState<any>(null),
     [name, setName] = useState("generated_candidate"),
@@ -43,20 +51,51 @@ export function SampleLab({ notify }: any) {
           Scan one sample against your active signatures, or use related samples
           to generate a draft.
         </p>
-        <label className="dropzone">
-          <Upload size={30} />
+        <button
+          type="button"
+          className="dropzone"
+          disabled={busy}
+          onClick={() => input.current?.click()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (!busy) {
+              setFiles(Array.from(e.dataTransfer.files));
+              setResult(null);
+            }
+          }}
+        >
+          <Upload size={26} />
           <strong>Choose sample files</strong>
-          <input
-            type="file"
-            multiple
-            onChange={(e) => setFiles(Array.from(e.target.files || []))}
-          />
-        </label>
-        {files.map((f) => (
-          <div className="file-row" key={f.name}>
+        </button>
+        <input
+          ref={input}
+          aria-label="Choose sample files"
+          type="file"
+          multiple
+          hidden
+          disabled={busy}
+          onChange={(e) => {
+            setFiles(Array.from(e.target.files || []));
+            setResult(null);
+            e.target.value = "";
+          }}
+        />
+        {files.map((f, index) => (
+          <div className="file-row" key={f.name + index}>
             <FileCode2 size={17} />
             <span>{f.name}</span>
             <small>{fmt(f.size)} bytes</small>
+            <IconButton
+              label={"Remove " + f.name}
+              disabled={busy}
+              onClick={() => {
+                setFiles(files.filter((_, i) => i !== index));
+                setResult(null);
+              }}
+            >
+              <X size={15} />
+            </IconButton>
           </div>
         ))}
         <label>
@@ -74,9 +113,14 @@ export function SampleLab({ notify }: any) {
             onClick={() => run()}
           >
             <ScanLine size={17} />
-            Scan sample
+            {files.length > 1 ? "Scan first sample" : "Scan sample"}
           </button>
-          <button disabled={!files.length || busy} onClick={() => run(true)}>
+          <button
+            disabled={
+              !files.length || busy || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
+            }
+            onClick={() => run(true)}
+          >
             <Plus size={17} />
             Generate candidate
           </button>
@@ -95,7 +139,10 @@ export function SampleLab({ notify }: any) {
             <pre className="source-preview">{result.source}</pre>
             <button
               className="primary"
+              disabled={busy}
               onClick={async () => {
+                if (busy) return;
+                setBusy(true);
                 try {
                   await write("/import", {
                     import_text: result.source,
@@ -108,6 +155,8 @@ export function SampleLab({ notify }: any) {
                   notify("Candidate imported into Vetting.");
                 } catch (e: any) {
                   notify(e.message, true);
+                } finally {
+                  setBusy(false);
                 }
               }}
             >

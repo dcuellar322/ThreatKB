@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { TagInput, RecordTags } from "./TagInput";
 import { recordLink } from "../lib/links";
 import { Select } from "./Select";
@@ -21,7 +22,7 @@ import {
 import { api, write, base } from "../lib/api";
 import { fmt, date } from "../lib/format";
 import { entityNames } from "../lib/navigation";
-import { Badge, IconButton, Empty, Dialog, Loading } from "./ui";
+import { Badge, IconButton, Empty, Dialog, Loading, DetailList } from "./ui";
 import { ArtifactEditor } from "./ArtifactEditor";
 
 type RuleFilter = { field: string; op: string; value: string };
@@ -87,7 +88,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
     [editor, setEditor] = useState<any>(null),
     [extra, setExtra] = useState<any>(null),
     [savingRow, setSavingRow] = useState<number | null>(null),
-    [bulk, setBulk] = useState(false),
+    [bulk, setBulk] = useState<number[] | null>(null),
     [source, setSource] = useState<any>(null),
     [wrap, setWrap] = useState(false),
     [states, setStates] = useState<any[]>([]),
@@ -156,7 +157,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
   ]);
   useEffect(() => {
     setSelected(new Set());
-  }, [page, index, size, debounced, view, filters, sort, direction]);
+  }, [page, index, size, query, debounced, view, filters, sort, direction]);
   useEffect(() => {
     if (allRef.current)
       allRef.current.indeterminate =
@@ -270,7 +271,8 @@ export function Records({ page, version, notify, refresh, user }: any) {
     }
   };
   const closeEditor = () => {
-    setEditor(null);
+    // Remove the dialog guard before navigating after a successful save or close.
+    flushSync(() => setEditor(null));
     if (recordId || location.hash.includes("new=")) location.hash = "#/" + page;
   };
   const quickEdit = async (row: any, field: string, value: any) => {
@@ -311,10 +313,28 @@ export function Records({ page, version, notify, refresh, user }: any) {
           : page === "activity_log"
             ? "activity_type"
             : page === "releases"
-              ? null
+              ? "is_test_release"
               : "state",
-      label: "State",
+      label:
+        page === "jobs"
+          ? "Status"
+          : page === "activity_log"
+            ? "Action"
+            : page === "releases"
+              ? "Channel"
+              : "State",
     },
+    ...(page === "releases"
+      ? [
+          { key: "num_signatures", label: "Signatures" },
+          { key: "num_ips", label: "IPs" },
+          { key: "num_dns", label: "Domains" },
+          { key: null, label: "Created by", type: "creator" },
+        ]
+      : []),
+    ...(page === "activity_log"
+      ? [{ key: "user.email", label: "Analyst", type: "analyst" }]
+      : []),
     ...(editable && visibleColumns.includes("owner")
       ? [{ key: "owner_user.email", label: "Owner" }]
       : []),
@@ -333,7 +353,12 @@ export function Records({ page, version, notify, refresh, user }: any) {
         field: d.key,
       })),
     ...(visibleColumns.includes("updated")
-      ? [{ key: timestampKeys[page], label: "Updated" }]
+      ? [
+          {
+            key: timestampKeys[page],
+            label: page === "releases" ? "Created" : "Updated",
+          },
+        ]
       : []),
   ];
   const fieldOptions: any[] = [
@@ -389,12 +414,13 @@ export function Records({ page, version, notify, refresh, user }: any) {
     const timer = setTimeout(refresh, 2000);
     return () => clearTimeout(timer);
   }, [page, data]);
+  const pending = loading || query !== debounced;
   const total = data?.total_count || 0,
     pages = Math.max(1, Math.ceil(total / size));
   return (
     <>
       {page === "activity_log" && <ActivityDistribution days={days} />}
-      <section className="panel records-panel" aria-busy={loading}>
+      <section className="panel records-panel" aria-busy={pending}>
         <div className="table-toolbar">
           <div className="search-field">
             <Search size={16} />
@@ -644,9 +670,11 @@ export function Records({ page, version, notify, refresh, user }: any) {
           </div>
         )}
         {editable && selected.size > 0 && (
-          <div className="selection-bar">
+          <fieldset className="selection-bar" disabled={pending}>
             <strong>{selected.size} selected</strong>
-            <button onClick={() => setBulk(true)}>Edit selected</button>
+            <button onClick={() => setBulk([...selected])}>
+              Edit selected
+            </button>
             {page === "yara_rules" && (
               <>
                 <button onClick={() => selectedSource("download")}>
@@ -682,7 +710,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
             <button onClick={() => setSelected(new Set())}>
               Clear selection
             </button>
-          </div>
+          </fieldset>
         )}
         {error ? (
           <div className="inline-error" role="alert">
@@ -710,6 +738,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
                         ref={allRef}
                         type="checkbox"
                         aria-label="Select all visible records"
+                        disabled={pending || !data.data.length}
                         checked={
                           data.data.length > 0 &&
                           data.data.every((row: any) => selected.has(row.id))
@@ -784,6 +813,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
                           aria-label={
                             "Select " + (row[nameKeys[page]] || row.id)
                           }
+                          disabled={pending}
                           checked={selected.has(row.id)}
                           onChange={() =>
                             setSelected((old) => {
@@ -868,6 +898,18 @@ export function Records({ page, version, notify, refresh, user }: any) {
                                 </option>
                               ))}
                           </Select>
+                        ) : column.key === "is_test_release" ? (
+                          <Badge
+                            value={
+                              row.is_test_release
+                                ? "Test release"
+                                : "Production"
+                            }
+                          />
+                        ) : column.type === "creator" ? (
+                          row.created_user?.email || "System"
+                        ) : column.type === "analyst" ? (
+                          row.user?.email || "System"
                         ) : column.key === "state" ||
                           column.key === "status" ||
                           column.key === "activity_type" ||
@@ -957,7 +999,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
                 fmt(Math.min((index + 1) * size, total))
               : "0"}{" "}
             of {fmt(total)}
-            {loading ? " · Updating…" : ""}
+            {pending ? " · Updating…" : ""}
           </span>
           <div>
             <label>
@@ -1044,6 +1086,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
         )}
       {editor && (
         <ArtifactEditor
+          key={editor.id || "new"}
           user={user}
           page={page}
           initial={editor}
@@ -1057,16 +1100,16 @@ export function Records({ page, version, notify, refresh, user }: any) {
       )}
       {bulk && (
         <BulkEditor
-          count={selected.size}
-          ids={[...selected]}
+          count={bulk.length}
+          ids={bulk}
           page={page}
           states={states.filter((s) => user.admin || !s.is_release_state)}
           users={users}
           categories={categories}
           notify={notify}
-          onClose={() => setBulk(false)}
+          onClose={() => setBulk(null)}
           onSaved={() => {
-            setBulk(false);
+            setBulk(null);
             setSelected(new Set());
             refresh();
           }}
@@ -1138,24 +1181,33 @@ export function Records({ page, version, notify, refresh, user }: any) {
           onClose={() => setExtra(null)}
         >
           <div className="dialog-body">
-            <dl className="detail-list">
-              {Object.entries(extra)
-                .filter(([key]) => !["result", "payload"].includes(key))
-                .map(([key, value]) => (
-                  <div key={key}>
-                    <dt>{key.replaceAll("_", " ")}</dt>
-                    <dd>
-                      {typeof value === "object"
-                        ? JSON.stringify(value)
-                        : String(value ?? "—")}
-                    </dd>
-                  </div>
-                ))}
-            </dl>
+            <DetailList
+              value={Object.fromEntries(
+                Object.entries(extra).filter(
+                  ([key]) => !["result", "payload"].includes(key),
+                ),
+              )}
+            />
             {extra.result && (
-              <pre className="source-preview">
-                {JSON.stringify(extra.result, null, 2)}
-              </pre>
+              <section className="detail-section">
+                <h3>Result</h3>
+                {typeof extra.result === "object" &&
+                !Array.isArray(extra.result) ? (
+                  <DetailList value={extra.result} />
+                ) : (
+                  <pre className="source-preview">
+                    {JSON.stringify(extra.result, null, 2)}
+                  </pre>
+                )}
+              </section>
+            )}
+            {extra.payload && (
+              <details className="disclosure">
+                <summary>Job inputs</summary>
+                <pre className="source-preview">
+                  {JSON.stringify(extra.payload, null, 2)}
+                </pre>
+              </details>
             )}
           </div>
           {page === "releases" && (

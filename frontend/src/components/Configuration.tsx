@@ -1,11 +1,12 @@
 import { CodeEditor } from "./CodeEditor";
 import { TagInput } from "./TagInput";
 import { Select } from "./Select";
-import { useState, useEffect } from "react";
-import { Plus, ArrowUpRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, ArrowUpRight, Upload } from "lucide-react";
 import { api, write } from "../lib/api";
+import { date } from "../lib/format";
 
-import { Badge, Empty, Dialog } from "./ui";
+import { Badge, Empty, Dialog, Loading } from "./ui";
 const schemas: Record<string, Record<string, any>> = {
   Metadata: {
     key: "text",
@@ -75,6 +76,7 @@ const labels: Record<string, string> = {
 export function Configuration({
   notify,
   refresh,
+  version,
   selectedTab,
   standalone = false,
 }: any) {
@@ -82,6 +84,7 @@ export function Configuration({
       selectedTab && schemas[selectedTab] ? selectedTab : "Metadata",
     ),
     [data, setData] = useState<any[]>([]),
+    [loading, setLoading] = useState(true),
     [edit, setEdit] = useState<any>(null),
     [value, setValue] = useState<any>({}),
     [q, setQ] = useState(""),
@@ -89,6 +92,7 @@ export function Configuration({
     [run, setRun] = useState<any>(null),
     [args, setArgs] = useState(""),
     [output, setOutput] = useState<any>(null);
+  const requestId = useRef(0);
   const paths: any = {
     Metadata: "metadata?active_only=false",
     Tags: "tags",
@@ -104,22 +108,38 @@ export function Configuration({
   useEffect(() => {
     if (selectedTab && schemas[selectedTab]) setTab(selectedTab);
   }, [selectedTab]);
-  const reload = () =>
-    api("/" + paths[tab])
-      .then((r) =>
+  const reload = (signal?: AbortSignal) => {
+    const request = ++requestId.current;
+    setLoading(true);
+    return api("/" + paths[tab], { signal })
+      .then((r) => {
+        if (request !== requestId.current || signal?.aborted) return;
         setData(
           tab === "Sources"
             ? r.monitors
             : tab === "Users"
               ? r.filter((row: any) => row.id)
               : r,
-        ),
-      )
-      .catch((e) => notify(e.message, true));
+        );
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") notify(e.message, true);
+      })
+      .finally(() => {
+        if (!signal?.aborted && request === requestId.current)
+          setLoading(false);
+      });
+  };
   useEffect(() => {
     setData([]);
+    const controller = new AbortController();
+    reload(controller.signal);
+    return () => controller.abort();
+  }, [tab, version]);
+  useEffect(() => {
     setQ("");
-    reload();
+    setEdit(null);
+    setRun(null);
   }, [tab]);
   const endpoint = () =>
     "/" +
@@ -192,7 +212,10 @@ export function Configuration({
             <button
               className={tab === t ? "active" : ""}
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => {
+                location.hash = "/settings?tab=" + t;
+              }}
+              aria-pressed={tab === t}
             >
               {t}
             </button>
@@ -220,87 +243,101 @@ export function Configuration({
             </button>
           </div>
         </div>
-        {data
-          .filter((r) =>
-            Object.values(r)
-              .filter((v) => typeof v === "string" || typeof v === "number")
-              .join(" ")
-              .toLowerCase()
-              .includes(q.toLowerCase()),
-          )
-          .map((row, i) => (
-            <div className="config-row" key={row.id ?? row.key ?? row.tag ?? i}>
-              <button className="config-open" onClick={() => open(row)}>
-                <strong>
-                  {row.key ||
-                    row.name ||
-                    row.email ||
-                    row.tag ||
-                    row.text ||
-                    row.state ||
-                    row.category ||
-                    row.whitelist_artifact}
-                </strong>
-                <small>
-                  {row.description ||
-                    row.type ||
-                    row.notes ||
-                    row.last_success ||
-                    ""}
-                </small>
-              </button>
-              {row.stale && <Badge value="Stale" />}
-              {tab === "Scripts" && (
-                <button
-                  onClick={() => {
-                    setRun(row);
-                    setArgs("");
-                    setOutput(null);
-                  }}
-                >
-                  Run
+        {loading && <Loading />}
+        {!loading &&
+          data
+            .filter((r) =>
+              Object.values(r)
+                .filter((v) => typeof v === "string" || typeof v === "number")
+                .join(" ")
+                .toLowerCase()
+                .includes(q.toLowerCase()),
+            )
+            .map((row, i) => (
+              <div
+                className="config-row"
+                key={row.id ?? row.key ?? row.tag ?? i}
+              >
+                <button className="config-open" onClick={() => open(row)}>
+                  <strong>
+                    {row.key ||
+                      row.name ||
+                      row.email ||
+                      row.tag ||
+                      row.text ||
+                      row.state ||
+                      row.category ||
+                      row.whitelist_artifact}
+                  </strong>
+                  <small>
+                    {row.description ||
+                      row.type ||
+                      row.notes ||
+                      (row.last_success
+                        ? "Last received " + date(row.last_success)
+                        : "") ||
+                      ""}
+                  </small>
                 </button>
-              )}
-              <button onClick={() => open(row)}>Edit</button>
-            </div>
-          ))}
-        {!data.length && <Empty text="No definitions." />}
+                {tab === "Sources" && (
+                  <Badge
+                    value={
+                      row.enabled === false
+                        ? "Disabled"
+                        : row.stale
+                          ? "Stale"
+                          : "Healthy"
+                    }
+                  />
+                )}
+                {tab === "Scripts" && (
+                  <button
+                    onClick={() => {
+                      setRun(row);
+                      setArgs("");
+                      setOutput(null);
+                    }}
+                  >
+                    Run
+                  </button>
+                )}
+                <button onClick={() => open(row)}>Edit</button>
+              </div>
+            ))}
+        {!loading &&
+          !data.some((row) =>
+            Object.values(row).some(
+              (v) =>
+                ["string", "number"].includes(typeof v) &&
+                String(v).toLowerCase().includes(q.toLowerCase()),
+            ),
+          ) && (
+            <Empty text={q ? "No matching definitions." : "No definitions."} />
+          )}
       </section>
       {!standalone && (
         <details className="panel import-panel">
           <summary>Import and export</summary>
           <ImportForm notify={notify} />
-          <div className="button-row">
-            {[
-              ["export-legacy", "Export signatures to Git"],
-              ["export-indicators", "Export released indicators to Git"],
-            ].map(([path, label]) => (
-              <button
-                key={path}
-                onClick={async () => {
-                  try {
-                    const r = await write("/content/" + path, {});
-                    notify((r.added ?? r.exported) + " records exported.");
-                  } catch (e: any) {
-                    notify(e.message, true);
-                  }
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <GitExports notify={notify} />
         </details>
       )}
       {edit && (
         <Dialog
           title={
             (edit.new ? "Add " : "Edit ") +
-            (tab === "Users"
-              ? "user"
-              : tab === "Sources"
-                ? "source"
-                : "definition")
+            ({
+              Metadata: "metadata field",
+              Tags: "tag",
+              Macros: "macro",
+              Users: "user",
+              Settings: "setting",
+              Whitelist: "whitelist entry",
+              Sources: "source",
+              States: "workflow state",
+              Categories: "category",
+              Scripts: "script",
+            }[tab] || "definition")
           }
           onClose={() => setEdit(null)}
           dirty={dirty}
@@ -308,104 +345,169 @@ export function Configuration({
           wide={tab === "Scripts"}
         >
           <form onSubmit={save}>
-            <div className="dialog-body form-grid">
-              {Object.entries(schemas[tab]).map(([key, type]) => {
-                const label =
-                  labels[key] ||
-                  key
-                    .replaceAll("_", " ")
-                    .replace(/^./, (s) => s.toUpperCase());
-                const input = {
-                  "aria-label": label,
-                  id: "config-" + key,
-                  value: value[key] ?? "",
-                  onChange: (e: any) =>
-                    setValue({
-                      ...value,
-                      [key]:
-                        type === "number"
-                          ? Number(e.target.value)
-                          : e.target.value,
-                    }),
-                };
-                if (type === "code")
-                  return (
-                    <div className="field span-two" key={key}>
-                      <span>{label}</span>
-                      <CodeEditor label={label} {...input} />
-                    </div>
-                  );
-                return (
-                  <label
-                    key={key}
-                    className={
-                      type === "check"
-                        ? "check-label"
-                        : type === "code" || type === "textarea"
-                          ? "span-two"
-                          : ""
-                    }
-                  >
-                    {type === "check" ? (
-                      <>
-                        <input
-                          type="checkbox"
-                          checked={!!value[key]}
-                          onChange={(e) =>
-                            setValue({ ...value, [key]: e.target.checked })
-                          }
-                        />
-                        {label}
-                      </>
-                    ) : (
-                      <>
-                        {label}
-                        {Array.isArray(type) ? (
-                          <Select {...input}>
-                            {type.map((option) => {
-                              const [text, val] = option.split("|");
-                              return (
-                                <option key={option} value={val ?? text}>
-                                  {text}
-                                </option>
-                              );
-                            })}
-                          </Select>
-                        ) : type === "code" ? (
+            <div className="dialog-body">
+              <div className="form-grid config-fields">
+                {Object.entries(schemas[tab])
+                  .filter(
+                    ([key, type]) =>
+                      type !== "check" &&
+                      !(key === "choices" && value.type !== "select"),
+                  )
+                  .map(([key, type]) => {
+                    const label =
+                      (key === "choices"
+                        ? "Choices (comma separated)"
+                        : undefined) ||
+                      labels[key] ||
+                      key
+                        .replaceAll("_", " ")
+                        .replace(/^./, (s) => s.toUpperCase());
+                    const input = {
+                      "aria-label": label,
+                      id: "config-" + key,
+                      value: value[key] ?? "",
+                      onChange: (e: any) =>
+                        setValue({
+                          ...value,
+                          [key]:
+                            type === "number"
+                              ? Number(e.target.value)
+                              : e.target.value,
+                        }),
+                    };
+                    if (type === "code")
+                      return (
+                        <div className="field span2" key={key}>
+                          <span>{label}</span>
                           <CodeEditor label={label} {...input} />
-                        ) : type === "textarea" ? (
-                          <textarea
-                            {...input}
-                            rows={type === "code" ? 12 : 3}
-                            className=""
-                          />
+                        </div>
+                      );
+                    return (
+                      <label
+                        key={key}
+                        className={
+                          type === "check"
+                            ? "check-label"
+                            : type === "code" || type === "textarea"
+                              ? "span2"
+                              : ""
+                        }
+                      >
+                        {type === "check" ? (
+                          <>
+                            <input
+                              type="checkbox"
+                              checked={!!value[key]}
+                              onChange={(e) =>
+                                setValue({ ...value, [key]: e.target.checked })
+                              }
+                            />
+                            {label}
+                          </>
                         ) : (
-                          <input
-                            {...input}
-                            type={type}
-                            required={
-                              [
-                                "key",
-                                "tag",
-                                "name",
-                                "email",
-                                "state",
-                                "category",
-                                "whitelist_artifact",
-                              ].includes(key) ||
-                              (key === "password" && edit.new)
-                            }
-                            autoComplete={
-                              type === "password" ? "new-password" : undefined
-                            }
-                            readOnly={!edit.new && ["key", "tag"].includes(key)}
-                          />
+                          <>
+                            {label}
+                            {Array.isArray(type) ? (
+                              <Select {...input}>
+                                {type.map((option) => {
+                                  const [text, val] = option.split("|");
+                                  return (
+                                    <option key={option} value={val ?? text}>
+                                      {text}
+                                    </option>
+                                  );
+                                })}
+                              </Select>
+                            ) : type === "code" ? (
+                              <CodeEditor label={label} {...input} />
+                            ) : type === "textarea" ? (
+                              <textarea
+                                {...input}
+                                rows={type === "code" ? 12 : 3}
+                                className=""
+                              />
+                            ) : (
+                              <input
+                                {...input}
+                                type={type}
+                                pattern={
+                                  tab === "Sources" && key === "name"
+                                    ? "[A-Za-z0-9_.\\-]{1,64}"
+                                    : undefined
+                                }
+                                title={
+                                  tab === "Sources" && key === "name"
+                                    ? "Use letters, numbers, periods, underscores or hyphens (up to 64 characters)."
+                                    : undefined
+                                }
+                                min={
+                                  tab === "Sources" &&
+                                  key === "max_delay_minutes"
+                                    ? 1
+                                    : undefined
+                                }
+                                max={
+                                  tab === "Sources" &&
+                                  key === "max_delay_minutes"
+                                    ? 10080
+                                    : undefined
+                                }
+                                required={
+                                  [
+                                    "key",
+                                    "tag",
+                                    "name",
+                                    "email",
+                                    "state",
+                                    "category",
+                                    "whitelist_artifact",
+                                  ].includes(key) ||
+                                  (key === "password" && edit.new)
+                                }
+                                autoComplete={
+                                  type === "password"
+                                    ? "new-password"
+                                    : tab === "Users" && key === "email"
+                                      ? "username"
+                                      : undefined
+                                }
+                                readOnly={
+                                  !edit.new &&
+                                  (["key", "tag"].includes(key) ||
+                                    (tab === "Sources" && key === "name"))
+                                }
+                              />
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </label>
-                );
-              })}
+                      </label>
+                    );
+                  })}
+              </div>
+              {Object.values(schemas[tab]).includes("check") && (
+                <fieldset className="form-section config-options">
+                  <legend>Options</legend>
+                  <div className="form-grid">
+                    {Object.entries(schemas[tab])
+                      .filter(([, type]) => type === "check")
+                      .map(([key]) => (
+                        <label className="check-label" key={key}>
+                          <input
+                            type="checkbox"
+                            checked={!!value[key]}
+                            onChange={(e) =>
+                              setValue({ ...value, [key]: e.target.checked })
+                            }
+                          />
+                          {labels[key] ||
+                            key
+                              .replaceAll("_", " ")
+                              .replace(/^./, (s) => s.toUpperCase())}
+                        </label>
+                      ))}
+                  </div>
+                </fieldset>
+              )}
             </div>
             <div className="dialog-footer">
               {!edit.new && tab !== "Sources" && (
@@ -569,10 +671,12 @@ export function ImportForm({ notify }: any) {
           Retire matching released indicators
         </label>
       </div>
-      <label className="button">
-        Read from file
+      <label className="button import-file">
+        <Upload size={15} /> Read from file
         <input
           type="file"
+          className="sr-only"
+          aria-label="Read from file"
           accept=".yar,.yara,.txt,.csv,.json"
           onChange={async (e) => {
             const file = e.target.files?.[0];
@@ -676,27 +780,31 @@ export function ImportForm({ notify }: any) {
           </label>
         </div>
       </details>
-      <button
-        type="button"
-        disabled={busy || !text}
-        onClick={async () => {
-          try {
-            const r = await write("/import", {
-              ...payload(),
-              import_text: text,
-              autocommit: false,
-            });
-            setPreview(r.artifacts.map((a: any) => ({ ...a, selected: true })));
-          } catch (e: any) {
-            notify(e.message, true);
-          }
-        }}
-      >
-        Preview extraction
-      </button>
-      <button className="primary" disabled={busy}>
-        Process import <ArrowUpRight size={16} />
-      </button>
+      <div className="form-actions">
+        <button
+          type="button"
+          disabled={busy || !text}
+          onClick={async () => {
+            try {
+              const r = await write("/import", {
+                ...payload(),
+                import_text: text,
+                autocommit: false,
+              });
+              setPreview(
+                r.artifacts.map((a: any) => ({ ...a, selected: true })),
+              );
+            } catch (e: any) {
+              notify(e.message, true);
+            }
+          }}
+        >
+          Preview extraction
+        </button>
+        <button className="primary" disabled={busy || !text.trim()}>
+          {busy ? "Importing…" : "Process import"} <ArrowUpRight size={16} />
+        </button>
+      </div>
       {preview.length > 0 && (
         <section className="import-preview">
           <h3>Extracted artifacts</h3>
@@ -740,18 +848,35 @@ export function ImportForm({ notify }: any) {
         </section>
       )}
       {result && (
-        <pre className="source-preview">
-          {JSON.stringify(
-            {
-              committed: result.committed?.length,
-              retired: result.retired?.length,
-              duplicates: result.duplicates?.length,
-              errors: result.errors,
-            },
-            null,
-            2,
+        <section
+          className="import-result"
+          aria-label="Import results"
+          role="status"
+        >
+          <h3>Import results</h3>
+          <dl className="result-counts">
+            {[
+              ["Imported", result.committed],
+              ["Retired", result.retired],
+              ["Duplicates", result.duplicates],
+              ["Errors", result.errors],
+            ].map(([label, rows]) => (
+              <div key={String(label)}>
+                <dt>{String(label)}</dt>
+                <dd>{Array.isArray(rows) ? rows.length : 0}</dd>
+              </div>
+            ))}
+          </dl>
+          {!!result.errors?.length && (
+            <ul>
+              {result.errors.map((error: any, i: number) => (
+                <li key={i}>
+                  {typeof error === "string" ? error : JSON.stringify(error)}
+                </li>
+              ))}
+            </ul>
           )}
-        </pre>
+        </section>
       )}
       <details className="import-options">
         <summary>MISP warninglist</summary>
@@ -781,5 +906,33 @@ export function ImportForm({ notify }: any) {
         </button>
       </details>
     </form>
+  );
+}
+
+export function GitExports({ notify }: any) {
+  return (
+    <details className="disclosure git-exports">
+      <summary>Export to Git</summary>
+      <div className="form-actions">
+        {[
+          ["export-legacy", "Export signatures"],
+          ["export-indicators", "Export released indicators"],
+        ].map(([path, label]) => (
+          <button
+            key={path}
+            onClick={async () => {
+              try {
+                const r = await write("/content/" + path, {});
+                notify((r.added ?? r.exported) + " records exported.");
+              } catch (e: any) {
+                notify(e.message, true);
+              }
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }

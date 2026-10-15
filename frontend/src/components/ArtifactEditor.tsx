@@ -3,7 +3,7 @@ import { UploadFiles } from "./UploadFiles";
 import { permalink } from "../lib/links";
 import { TagInput } from "./TagInput";
 import { Select } from "./Select";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import {
   Link,
   Copy,
@@ -15,6 +15,7 @@ import {
   Trash2,
   History,
   Loader2,
+  ChevronDown,
 } from "lucide-react";
 import { api, base, write } from "../lib/api";
 import { date } from "../lib/format";
@@ -47,11 +48,15 @@ export function ArtifactEditor({
     [rightRevision, setRightRevision] = useState(""),
     [comparing, setComparing] = useState(false),
     [keepRevision, setKeepRevision] = useState(false),
+    [actionsOpen, setActionsOpen] = useState(false),
     [merging, setMerging] = useState(false),
+    [mergeBusy, setMergeBusy] = useState(false),
     [mergeQuery, setMergeQuery] = useState(""),
     [destinations, setDestinations] = useState<any[]>([]),
     [destination, setDestination] = useState("");
-  const dirty = JSON.stringify(value) !== JSON.stringify(initial);
+  const actionsId = useId();
+  const baseline = useRef(initial);
+  const dirty = JSON.stringify(value) !== JSON.stringify(baseline.current);
   const revisions = (initial.revisions || []).filter(
     (revision: any, index: number, rows: any[]) =>
       rows.findIndex((row) => row.revision === revision.revision) === index,
@@ -61,6 +66,7 @@ export function ArtifactEditor({
   };
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
+      if (merging) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         if (!busy)
@@ -75,24 +81,7 @@ export function ArtifactEditor({
     };
     document.addEventListener("keydown", shortcut);
     return () => document.removeEventListener("keydown", shortcut);
-  }, [busy, dirty]);
-  useEffect(() => {
-    const navigate = (event: Event) => {
-      if (dirty && !confirm("Discard unsaved changes?")) event.preventDefault();
-    };
-    window.addEventListener("threatkb:before-navigate", navigate);
-    const before = (event: BeforeUnloadEvent) => {
-      if (dirty) {
-        event.preventDefault();
-        event.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", before);
-    return () => {
-      window.removeEventListener("beforeunload", before);
-      window.removeEventListener("threatkb:before-navigate", navigate);
-    };
-  }, [dirty]);
+  }, [busy, dirty, merging]);
   useEffect(() => {
     if (!merging) return;
     const timer = setTimeout(
@@ -133,14 +122,14 @@ export function ArtifactEditor({
       api("/metadata?artifact_type=" + artifactType).then(setDefinitions);
     api("/cfg_states?counts=false").then((rows) => {
       setStates(rows);
-      if (initial.new && !initial.state)
-        setValue((v: any) => ({
-          ...v,
-          state:
-            rows.find((r: any) => r.is_staging_state)?.state ||
-            rows[0]?.state ||
-            "",
-        }));
+      if (initial.new && !initial.state) {
+        const state =
+          rows.find((r: any) => r.is_staging_state)?.state ||
+          rows[0]?.state ||
+          "";
+        baseline.current = { ...initial, state };
+        setValue((v: any) => ({ ...v, state: v.state || state }));
+      }
     });
     if (page === "yara_rules")
       api("/cfg_category_range_mapping").then(setCategories);
@@ -187,7 +176,7 @@ export function ArtifactEditor({
     <>
       {" "}
       <Dialog
-        wide
+        wide={isRule}
         dirty={dirty}
         busy={busy}
         title={
@@ -229,7 +218,7 @@ export function ArtifactEditor({
         <div className="dialog-body">
           {tab === "Content" ? (
             <form id="artifact-form" onSubmit={save}>
-              <div className="form-grid">
+              <div className="form-grid artifact-fields">
                 <label className="span2">
                   {isRule
                     ? "Rule name"
@@ -453,88 +442,96 @@ export function ArtifactEditor({
                         References
                         <textarea
                           aria-label="References"
-                          rows={2}
+                          rows={3}
                           value={value.references || ""}
                           onChange={(e) => field("references", e.target.value)}
                         />
                       </label>
                     )}
                     {isRule && (
-                      <>
-                        <div className="field">
-                          <span>Strings</span>
-                          <CodeEditor
-                            label="Strings"
-                            className="code-input"
-                            value={String(value.strings || "").replace(
-                              /^\s*strings:\s*/,
-                              "",
-                            )}
-                            onChange={(e) => field("strings", e.target.value)}
-                          />
+                      <fieldset className="form-section span2">
+                        <legend>Detection logic</legend>
+                        <div className="form-grid">
+                          <div className="field">
+                            <span>Strings</span>
+                            <CodeEditor
+                              label="Strings"
+                              className="code-input"
+                              value={String(value.strings || "").replace(
+                                /^\s*strings:\s*/,
+                                "",
+                              )}
+                              onChange={(e) => field("strings", e.target.value)}
+                            />
+                          </div>
+                          <div className="field">
+                            <span>Condition</span>
+                            <CodeEditor
+                              label="Condition"
+                              className="code-input"
+                              value={String(value.condition || "").replace(
+                                /^\s*condition:\s*/,
+                                "",
+                              )}
+                              onChange={(e) =>
+                                field("condition", e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="field span2">
+                            <span>Imports</span>
+                            <CodeEditor
+                              label="Imports"
+                              className="code-input compact-editor"
+                              value={value.imports || ""}
+                              onChange={(e) => field("imports", e.target.value)}
+                            />
+                          </div>
                         </div>
-                        <div className="field">
-                          <span>Condition</span>
-                          <CodeEditor
-                            label="Condition"
-                            className="code-input"
-                            value={String(value.condition || "").replace(
-                              /^\s*condition:\s*/,
-                              "",
-                            )}
-                            onChange={(e) => field("condition", e.target.value)}
-                          />
-                        </div>
-                        <div className="field span2">
-                          <span>Imports</span>
-                          <CodeEditor
-                            label="Imports"
-                            className="code-input compact-editor"
-                            value={value.imports || ""}
-                            onChange={(e) => field("imports", e.target.value)}
-                          />
-                        </div>
-                      </>
+                      </fieldset>
                     )}
                     {isRule && (
-                      <>
-                        <div className="field ">
-                          <span>MITRE tactics</span>
-                          <TagInput
-                            label="MITRE tactics"
-                            suggest={false}
-                            placeholder="Add identifier…"
-                            value={value.mitre_tactics || []}
-                            onChange={(ids: string[]) =>
-                              field("mitre_tactics", ids)
-                            }
-                          />
+                      <fieldset className="form-section span2">
+                        <legend>MITRE ATT&CK</legend>
+                        <div className="form-grid">
+                          <div className="field ">
+                            <span>MITRE tactics</span>
+                            <TagInput
+                              label="MITRE tactics"
+                              suggest={false}
+                              placeholder="Add identifier…"
+                              value={value.mitre_tactics || []}
+                              onChange={(ids: string[]) =>
+                                field("mitre_tactics", ids)
+                              }
+                            />
+                          </div>
+                          <div className="field ">
+                            <span>MITRE techniques</span>
+                            <TagInput
+                              label="MITRE techniques"
+                              suggest={false}
+                              placeholder="Add identifier…"
+                              value={value.mitre_techniques || []}
+                              onChange={(ids: string[]) =>
+                                field("mitre_techniques", ids)
+                              }
+                            />
+                          </div>
+                          <div className="field span2">
+                            <span>MITRE sub-techniques</span>
+                            <TagInput
+                              label="MITRE sub-techniques"
+                              suggest={false}
+                              placeholder="Add identifier…"
+                              value={value.mitre_sub_techniques || []}
+                              onChange={(ids: string[]) =>
+                                field("mitre_sub_techniques", ids)
+                              }
+                            />
+                          </div>
                         </div>
-                        <div className="field ">
-                          <span>MITRE techniques</span>
-                          <TagInput
-                            label="MITRE techniques"
-                            suggest={false}
-                            placeholder="Add identifier…"
-                            value={value.mitre_techniques || []}
-                            onChange={(ids: string[]) =>
-                              field("mitre_techniques", ids)
-                            }
-                          />
-                        </div>
-                        <div className="field span2">
-                          <span>MITRE sub-techniques</span>
-                          <TagInput
-                            label="MITRE sub-techniques"
-                            suggest={false}
-                            placeholder="Add identifier…"
-                            value={value.mitre_sub_techniques || []}
-                            onChange={(ids: string[]) =>
-                              field("mitre_sub_techniques", ids)
-                            }
-                          />
-                        </div>
-                      </>
+                      </fieldset>
                     )}
                     <div className="field span2">
                       <span>Tags</span>
@@ -995,7 +992,7 @@ export function ArtifactEditor({
                 </label>
               ))}
               {!files.length && <Empty text="No samples attached." />}
-              <div className="button-row">
+              <div className="button-row sample-actions">
                 <button
                   hidden={!user?.admin}
                   disabled={!chosen.size}
@@ -1031,22 +1028,22 @@ export function ArtifactEditor({
                   <Play size={15} />
                   Run sample test
                 </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const r = await write("/jobs", {
+                        kind: "test_rule",
+                        payload: { rule_id: initial.id, negative: true },
+                      });
+                      notify("Goodware test queued: " + r.id.slice(0, 8));
+                    } catch (e: any) {
+                      notify(e.message, true);
+                    }
+                  }}
+                >
+                  Run goodware test
+                </button>
               </div>
-              <button
-                onClick={async () => {
-                  try {
-                    const r = await write("/jobs", {
-                      kind: "test_rule",
-                      payload: { rule_id: initial.id, negative: true },
-                    });
-                    notify("Goodware test queued: " + r.id.slice(0, 8));
-                  } catch (e: any) {
-                    notify(e.message, true);
-                  }
-                }}
-              >
-                Run goodware test
-              </button>
               <div className="section-top">
                 <h3>Match history</h3>
                 <button
@@ -1061,7 +1058,7 @@ export function ArtifactEditor({
                   Refresh outcomes
                 </button>
               </div>
-              <label className="check-label">
+              <label className="check-label sample-history-options">
                 <input
                   type="checkbox"
                   onChange={async (e) =>
@@ -1094,7 +1091,7 @@ export function ArtifactEditor({
             </>
           )}
         </div>
-        <div className="dialog-footer">
+        <div className="dialog-footer artifact-footer">
           <span className="muted">
             {initial.uuid
               ? initial.uuid
@@ -1105,129 +1102,147 @@ export function ArtifactEditor({
           <div className="button-row">
             {!initial.new && (
               <button
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(
-                      permalink(page, initial.id),
-                    );
-                    notify("Permalink copied.");
-                  } catch {
-                    notify(
-                      "Could not copy the link. Copy it from the address bar.",
-                      true,
-                    );
-                  }
-                }}
+                className="record-actions-toggle"
+                aria-expanded={actionsOpen}
+                aria-controls={actionsId}
+                onClick={() => setActionsOpen(!actionsOpen)}
               >
-                <Link size={15} />
-                Copy permalink
+                Record actions <ChevronDown size={14} />
               </button>
             )}
-            {isRule && !initial.new && (
-              <label className="check-label revision-option">
-                <input
-                  type="checkbox"
-                  checked={keepRevision}
-                  onChange={(e) => setKeepRevision(e.target.checked)}
-                />
-                Keep revision number
-              </label>
-            )}
-            {!initial.new && (
-              <button
-                onClick={async () => {
-                  try {
-                    const type = {
-                      yara_rules: 1,
-                      c2dns: 2,
-                      c2ips: 3,
-                      tasks: 4,
-                    }[page as "yara_rules"];
-                    if (following)
-                      await api(
-                        "/bookmarks?entity_type=" +
-                          type +
-                          "&entity_id=" +
-                          initial.id,
-                        { method: "DELETE" },
-                      );
-                    else
-                      await write("/bookmarks", {
-                        entity_type: type,
-                        entity_id: initial.id,
-                      });
-                    setFollowing(!following);
-                    notify(
-                      following
-                        ? "Stopped following."
-                        : "Following this record.",
-                    );
-                  } catch (e: any) {
-                    notify(e.message, true);
-                  }
-                }}
-              >
-                <Bell size={16} />
-                {following ? "Unfollow" : "Follow"}
-              </button>
-            )}
-            {isRule && (initial.active === false || initial.active === 0) && (
-              <button
-                onClick={async () => {
-                  await write("/yara_rules/" + initial.id + "/restore", {});
-                  onSaved();
-                  notify("Signature restored.");
-                }}
-              >
-                Restore signature
-              </button>
-            )}
-            {!initial.new && !initial.release && (
-              <button
-                className="text-danger"
-                onClick={async () => {
-                  if (!confirm("Deactivate this record?")) return;
-                  try {
-                    await api("/" + page + "/" + initial.id, {
-                      method: "DELETE",
-                    });
-                    notify("Record deactivated.");
-                    onSaved();
-                  } catch (e: any) {
-                    notify(e.message, true);
-                  }
-                }}
-              >
-                Deactivate
-              </button>
-            )}
-            {isRule && !initial.new && (
-              <button onClick={() => setMerging(true)}>Merge into…</button>
-            )}
-            {!isRule &&
-              !initial.new &&
-              (initial.active === false || initial.active === 0) && (
+            <div
+              id={actionsId}
+              className={"record-actions " + (actionsOpen ? "open" : "")}
+            >
+              {!initial.new && (
                 <button
                   onClick={async () => {
                     try {
-                      await write(
-                        "/artifacts/" +
-                          ({ c2ips: 3, c2dns: 2, tasks: 4 } as any)[page] +
-                          "/" +
-                          initial.id +
-                          "/restore",
-                        {},
+                      await navigator.clipboard.writeText(
+                        permalink(page, initial.id),
                       );
-                      onSaved();
-                      notify("Record restored.");
+                      notify("Permalink copied.");
+                    } catch {
+                      notify(
+                        "Could not copy the link. Copy it from the address bar.",
+                        true,
+                      );
+                    }
+                  }}
+                >
+                  <Link size={15} />
+                  Copy permalink
+                </button>
+              )}
+              {isRule && !initial.new && (
+                <label className="check-label revision-option">
+                  <input
+                    type="checkbox"
+                    checked={keepRevision}
+                    onChange={(e) => setKeepRevision(e.target.checked)}
+                  />
+                  Keep revision number
+                </label>
+              )}
+              {!initial.new && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const type = {
+                        yara_rules: 1,
+                        c2dns: 2,
+                        c2ips: 3,
+                        tasks: 4,
+                      }[page as "yara_rules"];
+                      if (following)
+                        await api(
+                          "/bookmarks?entity_type=" +
+                            type +
+                            "&entity_id=" +
+                            initial.id,
+                          { method: "DELETE" },
+                        );
+                      else
+                        await write("/bookmarks", {
+                          entity_type: type,
+                          entity_id: initial.id,
+                        });
+                      setFollowing(!following);
+                      notify(
+                        following
+                          ? "Stopped following."
+                          : "Following this record.",
+                      );
                     } catch (e: any) {
                       notify(e.message, true);
                     }
                   }}
                 >
-                  Restore record
+                  <Bell size={16} />
+                  {following ? "Unfollow" : "Follow"}
                 </button>
               )}
+              {isRule && (initial.active === false || initial.active === 0) && (
+                <button
+                  onClick={async () => {
+                    await write("/yara_rules/" + initial.id + "/restore", {});
+                    onSaved();
+                    notify("Signature restored.");
+                  }}
+                >
+                  Restore signature
+                </button>
+              )}
+              {!initial.new &&
+                !initial.release &&
+                initial.active !== false &&
+                initial.active !== 0 && (
+                  <button
+                    className="text-danger"
+                    onClick={async () => {
+                      if (!confirm("Deactivate this record?")) return;
+                      try {
+                        await api("/" + page + "/" + initial.id, {
+                          method: "DELETE",
+                        });
+                        notify("Record deactivated.");
+                        onSaved();
+                      } catch (e: any) {
+                        notify(e.message, true);
+                      }
+                    }}
+                  >
+                    Deactivate
+                  </button>
+                )}
+              {isRule && !initial.new && (
+                <button onClick={() => setMerging(true)}>Merge into…</button>
+              )}
+              {!isRule &&
+                !initial.new &&
+                (initial.active === false || initial.active === 0) && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await write(
+                          "/artifacts/" +
+                            ({ c2ips: 3, c2dns: 2, tasks: 4 } as any)[page] +
+                            "/" +
+                            initial.id +
+                            "/restore",
+                          {},
+                        );
+                        onSaved();
+                        notify("Record restored.");
+                      } catch (e: any) {
+                        notify(e.message, true);
+                      }
+                    }}
+                  >
+                    Restore record
+                  </button>
+                )}
+            </div>
             <button onClick={close}>Close</button>
             {tab === "Content" && (
               <button
@@ -1250,11 +1265,15 @@ export function ArtifactEditor({
       {merging && (
         <Dialog
           title="Merge into another signature"
+          busy={mergeBusy}
+          dirty={!!destination}
           onClose={() => setMerging(false)}
         >
           <form
             onSubmit={async (e) => {
               e.preventDefault();
+              if (mergeBusy) return;
+              setMergeBusy(true);
               try {
                 await write("/yara_rules/merge_signatures_by_id", {
                   merge_from_id: initial.id,
@@ -1265,6 +1284,8 @@ export function ArtifactEditor({
                 notify("Signature merged.");
               } catch (error: any) {
                 notify(error.message, true);
+              } finally {
+                setMergeBusy(false);
               }
             }}
           >
@@ -1295,10 +1316,17 @@ export function ArtifactEditor({
               </label>
             </div>
             <div className="dialog-footer">
-              <button type="button" onClick={() => setMerging(false)}>
+              <button
+                type="button"
+                disabled={mergeBusy}
+                onClick={() => {
+                  if (!destination || confirm("Discard unsaved changes?"))
+                    setMerging(false);
+                }}
+              >
                 Cancel
               </button>
-              <button className="primary" disabled={!destination}>
+              <button className="primary" disabled={!destination || mergeBusy}>
                 Merge signatures
               </button>
             </div>

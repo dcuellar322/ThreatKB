@@ -11,7 +11,11 @@ import { Records } from "./components/Records";
 import { Content } from "./components/Content";
 import { SampleLab } from "./components/SampleLab";
 import { LegacyTools } from "./components/LegacyTools";
-import { Configuration, ImportForm } from "./components/Configuration";
+import {
+  Configuration,
+  ImportForm,
+  GitExports,
+} from "./components/Configuration";
 import { Account, Following } from "./components/Account";
 
 export function App() {
@@ -30,9 +34,13 @@ export function App() {
   const currentRoute = useRef(route);
   currentRoute.current = route;
   const page = route.replace(/^#!?\//, "").split("?")[0] || "yara_rules";
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const notify = useCallback((message: string, error = false) => {
+    clearTimeout(noticeTimer.current);
     setNotice({ message, error });
-    if (!error) setTimeout(() => setNotice(null), 5000);
+    if (!error) noticeTimer.current = setTimeout(() => setNotice(null), 5000);
   }, []);
   const go = (next: string) => {
     location.hash = "/" + next;
@@ -255,9 +263,11 @@ export function App() {
         <main id="main-content" className="main" tabIndex={-1}>
           <div className="page-heading">
             <h1>{title(page)}</h1>
-            <IconButton label="Refresh view" onClick={refresh}>
-              <RefreshCw size={17} />
-            </IconButton>
+            {!["scanner", "import"].includes(page) && (
+              <IconButton label="Refresh view" onClick={refresh}>
+                <RefreshCw size={17} />
+              </IconButton>
+            )}
           </div>
           <section key={page} className="page-content">
             {page === "dashboard" ? (
@@ -268,6 +278,7 @@ export function App() {
               <SampleLab notify={notify} />
             ) : page === "settings" ? (
               <Configuration
+                version={version}
                 notify={notify}
                 refresh={refresh}
                 selectedTab={new URLSearchParams(route.split("?")[1]).get(
@@ -276,6 +287,7 @@ export function App() {
               />
             ) : page === "whitelist" ? (
               <Configuration
+                version={version}
                 notify={notify}
                 refresh={refresh}
                 selectedTab="Whitelist"
@@ -284,6 +296,7 @@ export function App() {
             ) : page === "import" ? (
               <section className="panel import-panel">
                 <ImportForm notify={notify} />
+                {user.admin && <GitExports notify={notify} />}
               </section>
             ) : ["tests", "files", "errors"].includes(page) ? (
               <LegacyTools
@@ -293,9 +306,14 @@ export function App() {
                 user={user}
               />
             ) : page === "account" ? (
-              <Account user={user} notify={notify} onUser={setUser} />
+              <Account
+                user={user}
+                notify={notify}
+                onUser={setUser}
+                version={version}
+              />
             ) : page === "bookmarks" ? (
-              <Following notify={notify} />
+              <Following notify={notify} version={version} />
             ) : (
               <Records
                 page={page}

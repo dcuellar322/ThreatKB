@@ -361,7 +361,12 @@ export function LegacyTools({ page, version, notify, user }: any) {
                     Open signature
                   </a>
                 </div>
-                <div className="table-scroll">
+                <div
+                  className="table-scroll test-results"
+                  role="region"
+                  aria-label="File test results"
+                  tabIndex={0}
+                >
                   <table>
                     <thead>
                       <tr>

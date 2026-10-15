@@ -20,6 +20,7 @@ import { Badge, IconButton, Empty, Dialog, Loading } from "./ui";
 export function Content({ version, notify, refresh }: any) {
   const [pack, setPack] = useState("sigpack"),
     [newName, setNewName] = useState<any>(null),
+    [busy, setBusy] = useState(false),
     [config, setConfig] = useState<any>(null),
     [data, setData] = useState<any>(null),
     [q, setQ] = useState(""),
@@ -64,11 +65,15 @@ export function Content({ version, notify, refresh }: any) {
       {newName !== null && (
         <Dialog
           title="New versioned signature"
+          dirty={!!newName}
+          busy={busy}
           onClose={() => setNewName(null)}
         >
           <form
             onSubmit={async (e) => {
               e.preventDefault();
+              if (busy) return;
+              setBusy(true);
               try {
                 const value = await write("/content/rules", {
                   name: newName,
@@ -81,6 +86,8 @@ export function Content({ version, notify, refresh }: any) {
                 refresh();
               } catch (err: any) {
                 notify(err.message, true);
+              } finally {
+                setBusy(false);
               }
             }}
           >
@@ -102,10 +109,19 @@ export function Content({ version, notify, refresh }: any) {
               </p>
             </div>
             <div className="dialog-footer">
-              <button type="button" onClick={() => setNewName(null)}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (!newName || confirm("Discard unsaved changes?"))
+                    setNewName(null);
+                }}
+              >
                 Cancel
               </button>
-              <button className="primary">Create draft</button>
+              <button className="primary" disabled={busy}>
+                {busy ? "Creating…" : "Create draft"}
+              </button>
             </div>
           </form>
         </Dialog>
@@ -115,12 +131,14 @@ export function Content({ version, notify, refresh }: any) {
           wide
           title="Repository settings"
           dirty={config.yaml !== config.original}
+          busy={busy}
           onClose={() => setConfig(null)}
         >
           <div className="dialog-body">
             <label>
               Content definition
               <Select
+                disabled={busy}
                 aria-label="Content definition"
                 value={config.name}
                 onChange={async (e) => {
@@ -130,8 +148,15 @@ export function Content({ version, notify, refresh }: any) {
                   )
                     return;
                   const name = e.target.value;
-                  const value = await api("/content/config/" + name);
-                  setConfig({ name, yaml: value.yaml, original: value.yaml });
+                  setBusy(true);
+                  try {
+                    const value = await api("/content/config/" + name);
+                    setConfig({ name, yaml: value.yaml, original: value.yaml });
+                  } catch (e: any) {
+                    notify(e.message, true);
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
               >
                 {[
@@ -160,6 +185,7 @@ export function Content({ version, notify, refresh }: any) {
           </div>
           <div className="dialog-footer">
             <button
+              disabled={busy}
               onClick={() => {
                 if (
                   config.yaml === config.original ||
@@ -172,7 +198,10 @@ export function Content({ version, notify, refresh }: any) {
             </button>
             <button
               className="primary"
+              disabled={busy}
               onClick={async () => {
+                if (busy) return;
+                setBusy(true);
                 try {
                   await write(
                     "/content/config/" + config.name,
@@ -184,10 +213,12 @@ export function Content({ version, notify, refresh }: any) {
                   refresh();
                 } catch (e: any) {
                   notify(e.message, true);
+                } finally {
+                  setBusy(false);
                 }
               }}
             >
-              Validate & commit
+              {busy ? "Committing…" : "Validate & commit"}
             </button>
           </div>
         </Dialog>
@@ -324,6 +355,7 @@ export function Content({ version, notify, refresh }: any) {
           <div>
             <IconButton
               label="Previous content page"
+              disabled={!index}
               onClick={() => setIndex(Math.max(0, index - 1))}
             >
               <ChevronLeft size={16} />
@@ -422,6 +454,7 @@ export function Content({ version, notify, refresh }: any) {
           wide
           title="Versioned signature"
           dirty={text !== edit.yaml}
+          busy={busy}
           onClose={() => setEdit(null)}
         >
           <div className="dialog-body">
@@ -446,8 +479,20 @@ export function Content({ version, notify, refresh }: any) {
           <div className="dialog-footer">
             <code>{edit.id}</code>
             <button
+              disabled={busy}
+              onClick={() => {
+                if (text === edit.yaml || confirm("Discard unsaved changes?"))
+                  setEdit(null);
+              }}
+            >
+              Close
+            </button>
+            <button
               className="primary"
+              disabled={busy}
               onClick={async () => {
+                if (busy) return;
+                setBusy(true);
                 try {
                   await write(
                     "/content/rules/" + edit.id,
@@ -459,11 +504,13 @@ export function Content({ version, notify, refresh }: any) {
                   refresh();
                 } catch (e: any) {
                   notify(e.message, true);
+                } finally {
+                  setBusy(false);
                 }
               }}
             >
               <Check size={16} />
-              Validate & commit
+              {busy ? "Committing…" : "Validate & commit"}
             </button>
           </div>
         </Dialog>
