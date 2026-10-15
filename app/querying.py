@@ -2,7 +2,7 @@
 
 import json
 from collections import defaultdict
-from flask import abort
+from flask import abort, request
 from flask_login import current_user
 from sqlalchemy import and_, or_, select, exists, DateTime
 from sqlalchemy.orm import joinedload, selectinload
@@ -32,9 +32,38 @@ def visible_query(model, kind):
 
 
 def search_predicate(model, kind, key, raw):
+    operation = "contains"
+    if isinstance(raw, dict):
+        operation = raw.get("op", "contains")
+        if operation not in (
+            "contains",
+            "not_contains",
+            "eq",
+            "neq",
+            "prefix",
+            "empty",
+            "before_now",
+            "after_now",
+        ):
+            abort(400, description="Unknown filter operation.")
+        raw = raw.get("value", "")
     value = str(raw)
-    missing, negative = value == "~", value.startswith("!")
-    needle = "%" + (value[1:] if negative else value) + "%"
+    missing = operation == "empty" or value == "~"
+    negative = operation in ("not_contains", "neq") or (
+        operation == "contains" and value.startswith("!")
+    )
+    plain = value[1:] if operation == "contains" and value.startswith("!") else value
+    needle = plain + "%" if operation == "prefix" else "%" + plain + "%"
+    if operation == "before_now":
+        value = "<now"
+    if operation == "after_now":
+        value = ">now"
+
+    def match_column(column):
+        if operation in ("eq", "neq"):
+            return column == plain
+        return column.like(needle)
+
     if key in ("owner_user.email", "user.email"):
         foreign = getattr(
             model, "owner_user_id" if key.startswith("owner") else "user_id", None
@@ -44,7 +73,7 @@ def search_predicate(model, kind, key, raw):
         if missing:
             return foreign.is_(None)
         match = exists(
-            select(KBUser.id).where(KBUser.id == foreign, KBUser.email.ilike(needle))
+            select(KBUser.id).where(KBUser.id == foreign, match_column(KBUser.email))
         )
     elif key == "tags":
         base = (
@@ -56,13 +85,13 @@ def search_predicate(model, kind, key, raw):
         match = exists(
             select(Tags_mapping.id)
             .join(Tags, Tags.id == Tags_mapping.tag_id)
-            .where(*base, Tags.text.ilike(needle))
+            .where(*base, match_column(Tags.text))
         )
     elif key == "comments":
         base = (Comments.entity_type == kind, Comments.entity_id == model.id)
         if missing:
             return ~exists(select(Comments.id).where(*base))
-        match = exists(select(Comments.id).where(*base, Comments.comment.ilike(needle)))
+        match = exists(select(Comments.id).where(*base, match_column(Comments.comment)))
     elif key in model.__table__.columns:
         column = getattr(model, key)
         if missing:
@@ -71,7 +100,7 @@ def search_predicate(model, kind, key, raw):
             return (
                 column < datetime.now() if value == "<now" else column > datetime.now()
             )
-        match = db.cast(column, db.String).ilike(needle)
+        match = match_column(column)
     else:
         base = (
             Metadata.artifact_type == kind,
@@ -100,14 +129,15 @@ def search_predicate(model, kind, key, raw):
                 )
             )
         else:
-            match = exists(query.where(MetadataMapping.value.ilike(needle)))
+            match = exists(query.where(match_column(MetadataMapping.value)))
     return ~match if negative else match
 
 
 def eager_people(query, model):
-    for name in ("created_user", "modified_user", "owner_user", "user"):
-        if name in model.__mapper__.relationships:
-            query = query.options(joinedload(getattr(model, name)))
+    # User caches serve artifacts. Joining tiny user tables before LIMIT made
+    # MySQL hash-join every matching artifact and sort a large temporary table.
+    if model.__tablename__ == "activity_log":
+        return query.options(selectinload(model.user))
     return query
 
 
@@ -185,7 +215,7 @@ def serialize_page(
     result = []
     for row in rows:
         if kind == 4:
-            value = row.to_dict(include_comments=False)
+            value = row.to_dict(include_comments=False, users_cache=users)
             if include_comments:
                 value["comments"] = comments[table][row.id]
             if include_tags:
@@ -242,7 +272,7 @@ def filter_page(**options):
             query = query.filter_by(active=True)
         elif options["include_inactive"] and not options["include_active"]:
             query = query.filter_by(active=False)
-    if not options["include_merged"] and hasattr(model, "state"):
+    if not strtobool(options["include_merged"]) and hasattr(model, "state"):
         query = query.filter(or_(model.state != "Merged", model.state.is_(None)))
     clauses = [
         search_predicate(model, kind, key, value)
@@ -251,20 +281,26 @@ def filter_page(**options):
     ]
     if clauses:
         query = query.filter((or_ if options["operator"] == "or" else and_)(*clauses))
+    text_query = request.args.get("q", "").strip()[:256]
+    name = {
+        1: "name",
+        2: "domain_name",
+        3: "ip",
+        4: "title",
+        "ACTIVITY_LOG": "activity_text",
+    }.get(kind)
+    if text_query and name:
+        query = query.filter(
+            search_predicate(model, kind, name, {"op": "contains", "value": text_query})
+        )
     if options["since"]:
         name = "activity_date" if kind == "ACTIVITY_LOG" else "creation_date"
         if hasattr(model, name):
             query = query.filter(getattr(model, name) > options["since"])
-    sort = (options["sort_by"] or options["default_sort"]).split(".")[-1]
-    direction = str(options["sort_direction"]).upper()
-    if sort not in model.__table__.columns or direction not in ("ASC", "DESC"):
-        abort(400, description="Choose a valid sort column and direction.")
-    column = getattr(model, sort)
-    descending = direction == "DESC" if options["sort_by"] else True
-    total = query.order_by(None).count()
-    query = query.order_by(column.desc() if descending else column.asc())
-    if sort != "id":
-        query = query.order_by(model.id.desc() if descending else model.id.asc())
+    sort = options["sort_by"] or options["default_sort"]
+    direction = str(options["sort_direction"]).upper() if options["sort_by"] else "DESC"
+    total = query.with_entities(db.func.count(model.id)).scalar()
+    query = apply_sort(query, model, sort, direction, kind)
     rows = eager_people(query, model).offset(page * size).limit(size).all()
     values = serialize_page(
         rows,
@@ -287,3 +323,51 @@ def filter_page(**options):
         if options["exclude_totals"] and strtobool(options["exclude_totals"])
         else payload
     )
+
+
+def apply_sort(query, model, key, direction, kind=None):
+    if direction not in ("ASC", "DESC"):
+        abort(400, description="Choose ASC or DESC sorting.")
+    if key in ("owner_user.email", "user.email"):
+        from sqlalchemy.orm import aliased
+
+        foreign = getattr(
+            model, "owner_user_id" if key.startswith("owner") else "user_id", None
+        )
+        if foreign is None:
+            abort(400, description="This record has no such user field.")
+        owner = aliased(KBUser)
+        query = query.outerjoin(owner, owner.id == foreign)
+        column = owner.email
+    elif key.startswith("metadata:"):
+        field = Metadata.query.filter_by(
+            artifact_type=kind, key=key[9:], active=True
+        ).first()
+        if not field:
+            abort(400, description="Choose an active metadata field.")
+        column = (
+            select(MetadataMapping.value)
+            .where(
+                MetadataMapping.metadata_id == field.id,
+                MetadataMapping.artifact_id == model.id,
+            )
+            .order_by(MetadataMapping.id.desc())
+            .limit(1)
+            .correlate(model)
+            .scalar_subquery()
+        )
+        if field.type_ == "integer":
+            column = db.cast(column, db.Integer)
+    else:
+        key = key.split(".")[-1]
+        if key not in model.__table__.columns:
+            abort(400, description="Choose a valid sort column.")
+        column = getattr(model, key)
+    query = query.order_by(None).order_by(
+        column.asc() if direction == "ASC" else column.desc()
+    )
+    if key != "id":
+        query = query.order_by(
+            model.id.asc() if direction == "ASC" else model.id.desc()
+        )
+    return query

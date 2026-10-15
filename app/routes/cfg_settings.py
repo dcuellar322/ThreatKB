@@ -6,20 +6,26 @@ from dateutil import parser
 import json
 import pycountry
 
-@app.route('/ThreatKB/cfg_settings', methods=['GET'])
+
+@app.route("/ThreatKB/cfg_settings", methods=["GET"])
 @auto.doc()
 @login_required
 @admin_only()
 def get_all_cfg_settings():
     """Return all public config settings
     Return: list of config settings dictionaries"""
-    entities = cfg_settings.Cfg_settings.query.filter_by(public=True).all()
-    return Response(json.dumps([entity.to_dict() for entity in entities]), mimetype='application/json')
+    query = cfg_settings.Cfg_settings.query
+    if request.args.get("include_private") != "true":
+        query = query.filter_by(public=True)
+    entities = query.order_by(cfg_settings.Cfg_settings.key).all()
+    return Response(
+        json.dumps([entity.to_dict() for entity in entities]),
+        mimetype="application/json",
+    )
 
 
-@app.route('/ThreatKB/cfg_settings/<key>', methods=['GET'])
+@app.route("/ThreatKB/cfg_settings/<key>", methods=["GET"])
 @auto.doc()
-@cache.cached(timeout=60)
 def get_cfg_settings(key):
     """Return config settings associated with key if it is public
     Return: config settings dictionary"""
@@ -30,7 +36,7 @@ def get_cfg_settings(key):
     return jsonify(entity.to_dict())
 
 
-@app.route('/ThreatKB/cfg_settings', methods=['POST', 'PUT'])
+@app.route("/ThreatKB/cfg_settings", methods=["POST", "PUT"])
 @auto.doc()
 @login_required
 @admin_only()
@@ -39,10 +45,10 @@ def create_cfg_settings():
     From Data: key (str), value (str), public (bool)
     Return: config setting dictionary"""
     entity = cfg_settings.Cfg_settings(
-        key=request.json['key']
-        , value=request.json['value']
-        , description=request.json['description']
-        , public=request.json.get('public', True),
+        key=request.json["key"],
+        value=request.json["value"],
+        description=request.json.get("description", ""),
+        public=request.json.get("public", True),
     )
     db.session.add(entity)
     db.session.commit()
@@ -50,7 +56,7 @@ def create_cfg_settings():
     return jsonify(entity.to_dict()), 201
 
 
-@app.route('/ThreatKB/cfg_settings/<key>', methods=['PUT'])
+@app.route("/ThreatKB/cfg_settings/<key>", methods=["PUT"])
 @auto.doc()
 @login_required
 @admin_only()
@@ -63,9 +69,9 @@ def update_cfg_settings(key):
         abort(404)
     entity = cfg_settings.Cfg_settings(
         key=key,
-        value=request.json['value'],
-        description=request.json['description'],
-        public=request.json.get('public', True),
+        value=request.json["value"],
+        description=request.json.get("description", ""),
+        public=request.json.get("public", True),
     )
     db.session.merge(entity)
     db.session.commit()
@@ -75,7 +81,7 @@ def update_cfg_settings(key):
     return jsonify(entity.to_dict()), 200
 
 
-@app.route('/ThreatKB/cfg_settings/<key>', methods=['DELETE'])
+@app.route("/ThreatKB/cfg_settings/<key>", methods=["DELETE"])
 @auto.doc()
 @login_required
 @admin_only()
@@ -84,9 +90,9 @@ def delete_cfg_settings(key):
     Return: None"""
     entity = db.session.get(cfg_settings.Cfg_settings, key)
 
-    if not entity or not entity.public:
+    if not entity:
         abort(404)
     db.session.delete(entity)
     db.session.commit()
 
-    return jsonify(''), 204
+    return jsonify(""), 204

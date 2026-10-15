@@ -106,3 +106,63 @@ def test_pagination_is_stable_and_invalid_inputs_are_rejected(authenticated):
         "searches=broken",
     ):
         assert authenticated.get("/ThreatKB/yara_rules?" + query).status_code == 400
+
+
+def test_text_search_combines_with_structured_filters(authenticated):
+    fixtures()
+    response = authenticated.get(
+        "/ThreatKB/yara_rules",
+        query_string={
+            "q": "Fixture",
+            "searches": json.dumps({"name": {"op": "eq", "value": "does_not_exist"}}),
+        },
+    )
+    assert response.status_code == 200 and response.json["total_count"] == 0
+
+
+def test_bulk_compilation_loads_macros_once_and_reuses_compiled_rules(authenticated):
+    from app.detection import compile_active_rules
+    from app.models.macros import Macros
+    from app.models.cfg_settings import Cfg_settings
+    from flask import g
+
+    fixtures()
+    db.session.add_all(
+        [
+            Cfg_settings(key="MACRO_TAG_TEMPLATE", value="[[%s]]"),
+            Macros(
+                tag="macro_test",
+                value="true",
+                active=True,
+                created_user_id=1,
+                modified_user_id=1,
+            ),
+        ]
+    )
+    db.session.commit()
+    g.pop("_macro_replacements", None)
+    statements = []
+
+    def capture(conn, cursor, statement, params, context, many):
+        statements.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", capture)
+    try:
+        first = compile_active_rules()
+        second = compile_active_rules()
+        assert first is second
+        assert len([s for s in statements if "FROM macros" in s]) == 1
+        assert len(statements) < 7, len(statements)
+    finally:
+        event.remove(db.engine, "before_cursor_execute", capture)
+
+
+def test_test_history_sorting_rejects_sql_and_checks_access(authenticated):
+    assert (
+        authenticated.get(
+            "/ThreatKB/tests?sort_by=id%3BDROP%20TABLE%20kb_users"
+        ).status_code
+        == 400
+    )
+    assert authenticated.get("/ThreatKB/tests?page_size=100000").status_code == 400
+    assert authenticated.get("/ThreatKB/tests/9999").status_code == 404

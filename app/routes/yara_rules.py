@@ -1,4 +1,4 @@
-from app import app, db, auto, ENTITY_MAPPING
+from app import app, db, auto, ENTITY_MAPPING, admin_only
 from app.models.yara_rule import Yara_rule_history, Yara_rule
 from app.models.cfg_states import Cfg_states
 from app.routes import test_yara_rule
@@ -8,12 +8,21 @@ from flask_login import current_user, login_required
 from app.compat import strtobool
 from app.utilities import extract_yara_rules_text, extract_artifacts_text
 from app.models.metadata import Metadata, MetadataMapping
-from app.models.releases import get_release_yara_rule_history_mapping, get_release_metadata
+from app.models.releases import (
+    get_release_yara_rule_history_mapping,
+    get_release_metadata,
+)
 from app.routes.batch import batch_update, batch_delete
 from app.routes.bookmarks import is_bookmarked, delete_bookmarks
-from app.routes.cfg_category_range_mapping import update_cfg_category_range_mapping_current
-from app.routes.tags_mapping import create_tags_mapping, delete_tags_mapping, get_tags_for_source, \
-    batch_delete_tags_mapping_for_source_id
+from app.routes.cfg_category_range_mapping import (
+    update_cfg_category_range_mapping_current,
+)
+from app.routes.tags_mapping import (
+    create_tags_mapping,
+    delete_tags_mapping,
+    get_tags_for_source,
+    batch_delete_tags_mapping_for_source_id,
+)
 from app.routes.comments import create_comment
 from app.models.cfg_settings import Cfg_settings
 from app.utilities import filter_entities
@@ -24,15 +33,22 @@ import string
 import base64
 
 
-@app.post('/ThreatKB/yara_rules/<int:id>/restore')
+@app.post("/ThreatKB/yara_rules/<int:id>/restore")
 @login_required
 def restore_yara_rule(id):
     entity = db.get_or_404(Yara_rule, id)
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
     from app.detection import validate_signature
+
     try:
-        validate_signature({key: getattr(entity, key) for key in ("name", "strings", "condition", "imports")}, entity.id)
+        validate_signature(
+            {
+                key: getattr(entity, key)
+                for key in ("name", "strings", "condition", "imports")
+            },
+            entity.id,
+        )
     except Exception as error:
         abort(422, description=f"Repair this signature before restoring it: {error}")
     entity.active = True
@@ -41,174 +57,114 @@ def restore_yara_rule(id):
     return jsonify(entity.to_dict(short=True))
 
 
-@app.post('/ThreatKB/yara_rules/<int:id>/revisions/<int:revision>/restore')
+@app.post("/ThreatKB/yara_rules/<int:id>/revisions/<int:revision>/restore")
 @login_required
 def restore_signature_revision(id, revision):
     entity = db.get_or_404(Yara_rule, id)
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
-    snapshot = Yara_rule_history.query.filter_by(yara_rule_id=id, revision=revision).first_or_404()
+    snapshot = Yara_rule_history.query.filter_by(
+        yara_rule_id=id, revision=revision
+    ).first_or_404()
     import json
+
     data = json.loads(snapshot.rule_json)
-    data['owner_user_id'] = entity.owner_user_id
-    data.pop('owner_user', None)
-    data['active'] = entity.active
-    data['new_comment'] = f'Restored signature content from revision {revision}.'
+    data["owner_user_id"] = entity.owner_user_id
+    data.pop("owner_user", None)
+    data["active"] = entity.active
+    data["new_comment"] = f"Restored signature content from revision {revision}."
     from app.signature_service import save_signature
+
     restored, changed = save_signature(data, entity)
     return jsonify(restored.to_dict(include_yara_rule_string=True))
 
 
-@app.route('/ThreatKB/yara_rules/merge_signatures', methods=['POST'])
+@app.post("/ThreatKB/yara_rules/merge_signatures")
+@login_required
 def merge_signatures():
-    signatures = request.json.get('signatures', [])
-    save_output = request.json.get('save_output', 0)
-    signature_ids = request.json.get('signature_ids', [])
+    from app.signature_merge import merge_sources
+    from app.signature_service import save_signature
 
-    for i in range(len(signatures)):
-        try:
-            signatures[i] = base64.b64decode(signatures[i]).decode()
-        except:
-            pass
-
-    if signature_ids and (not current_user.is_authenticated or not current_user.active or not current_user.admin):
-        abort(403)
-
-    for id_ in signature_ids:
-        signature = db.session.query(yara_rule.Yara_rule).filter(yara_rule.Yara_rule.id == id_).first()
-        if signature:
-            signatures.append(signature.to_dict(include_yara_rule_string=True)['yara_rule_string'])
-
-    if not signatures or not type(signatures) == list or len(signatures) < 2:
-        abort(412, description="You must provide at least 2 signatures as a list")
-
-    rules = extract_yara_rules_text("\n\n".join(signatures))
-    rule_name = f"Merged_Rule_{str(uuid.uuid4())[:8]}"
-    description = f"\"Merger of {', '.join([rule['parsed_rule']['rule_name'] for rule in rules])}\""
-    strings = ""
-    condition = ""
-    imports = ""
-    r = 1
-    for rule in rules:
-        old_new = {}
-        current_strings = []
-        postfix = f"r{r}"
-        for s in rule['parsed_rule']['strings']:
-            old_name = s['name'].strip()
-            if old_name.startswith('$'):
-                name = f"${s['name'].strip()[1:]}_{postfix}"
-            else:
-                name = f"{s['name'].strip()}_{postfix}"
-
-            if s['value'].startswith("{") or s['value'].startswith("/"):
-                value = s['value'].strip()
-            else:
-                value = f"\"{s['value'].strip()}\""
-
-            old_new[old_name] = name
-            modifier = ' '.join(s.get('modifiers', []))
-            current_strings.append(
-                f"{name} = {value} {modifier}"
-            )
-        strings += '\n\t\t' + '\n\t\t'.join(current_strings)
-        app.logger.info(f"condition is\n{rule['condition']}")
-        this_condition = rule['condition'].strip()
-        for old, new in old_new.items():
-            this_condition = this_condition.replace(old, new)
-        condition += f"(\n\t{this_condition}\n\t)\n\tor\n\t"
-        imports += rule['imports'] + "\n" if not rule['imports'] in imports else ""
-        r += 1
-
-    condition = condition.rstrip("\n\tor\n\t")
-    full_rule = f"""
-    {imports}
-
-    rule {rule_name}
-    {{
-        meta:
-            description = {description}
-        strings:{strings}
-        condition:
-            {condition}
-    }}
-    """
-
-    app.logger.info(f"rule is\n{full_rule}")
-    if not save_output:
-        return jsonify({"merged_signature": full_rule.strip(" ").strip()})
-    else:
-        if not current_user.is_authenticated or not current_user.active or not current_user.admin:
+    values = request.get_json()
+    sources = values.get("signatures", [])
+    identities = values.get("signature_ids", [])
+    if (
+        not isinstance(sources, list)
+        or not isinstance(identities, list)
+        or len(sources) + len(identities) > 20
+    ):
+        abort(400)
+    for identity in identities:
+        rule = db.get_or_404(Yara_rule, identity)
+        if not current_user.admin and rule.owner_user_id != current_user.id:
             abort(403)
-        output = extract_artifacts_text(do_extract_ip=False,
-                                        do_extract_dns=False,
-                                        do_extract_signature=True,
-                                        text=full_rule)
-        rule_dict = output[0]
-        yr, fta = yara_rule.Yara_rule.get_yara_rule_from_yara_dict(rule_dict, {})
-        yr.created_user_id, yr.modified_user_id = current_user.id, current_user.id
-        staging_state = db.session.query(Cfg_states).filter(Cfg_states.is_staging_state > 0).first()
-        yr.state = staging_state.state
-        yr.description = description.strip('"')
-        yr.revision = 1
-        db.session.add(yr)
-        try:
-            db.session.commit()
-        except:
-            db.session.rollback()
-            raise
-        return jsonify(yr.to_dict()), 201
+        sources.append(
+            rule.to_dict(include_yara_rule_string=True, short=True)["yara_rule_string"]
+        )
+    if any(
+        not isinstance(source, str) or len(source) > 1024 * 1024 for source in sources
+    ):
+        abort(400)
+    try:
+        value = merge_sources(sources, "Merged_" + uuid.uuid4().hex[:12])
+    except Exception as error:
+        abort(422, description=str(error))
+    if values.get("save_output"):
+        staging = Cfg_states.query.filter_by(is_staging_state=1).first()
+        if not staging:
+            abort(409, description="Configure a staging state first.")
+        value.update(state=staging.state, category="Uncategorized")
+        entity, _ = save_signature(value)
+        return jsonify(entity.to_dict(short=True)), 201
+    return jsonify(merged_signature=Yara_rule.to_yara_rule_string(value))
 
 
-@app.route('/ThreatKB/yara_rules/merge_signatures_by_id', methods=['POST'])
-@auto.doc()
+@app.post("/ThreatKB/yara_rules/merge_signatures_by_id")
 @login_required
 def merge_signatures_by_id():
-    """Merge a signature into another
-    From Data: merge_from_id (int), merge_to_id (int)
-    Return: merged yara_rule artifact dictionary"""
-    merge_from_id = request.json.get("merge_from_id", None)
-    merge_to_id = request.json.get("merge_to_id", None)
+    from app.authorization import require_artifact
+    from app.signature_merge import merge_sources
+    from app.signature_service import save_signature
 
-    if not merge_from_id or not merge_to_id:
-        abort(412, description="Not enough info provided")
-
-    merge_from_yr = yara_rule.Yara_rule.query.filter_by(id=merge_from_id).first()
-    merge_to_yr = yara_rule.Yara_rule.query.filter_by(id=merge_to_id).first()
-
-    merged_state = "Merged"
-    if not cfg_states.Cfg_states.query.filter_by(state=merged_state).first():
-        db.session.add(cfg_states.Cfg_states(state=merged_state))
-        try:
-            db.session.commit()
-        except:
-            db.session.rollback()
-            raise
-
-    merge_from_yr.state = merged_state
-    db.session.add(merge_from_yr)
-    merged_into_comment = "This yara rule was merged into signature '%s' with event id '%s' by '%s'" % (
-        merge_to_yr.name, merge_to_yr.eventid, current_user.email)
-    db.session.add(
-        comments.Comments(comment=merged_into_comment, entity_type=ENTITY_MAPPING["SIGNATURE"],
-                          entity_id=merge_from_yr.id, user_id=current_user.id))
-
-    merged_from_comment = "The yara rule '%s' with event id '%s' was merged into this yara rule by '%s'" % (
-        merge_from_yr.name, merge_from_yr.eventid, current_user.email)
-    db.session.add(
-        comments.Comments(comment=merged_from_comment, entity_type=ENTITY_MAPPING["SIGNATURE"],
-                          entity_id=merge_to_yr.id, user_id=current_user.id))
+    values = request.get_json()
+    source = require_artifact(1, values.get("merge_from_id"), write=True)
+    destination = require_artifact(1, values.get("merge_to_id"), write=True)
+    if source.id == destination.id:
+        abort(400, description="Choose another signature.")
     try:
-        db.session.commit()
-    except:
-        db.session.rollback()
-        raise
+        merged = merge_sources(
+            [
+                source.to_dict(include_yara_rule_string=True, short=True)[
+                    "yara_rule_string"
+                ],
+                destination.to_dict(include_yara_rule_string=True, short=True)[
+                    "yara_rule_string"
+                ],
+            ],
+            destination.name,
+        )
+    except Exception as error:
+        abort(422, description=str(error))
+    if not Cfg_states.query.filter_by(state="Merged").first():
+        db.session.add(Cfg_states(state="Merged"))
+        db.session.flush()
+    merged["new_comment"] = (
+        f"Merged signature {source.name} (EventID {source.eventid}) into this revision."
+    )
+    save_signature(merged, destination, commit=False)
+    save_signature(
+        {
+            "state": "Merged",
+            "new_comment": f"Merged into {destination.name} (EventID {destination.eventid}).",
+        },
+        source,
+        commit=False,
+    )
+    db.session.commit()
+    return jsonify(destination.to_dict(short=True))
 
-    delete_bookmarks(ENTITY_MAPPING["SIGNATURE"], merge_from_id, current_user.id)
 
-    return get_yara_rule(merge_to_yr.id)
-
-
-@app.route('/ThreatKB/yara_rules', methods=['GET'])
+@app.route("/ThreatKB/yara_rules", methods=["GET"])
 @auto.doc()
 @login_required
 def get_all_yara_rules():
@@ -241,47 +197,51 @@ def get_all_yara_rules():
         include_inactive = False
         include_active = True
 
-    include_yara_string = bool(strtobool(request.args.get("include_yara_string", "False")))
+    include_yara_string = bool(
+        strtobool(request.args.get("include_yara_string", "False"))
+    )
     short = bool(strtobool(request.args.get("short", "true")))
-    include_metadata = bool(strtobool(request.args.get('include_metadata', "true")))
-    include_tags = bool(strtobool(request.args.get('include_tags', "true")))
-    include_comments = bool(strtobool(request.args.get('include_comments', "true")))
+    include_metadata = bool(strtobool(request.args.get("include_metadata", "true")))
+    include_tags = bool(strtobool(request.args.get("include_tags", "true")))
+    include_comments = bool(strtobool(request.args.get("include_comments", "true")))
 
     if include_yara_string:
         include_yara_string = True
 
-    include_merged = request.args.get('include_merged', False)
-    searches = request.args.get('searches', '{}')
-    page_number = request.args.get('page_number', False)
-    page_size = request.args.get('page_size', False)
-    sort_by = request.args.get('sort_by', False)
-    operator = request.args.get('operator', 'and')
-    sort_direction = request.args.get('sort_dir', 'ASC')
-    exclude_totals = request.args.get('exclude_totals', False)
+    include_merged = request.args.get("include_merged", False)
+    searches = request.args.get("searches", "{}")
+    page_number = request.args.get("page_number", False)
+    page_size = request.args.get("page_size", False)
+    sort_by = request.args.get("sort_by", False)
+    operator = request.args.get("operator", "and")
+    sort_direction = request.args.get("sort_dir", "ASC")
+    exclude_totals = request.args.get("exclude_totals", False)
 
-    response_dict = filter_entities(entity=yara_rule.Yara_rule,
-                                    artifact_type=ENTITY_MAPPING["SIGNATURE"],
-                                    searches=searches,
-                                    page_number=page_number,
-                                    page_size=page_size,
-                                    sort_by=sort_by,
-                                    sort_direction=sort_direction,
-                                    include_metadata=include_metadata,
-                                    exclude_totals=exclude_totals,
-                                    default_sort="creation_date",
-                                    include_inactive=include_inactive,
-                                    include_tags=include_tags,
-                                    include_comments=include_comments,
-                                    include_active=include_active,
-                                    include_merged=include_merged,
-                                    include_yara_string=include_yara_string,
-                                    short=short,
-                                    operator=operator)
+    response_dict = filter_entities(
+        entity=yara_rule.Yara_rule,
+        artifact_type=ENTITY_MAPPING["SIGNATURE"],
+        searches=searches,
+        page_number=page_number,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        include_metadata=include_metadata,
+        exclude_totals=exclude_totals,
+        default_sort="creation_date",
+        include_inactive=include_inactive,
+        include_tags=include_tags,
+        include_comments=include_comments,
+        include_active=include_active,
+        include_merged=include_merged,
+        include_yara_string=include_yara_string,
+        short=short,
+        operator=operator,
+    )
 
-    return Response(response_dict, mimetype='application/json')
+    return Response(response_dict, mimetype="application/json")
 
 
-@app.route('/ThreatKB/yara_rules/<int:id>', methods=['GET'])
+@app.route("/ThreatKB/yara_rules/<int:id>", methods=["GET"])
 @auto.doc()
 @login_required
 def get_yara_rule(id):
@@ -301,15 +261,22 @@ def get_yara_rule(id):
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
 
-    return_dict = entity.to_dict(include_yara_rule_string=include_yara_string, short=short,
-                                 include_revisions=include_revisions, include_metadata=include_metadata)
-    return_dict["bookmarked"] = True if is_bookmarked(ENTITY_MAPPING["SIGNATURE"], id, current_user.id) \
+    return_dict = entity.to_dict(
+        include_yara_rule_string=include_yara_string,
+        short=short,
+        include_revisions=include_revisions,
+        include_metadata=include_metadata,
+    )
+    return_dict["bookmarked"] = (
+        True
+        if is_bookmarked(ENTITY_MAPPING["SIGNATURE"], id, current_user.id)
         else False
+    )
 
     return jsonify(return_dict)
 
 
-@app.route('/ThreatKB/yara_rules/<int:id>/release_mapping', methods=['GET'])
+@app.route("/ThreatKB/yara_rules/<int:id>/release_mapping", methods=["GET"])
 @auto.doc()
 @login_required
 def get_yara_rule_release_mapping(id):
@@ -322,7 +289,11 @@ def get_yara_rule_release_mapping(id):
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
 
-    rule_history = db.session.query(Yara_rule_history.id).filter(Yara_rule_history.yara_rule_id == entity.id).all()
+    rule_history = (
+        db.session.query(Yara_rule_history.id)
+        .filter(Yara_rule_history.yara_rule_id == entity.id)
+        .all()
+    )
     if not rule_history:
         return jsonify([])
 
@@ -342,7 +313,9 @@ def get_yara_rule_release_mapping(id):
     return jsonify(return_mapping)
 
 
-@app.route('/ThreatKB/yara_rules/<int:yara_rule_id>/revision/<int:revision>', methods=['GET'])
+@app.route(
+    "/ThreatKB/yara_rules/<int:yara_rule_id>/revision/<int:revision>", methods=["GET"]
+)
 @auto.doc()
 @login_required
 def get_yara_rule_string_from_revision(yara_rule_id, revision):
@@ -350,10 +323,11 @@ def get_yara_rule_string_from_revision(yara_rule_id, revision):
     Return: yara_rule string representation"""
 
     current_entity = db.session.get(yara_rule.Yara_rule, yara_rule_id)
-    revision_entity = Yara_rule_history.query \
-        .filter_by(yara_rule_id=yara_rule_id) \
-        .filter_by(revision=revision) \
+    revision_entity = (
+        Yara_rule_history.query.filter_by(yara_rule_id=yara_rule_id)
+        .filter_by(revision=revision)
         .first()
+    )
 
     if not current_entity or not revision_entity:
         abort(404)
@@ -368,7 +342,7 @@ def get_yara_rule_string_from_revision(yara_rule_id, revision):
     return jsonify(yara_rule_string)
 
 
-@app.route('/ThreatKB/yara_rules', methods=['POST', 'PUT'])
+@app.route("/ThreatKB/yara_rules", methods=["POST", "PUT"])
 @auto.doc()
 @login_required
 def create_yara_rule():
@@ -376,10 +350,12 @@ def create_yara_rule():
     From Data: name (str), state(str), category (str), condition (str), strings (str)
     Return: yara_rule artifact dictionary"""
     from app.signature_service import save_signature
+
     entity, changed = save_signature(request.get_json())
     return jsonify(entity.to_dict(include_yara_rule_string=True)), 201
 
-@app.route('/ThreatKB/yara_rules/<int:id>', methods=['PUT'])
+
+@app.route("/ThreatKB/yara_rules/<int:id>", methods=["PUT"])
 @auto.doc()
 @login_required
 def update_yara_rule(id):
@@ -387,12 +363,13 @@ def update_yara_rule(id):
     From Data: name (str), state(str), category (str), condition (str), strings (str)
     Return: yara_rule artifact dictionary"""
     from app.signature_service import save_signature
+
     entity = db.get_or_404(Yara_rule, id)
     entity, changed = save_signature(request.get_json(), entity)
     return jsonify(entity.to_dict(include_yara_rule_string=True)), 200
 
 
-@app.route('/ThreatKB/yara_rules/batch/edit', methods=['PUT'])
+@app.route("/ThreatKB/yara_rules/batch/edit", methods=["PUT"])
 @auto.doc()
 @login_required
 def batch_update_yara_rules():
@@ -405,20 +382,23 @@ def batch_update_yara_rules():
                }
     Return: Success Code"""
 
-    if 'batch' in request.json and request.json['batch']:
-        return batch_update(batch=request.json['batch'],
-                            artifact=yara_rule.Yara_rule,
-                            session=db.session)
+    if "batch" in request.json and request.json["batch"]:
+        return batch_update(
+            batch=request.json["batch"],
+            artifact=yara_rule.Yara_rule,
+            session=db.session,
+        )
 
 
-@app.route('/ThreatKB/yara_rules/<int:id>', methods=['DELETE'])
+@app.route("/ThreatKB/yara_rules/<int:id>", methods=["DELETE"])
 @auto.doc()
 @login_required
 def delete_yara_rule(id):
     """INACTIVATE yara_rule artifact associated with id
     Return: None"""
-    entity = db.session.get(yara_rule.Yara_rule, id)
-
+    entity = db.get_or_404(Yara_rule, id)
+    if not current_user.admin and entity.owner_user_id != current_user.id:
+        abort(403)
     if entity.active:
         entity.active = False
 
@@ -438,24 +418,14 @@ def delete_yara_rule(id):
         # delete_tags_mapping(entity.__tablename__, entity.id)
         delete_bookmarks(ENTITY_MAPPING["SIGNATURE"], id, current_user.id)
     else:
+        from app.artifact_cleanup import purge_artifacts
 
-        db.session.query(yara_rule.Yara_testing_history).filter(
-            yara_rule.Yara_testing_history.yara_rule_id.in_([entity.id])).delete(synchronize_session='fetch')
-        db.session.query(yara_rule.Yara_rule_history).filter(
-            yara_rule.Yara_rule_history.yara_rule_id.in_([entity.id])).delete(synchronize_session='fetch')
-        db.session.delete(entity)
-        try:
-            db.session.commit()
-        except:
-            db.session.rollback()
-            raise
+        purge_artifacts(Yara_rule, 1, [entity.id])
 
-        delete_bookmarks(ENTITY_MAPPING["SIGNATURE"], id, current_user.id)
-
-    return jsonify(''), 204
+    return jsonify(""), 204
 
 
-@app.route('/ThreatKB/yara_rules/batch/delete', methods=['PUT'])
+@app.route("/ThreatKB/yara_rules/batch/delete", methods=["PUT"])
 @auto.doc()
 @login_required
 def batch_delete_yara_rules():
@@ -465,15 +435,17 @@ def batch_delete_yara_rules():
                }
     Return: Success Code"""
 
-    if 'batch' in request.json and request.json['batch']:
-        return batch_delete(batch=request.json['batch'],
-                            artifact=yara_rule.Yara_rule,
-                            session=db.session,
-                            entity_mapping=ENTITY_MAPPING["SIGNATURE"],
-                            is_yara=True)
+    if "batch" in request.json and request.json["batch"]:
+        return batch_delete(
+            batch=request.json["batch"],
+            artifact=yara_rule.Yara_rule,
+            session=db.session,
+            entity_mapping=ENTITY_MAPPING["SIGNATURE"],
+            is_yara=True,
+        )
 
 
-@app.route('/ThreatKB/yara_rules/copy', methods=['POST'])
+@app.route("/ThreatKB/yara_rules/copy", methods=["POST"])
 @auto.doc()
 @login_required
 def copy_yara_rules():
@@ -482,34 +454,38 @@ def copy_yara_rules():
     Return: yara strings for copy"""
 
     signatures = []
-    if 'copy' in request.json and request.json['copy'] \
-            and 'ids' in request.json['copy'] and request.json['copy']['ids']:
-        for sig_id in request.json['copy']['ids']:
+    if (
+        "copy" in request.json
+        and request.json["copy"]
+        and "ids" in request.json["copy"]
+        and request.json["copy"]["ids"]
+    ):
+        for sig_id in request.json["copy"]["ids"]:
             sig = db.session.get(yara_rule.Yara_rule, sig_id)
             if not sig:
                 abort(404)
             if not current_user.admin and sig.owner_user_id != current_user.id:
                 abort(403)
 
-            signatures.append(sig.to_dict(include_yara_rule_string=True)["yara_rule_string"])
+            from app.querying import serialize_page
 
-    return jsonify('\n\n'.join(map(str, signatures))), 200
+            value = serialize_page([sig], Yara_rule, 1, short=True)[0]
+            signatures.append(Yara_rule.to_yara_rule_string(value))
+
+    return jsonify("\n\n".join(map(str, signatures))), 200
 
 
-@app.route('/ThreatKB/yara_rules/delete_all_inactive', methods=['PUT'])
+@app.route("/ThreatKB/yara_rules/delete_all_inactive", methods=["PUT"])
 @auto.doc()
 @login_required
+@admin_only()
 def delete_all_inactive_yara_rules():
-    rules_to_delete = db.session.query(yara_rule.Yara_rule).filter(yara_rule.Yara_rule.active == 0).all()
-    rules_to_delete_ids = [rule.id for rule in rules_to_delete]
-    db.session.query(yara_rule.Yara_testing_history).filter(
-        yara_rule.Yara_testing_history.yara_rule_id.in_(rules_to_delete_ids)).delete(synchronize_session='fetch')
-    db.session.query(yara_rule.Yara_rule_history).filter(
-        yara_rule.Yara_rule_history.yara_rule_id.in_(rules_to_delete_ids)).delete(synchronize_session='fetch')
-    db.session.query(yara_rule.Yara_rule).filter(yara_rule.Yara_rule.active == 0).delete()
-    try:
-        db.session.commit()
-    except:
-        db.session.rollback()
-        raise
-    return jsonify(''), 200
+    from app.artifact_cleanup import purge_artifacts
+
+    if not current_user.admin:
+        abort(403)
+    identities = db.session.scalars(
+        db.select(Yara_rule.id).where(Yara_rule.active.is_(False))
+    ).all()
+    count = purge_artifacts(Yara_rule, 1, identities)
+    return jsonify(deleted=count), 200

@@ -13,15 +13,31 @@ from ipaddress import ip_address
 
 #####################################################################
 
-def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared_reference=None,
-                   shared_description=None, shared_state=None, shared_match_type=None, shared_owner=None, metadata_field_mapping={},
-                   resurrect_retired_artifacts=True, shared_tags=None):
+
+def save_artifacts(
+    extract_ip,
+    extract_dns,
+    extract_signature,
+    artifacts,
+    shared_reference=None,
+    shared_description=None,
+    shared_state=None,
+    shared_match_type=None,
+    shared_owner=None,
+    metadata_field_mapping=None,
+    resurrect_retired_artifacts=True,
+    shared_tags=None,
+):
+    metadata_field_mapping = metadata_field_mapping or {}
     if shared_tags is None:
-        shared_tags = request.get_json(silent=True).get("tags", []) if request.is_json else []
+        shared_tags = (
+            request.get_json(silent=True).get("tags", []) if request.is_json else []
+        )
     if not isinstance(shared_tags, list):
         abort(400, description="tags must be a list")
-    if request.is_json and request.get_json().get('retire_existing'):
+    if request.is_json and request.get_json().get("retire_existing"):
         from app.indicator_retirement import retire_imported_indicators
+
         return retire_imported_indicators(artifacts)
     default_state = "Imported"
     return_artifacts = []
@@ -32,11 +48,63 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
     metadata_to_save_dns = []
     error_artifacts = []
 
-    domain_names = {domain_name.domain_name.lower(): domain_name for domain_name in c2dns.C2dns.query.all()}
-    ip_addresses = {ipaddress.ip: ipaddress for ipaddress in c2ip.C2ip.query.all()}
-    yara_rules = {yr.name: yr for yr in db.session.query(yara_rule.Yara_rule).all()}
-    unique_rule_name_enforcement = cfg_settings.Cfg_settings.get_setting("ENFORCE_UNIQUE_YARA_RULE_NAMES")
-    retired_state = cfg_states.Cfg_states.query.filter(cfg_states.Cfg_states.is_retired_state > 0).first()
+    if not isinstance(artifacts, list) or len(artifacts) > 10000:
+        abort(400, description="Import at most 10000 artifacts at a time.")
+    domains = {
+        str(a.get("artifact", "")).lower()
+        for a in artifacts
+        if a.get("type", "").lower() == "dns"
+    }
+    ips = set()
+    for item in artifacts:
+        if item.get("type", "").lower() == "ip":
+            try:
+                ips.add(str(ip_address(item["artifact"])))
+            except ValueError:
+                pass  # Report invalid values in the per-artifact import result below.
+    names = {
+        a.get("rule", {}).get("rule_name")
+        for a in artifacts
+        if a.get("type", "").lower() == "yara_rule"
+    }
+    domain_names = (
+        {
+            row.domain_name.lower(): row
+            for row in c2dns.C2dns.query.filter(c2dns.C2dns.domain_name.in_(domains))
+        }
+        if domains
+        else {}
+    )
+    ip_addresses = (
+        {row.ip: row for row in c2ip.C2ip.query.filter(c2ip.C2ip.ip.in_(ips))}
+        if ips
+        else {}
+    )
+    yara_rules = (
+        {
+            row.name: row
+            for row in yara_rule.Yara_rule.query.filter(
+                yara_rule.Yara_rule.name.in_(names)
+            )
+        }
+        if names
+        else {}
+    )
+    release_state = (
+        cfg_states.Cfg_states.query.filter_by(
+            state=shared_state, is_release_state=1
+        ).first()
+        if shared_state
+        else None
+    )
+    if release_state and not current_user.admin:
+        abort(403, description="Only administrators can import into a release state.")
+    unique_rule_name_enforcement = cfg_settings.Cfg_settings.get_setting(
+        "ENFORCE_UNIQUE_YARA_RULE_NAMES"
+    )
+    retired_state = cfg_states.Cfg_states.query.filter(
+        cfg_states.Cfg_states.is_retired_state > 0
+    ).first()
 
     if not retired_state:
         retired_state = cfg_states.Cfg_states(state="Retired", is_retired_state=1)
@@ -56,39 +124,84 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
                 # old_ip = c2ip.C2ip.query.filter(c2ip.C2ip.ip == artifact["artifact"]).first()
                 old_ip = ip_addresses.get(artifact["artifact"], None)
                 if old_ip and not resurrect_retired_artifacts:
-                    message = "System comment: duplicate IP '%s' found at '%s' by '%s'" % (
-                        artifact["artifact"], shared_reference if shared_reference else "no reference provided",
-                        current_user.email)
+                    message = (
+                        "System comment: duplicate IP '%s' found at '%s' by '%s'"
+                        % (
+                            artifact["artifact"],
+                            shared_reference
+                            if shared_reference
+                            else "no reference provided",
+                            current_user.email,
+                        )
+                    )
                     db.session.add(
-                        comments.Comments(comment=message, entity_type=ENTITY_MAPPING["IP"],
-                                          entity_id=old_ip.id, user_id=current_user.id))
+                        comments.Comments(
+                            comment=message,
+                            entity_type=ENTITY_MAPPING["IP"],
+                            entity_id=old_ip.id,
+                            user_id=current_user.id,
+                        )
+                    )
                     duplicate_artifacts.append(artifact)
                     continue
                 else:
                     if not resurrect_retired_artifacts or not old_ip:
-                        ip = c2ip.C2ip.get_c2ip_from_ip(artifact, metadata_field_mapping)
+                        ip = c2ip.C2ip.get_c2ip_from_ip(
+                            artifact, metadata_field_mapping
+                        )
                     else:
                         ip = old_ip
                         if not retired_state.state == ip.state:
-                            message = "System comment: duplicate IP '%s' found at '%s' by '%s' because it was not resurrected because it was in the state '%s' not the retired state of '%s'" % (
-                                artifact["artifact"], shared_reference if shared_reference else "no reference provided",
-                                current_user.email, ip.state, retired_state.state)
+                            message = (
+                                "System comment: duplicate IP '%s' found at '%s' by '%s' because it was not resurrected because it was in the state '%s' not the retired state of '%s'"
+                                % (
+                                    artifact["artifact"],
+                                    shared_reference
+                                    if shared_reference
+                                    else "no reference provided",
+                                    current_user.email,
+                                    ip.state,
+                                    retired_state.state,
+                                )
+                            )
                             db.session.add(
-                                comments.Comments(comment=message, entity_type=ENTITY_MAPPING["IP"],
-                                                  entity_id=old_ip.id, user_id=current_user.id))
+                                comments.Comments(
+                                    comment=message,
+                                    entity_type=ENTITY_MAPPING["IP"],
+                                    entity_id=old_ip.id,
+                                    user_id=current_user.id,
+                                )
+                            )
                             duplicate_artifacts.append(artifact)
                             continue
 
-                        message = "System comment: resurrected IP '%s' because of reference '%s' by '%s'" % (
-                            artifact["artifact"], shared_reference if shared_reference else "no reference provided",
-                            current_user.email)
+                        message = (
+                            "System comment: resurrected IP '%s' because of reference '%s' by '%s'"
+                            % (
+                                artifact["artifact"],
+                                shared_reference
+                                if shared_reference
+                                else "no reference provided",
+                                current_user.email,
+                            )
+                        )
                         db.session.add(
-                            comments.Comments(comment=message, entity_type=ENTITY_MAPPING["IP"],
-                                              entity_id=ip.id, user_id=current_user.id))
-                    ip.created_user_id, ip.modified_user_id = current_user.id, current_user.id
+                            comments.Comments(
+                                comment=message,
+                                entity_type=ENTITY_MAPPING["IP"],
+                                entity_id=ip.id,
+                                user_id=current_user.id,
+                            )
+                        )
+                    ip.created_user_id, ip.modified_user_id = (
+                        current_user.id,
+                        current_user.id,
+                    )
                     ip.state = default_state if not shared_state else shared_state
                     if Whitelist.hits_whitelist(ip.ip, ip.state):
-                        error_artifacts.append((ip.ip, f"Whitelist validation failed {ip.ip}"))
+                        error_artifacts.append(
+                            (ip.ip, f"Whitelist validation failed {ip.ip}")
+                        )
                         continue
 
                     if shared_reference:
@@ -113,39 +226,89 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
                 # old_dns = c2dns.C2dns.query.filter(c2dns.C2dns.domain_name == artifact["artifact"]).first()
                 old_dns = domain_names.get(artifact["artifact"].lower(), None)
                 if old_dns and not resurrect_retired_artifacts:
-                    message = "System comment: duplicate DNS '%s' found at '%s' by '%s'" % (
-                        artifact["artifact"], shared_reference if shared_reference else "no reference provided",
-                        current_user.email)
+                    message = (
+                        "System comment: duplicate DNS '%s' found at '%s' by '%s'"
+                        % (
+                            artifact["artifact"],
+                            shared_reference
+                            if shared_reference
+                            else "no reference provided",
+                            current_user.email,
+                        )
+                    )
                     db.session.add(
-                        comments.Comments(comment=message, entity_type=ENTITY_MAPPING["DNS"],
-                                          entity_id=old_dns.id, user_id=current_user.id))
+                        comments.Comments(
+                            comment=message,
+                            entity_type=ENTITY_MAPPING["DNS"],
+                            entity_id=old_dns.id,
+                            user_id=current_user.id,
+                        )
+                    )
                     duplicate_artifacts.append(artifact)
                     continue
                 else:
                     if not resurrect_retired_artifacts or not old_dns:
-                        dns = c2dns.C2dns.get_c2dns_from_hostname(artifact, metadata_field_mapping)
+                        dns = c2dns.C2dns.get_c2dns_from_hostname(
+                            artifact, metadata_field_mapping
+                        )
                     else:
                         dns = old_dns
                         if not retired_state.state == dns.state:
-                            message = "System comment: duplicate DNS '%s' found at '%s' by '%s'  because it was not resurrected because it was in the state '%s' not the retired state of '%s'" % (
-                                artifact["artifact"], shared_reference if shared_reference else "no reference provided",
-                                current_user.email, dns.state, retired_state.state)
+                            message = (
+                                "System comment: duplicate DNS '%s' found at '%s' by '%s'  because it was not resurrected because it was in the state '%s' not the retired state of '%s'"
+                                % (
+                                    artifact["artifact"],
+                                    shared_reference
+                                    if shared_reference
+                                    else "no reference provided",
+                                    current_user.email,
+                                    dns.state,
+                                    retired_state.state,
+                                )
+                            )
                             db.session.add(
-                                comments.Comments(comment=message, entity_type=ENTITY_MAPPING["DNS"],
-                                                  entity_id=old_dns.id, user_id=current_user.id))
+                                comments.Comments(
+                                    comment=message,
+                                    entity_type=ENTITY_MAPPING["DNS"],
+                                    entity_id=old_dns.id,
+                                    user_id=current_user.id,
+                                )
+                            )
                             duplicate_artifacts.append(artifact)
                             continue
-                        message = "System comment: resurrected DNS '%s' because of reference '%s' by '%s'" % (
-                            artifact["artifact"], shared_reference if shared_reference else "no reference provided",
-                            current_user.email)
+                        message = (
+                            "System comment: resurrected DNS '%s' because of reference '%s' by '%s'"
+                            % (
+                                artifact["artifact"],
+                                shared_reference
+                                if shared_reference
+                                else "no reference provided",
+                                current_user.email,
+                            )
+                        )
                         db.session.add(
-                            comments.Comments(comment=message, entity_type=ENTITY_MAPPING["DNS"],
-                                              entity_id=dns.id, user_id=current_user.id))
-                    dns.created_user_id, dns.modified_user_id = current_user.id, current_user.id
+                            comments.Comments(
+                                comment=message,
+                                entity_type=ENTITY_MAPPING["DNS"],
+                                entity_id=dns.id,
+                                user_id=current_user.id,
+                            )
+                        )
+                    dns.created_user_id, dns.modified_user_id = (
+                        current_user.id,
+                        current_user.id,
+                    )
                     dns.state = default_state if not shared_state else shared_state
-                    dns.match_type = None if not shared_match_type else shared_match_type
+                    dns.match_type = (
+                        None if not shared_match_type else shared_match_type
+                    )
                     if Whitelist.hits_whitelist(dns.domain_name, dns.state):
-                        error_artifacts.append((dns.domain_name, f"Whitelist validation failed {dns.domain_name}"))
+                        error_artifacts.append(
+                            (
+                                dns.domain_name,
+                                f"Whitelist validation failed {dns.domain_name}",
+                            )
+                        )
                         continue
 
                     if shared_reference:
@@ -171,12 +334,21 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
 
             elif artifact["type"].lower() == "yara_rule" and extract_signature:
                 yr = yara_rules.get(artifact["rule"]["rule_name"], None)
-                if unique_rule_name_enforcement and strtobool(unique_rule_name_enforcement) and yr:
+                if (
+                    unique_rule_name_enforcement
+                    and strtobool(unique_rule_name_enforcement)
+                    and yr
+                ):
                     duplicate_artifacts.append(artifact)
                     continue
 
-                yr, fta = yara_rule.Yara_rule.get_yara_rule_from_yara_dict(artifact, metadata_field_mapping)
-                yr.created_user_id, yr.modified_user_id = current_user.id, current_user.id
+                yr, fta = yara_rule.Yara_rule.get_yara_rule_from_yara_dict(
+                    artifact, metadata_field_mapping
+                )
+                yr.created_user_id, yr.modified_user_id = (
+                    current_user.id,
+                    current_user.id,
+                )
                 yr.state = default_state if not shared_state else shared_state
                 yr.revision = 1
                 if shared_reference:
@@ -188,15 +360,20 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
 
                 db.session.add(yr)
                 db.session.commit()
-                db.session.add(yara_rule.Yara_rule_history(date_created=datetime.datetime.now(),
-                                                           revision=yr.revision,
-                                                           rule_json=json.dumps(yr.to_revision_dict()),
-                                                           user_id=current_user.id,
-                                                           yara_rule_id=yr.id,
-                                                           state=yr.state))
+                db.session.add(
+                    yara_rule.Yara_rule_history(
+                        date_created=datetime.datetime.now(),
+                        revision=yr.revision,
+                        rule_json=json.dumps(yr.to_revision_dict()),
+                        user_id=current_user.id,
+                        yara_rule_id=yr.id,
+                        state=yr.state,
+                    )
+                )
 
                 if shared_tags:
                     from app.routes.tags_mapping import create_tags_mapping
+
                     create_tags_mapping("yara_rules", yr.id, shared_tags)
                 return_artifacts.append(yr)
                 fields_to_add[yr] = fta
@@ -231,24 +408,36 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
         metadata_cache = Metadata.get_metadata_cache()
         for metadata_to_save in metadata_to_save_dns:
             artifact, metadata = metadata_to_save
-            for m in c2dns.C2dns.get_metadata_to_save(artifact, metadata, metadata_cache):
+            for m in c2dns.C2dns.get_metadata_to_save(
+                artifact, metadata, metadata_cache
+            ):
                 db.session.add(m)
         db.session.commit()
 
     if return_artifacts or resurrected_artifacts:
         from app.ingestion_health import record_ingestion_success
-        source = request.get_json(silent=True).get('source', 'default') if request.is_json else 'default'
-        record_ingestion_success(source, len(return_artifacts) + len(resurrected_artifacts))
 
-    return {"committed": [artifact.to_dict() for artifact in return_artifacts],
-            "duplicates": duplicate_artifacts,
-            "resurrected": resurrected_artifacts,
-            "errors": error_artifacts}
+        source = (
+            request.get_json(silent=True).get("source", "default")
+            if request.is_json
+            else "default"
+        )
+        record_ingestion_success(
+            source, len(return_artifacts) + len(resurrected_artifacts)
+        )
+
+    return {
+        "committed": [artifact.to_dict() for artifact in return_artifacts],
+        "duplicates": duplicate_artifacts,
+        "resurrected": resurrected_artifacts,
+        "errors": error_artifacts,
+    }
 
 
 #####################################################################
 
-@app.route('/ThreatKB/import', methods=['POST'])
+
+@app.route("/ThreatKB/import", methods=["POST"])
 @auto.doc()
 @login_required
 def import_artifacts():
@@ -258,16 +447,16 @@ def import_artifacts():
     Return: list of artifact dictionaries [{"type":"IP": "artifact": {}}, {"type":"DNS": "artifact": {}}, ...]"""
     autocommit = request.json.get("autocommit", 0)
     resurrect_retired_artifacts = request.json.get("resurrect_retired_artifacts", True)
-    import_text = request.json.get('import_text', None)
-    shared_state = request.json.get('shared_state', None)
-    shared_match_type = request.json.get('shared_match_type', None)
+    import_text = request.json.get("import_text", None)
+    shared_state = request.json.get("shared_state", None)
+    shared_match_type = request.json.get("shared_match_type", None)
     shared_reference = request.json.get("shared_reference", None)
     shared_description = request.json.get("shared_description", None)
     shared_owner = request.json.get("shared_owner", None)
-    extract_ip = request.json.get('extract_ip', True)
-    extract_dns = request.json.get('extract_dns', True)
-    extract_signature = request.json.get('extract_signature', True)
-    metadata_field_mapping = request.json.get('metadata_field_mapping', {})
+    extract_ip = request.json.get("extract_ip", True)
+    extract_dns = request.json.get("extract_dns", True)
+    extract_signature = request.json.get("extract_signature", True)
+    metadata_field_mapping = request.json.get("metadata_field_mapping", {})
 
     if not shared_owner:
         shared_owner = int(current_user.id)
@@ -275,22 +464,35 @@ def import_artifacts():
     if not import_text:
         abort(404)
 
-    artifacts = extract_artifacts(do_extract_ip=extract_ip, do_extract_dns=extract_dns,
-                                  do_extract_signature=extract_signature, text=import_text)
+    artifacts = extract_artifacts(
+        do_extract_ip=extract_ip,
+        do_extract_dns=extract_dns,
+        do_extract_signature=extract_signature,
+        text=import_text,
+    )
 
     if autocommit:
-        artifacts = save_artifacts(extract_ip=extract_ip, extract_dns=extract_dns, extract_signature=extract_signature,
-                                   artifacts=artifacts, shared_reference=shared_reference,
-                                   shared_description=shared_description, shared_state=shared_state, shared_match_type=shared_match_type,
-                                   shared_owner=shared_owner, metadata_field_mapping=metadata_field_mapping,
-                                   resurrect_retired_artifacts=resurrect_retired_artifacts)
+        artifacts = save_artifacts(
+            extract_ip=extract_ip,
+            extract_dns=extract_dns,
+            extract_signature=extract_signature,
+            artifacts=artifacts,
+            shared_reference=shared_reference,
+            shared_description=shared_description,
+            shared_state=shared_state,
+            shared_match_type=shared_match_type,
+            shared_owner=shared_owner,
+            metadata_field_mapping=metadata_field_mapping,
+            resurrect_retired_artifacts=resurrect_retired_artifacts,
+        )
 
     return jsonify({"artifacts": artifacts})
 
 
 #####################################################################
 
-@app.route('/ThreatKB/import_by_file', methods=['POST'])
+
+@app.route("/ThreatKB/import_by_file", methods=["POST"])
 @auto.doc()
 @login_required
 def import_artifacts_by_filek():
@@ -299,18 +501,24 @@ def import_artifacts_by_filek():
     Optional Arguments: autocommit (int), shared_state (str), shared_reference (str), shared_description(str), shared_owner (int)
     Return: list of artifact dictionaries [{"type":"IP": "artifact": {}}, {"type":"DNS": "artifact": {}}, ...]"""
     autocommit = strtobool(request.values.get("autocommit", 0))
-    import_text = request.files['file'].stream.read()
+    import_text = request.files["file"].stream.read()
     import_text = import_text.strip()
-    shared_state = request.values.get('shared_state', None)
-    shared_match_type = request.values.get('shared_match_type', None)
-    resurrect_retired_artifacts = request.json.get("resurrect_retired_artifacts", True)
+    shared_state = request.values.get("shared_state", None)
+    shared_match_type = request.values.get("shared_match_type", None)
+    resurrect_retired_artifacts = strtobool(
+        request.values.get("resurrect_retired_artifacts", True)
+    )
     shared_reference = request.values.get("shared_reference", None) or None
     shared_description = request.values.get("shared_description", None) or None
     shared_owner = request.values.get("shared_owner", None) or None
-    extract_ip = strtobool(request.values.get('extract_ip', True))
-    extract_dns = strtobool(request.values.get('extract_dns', True))
-    extract_signature = strtobool(request.values.get('extract_signature', True))
-    metadata_field_mapping = request.values.get('metadata_field_mapping', {})
+    extract_ip = strtobool(request.values.get("extract_ip", True))
+    extract_dns = strtobool(request.values.get("extract_dns", True))
+    extract_signature = strtobool(request.values.get("extract_signature", True))
+    metadata_field_mapping = request.values.get("metadata_field_mapping", "{}")
+    try:
+        metadata_field_mapping = json.loads(metadata_field_mapping)
+    except (TypeError, ValueError):
+        abort(400, description="Metadata field mapping must be a JSON object.")
 
     if not shared_owner:
         shared_owner = int(current_user.id)
@@ -318,22 +526,35 @@ def import_artifacts_by_filek():
     if not import_text:
         abort(404)
 
-    artifacts = extract_artifacts(do_extract_ip=extract_ip, do_extract_dns=extract_dns,
-                                  do_extract_signature=extract_signature, text=import_text)
+    artifacts = extract_artifacts(
+        do_extract_ip=extract_ip,
+        do_extract_dns=extract_dns,
+        do_extract_signature=extract_signature,
+        text=import_text,
+    )
 
     if autocommit:
-        artifacts = save_artifacts(extract_ip=extract_ip, extract_dns=extract_dns, extract_signature=extract_signature,
-                                   artifacts=artifacts, shared_reference=shared_reference,
-                                   shared_description=shared_description, shared_state=shared_state, shared_match_type=shared_match_type,
-                                   shared_owner=shared_owner, metadata_field_mapping=metadata_field_mapping,
-                                   resurrect_retired_artifacts=resurrect_retired_artifacts)
+        artifacts = save_artifacts(
+            extract_ip=extract_ip,
+            extract_dns=extract_dns,
+            extract_signature=extract_signature,
+            artifacts=artifacts,
+            shared_reference=shared_reference,
+            shared_description=shared_description,
+            shared_state=shared_state,
+            shared_match_type=shared_match_type,
+            shared_owner=shared_owner,
+            metadata_field_mapping=metadata_field_mapping,
+            resurrect_retired_artifacts=resurrect_retired_artifacts,
+        )
 
     return jsonify({"artifacts": artifacts})
 
 
 #####################################################################
 
-@app.route('/ThreatKB/import/commit', methods=['POST'])
+
+@app.route("/ThreatKB/import/commit", methods=["POST"])
 @login_required
 def commit_artifacts():
     """Commit previously extracted artifacts. The artifact dictionary
@@ -344,13 +565,13 @@ def commit_artifacts():
     shared_reference = request.json.get("shared_reference", None)
     shared_description = request.json.get("shared_description", None)
     resurrect_retired_artifacts = request.json.get("resurrect_retired_artifacts", True)
-    shared_state = request.json.get('shared_state', None)
-    shared_match_type = request.json.get('shared_match_type', None)
-    extract_ip = request.json.get('extract_ip', True)
-    extract_dns = request.json.get('extract_dns', True)
+    shared_state = request.json.get("shared_state", None)
+    shared_match_type = request.json.get("shared_match_type", None)
+    extract_ip = request.json.get("extract_ip", True)
+    extract_dns = request.json.get("extract_dns", True)
     shared_owner = request.json.get("shared_owner", None)
-    extract_signature = request.json.get('extract_signature', True)
-    metadata_field_mapping = request.json.get('metadata_field_mapping', {})
+    extract_signature = request.json.get("extract_signature", True)
+    metadata_field_mapping = request.json.get("metadata_field_mapping", {})
 
     if not artifacts:
         abort(404)
@@ -358,9 +579,17 @@ def commit_artifacts():
     if not shared_owner:
         shared_owner = int(current_user.id)
 
-    artifacts = save_artifacts(extract_ip=extract_ip, extract_dns=extract_dns, extract_signature=extract_signature,
-                               artifacts=artifacts, shared_reference=shared_reference,
-                               shared_description=shared_description, shared_state=shared_state, shared_match_type=shared_match_type,
-                               metadata_field_mapping=metadata_field_mapping, shared_owner=shared_owner,
-                               resurrect_retired_artifacts=resurrect_retired_artifacts)
+    artifacts = save_artifacts(
+        extract_ip=extract_ip,
+        extract_dns=extract_dns,
+        extract_signature=extract_signature,
+        artifacts=artifacts,
+        shared_reference=shared_reference,
+        shared_description=shared_description,
+        shared_state=shared_state,
+        shared_match_type=shared_match_type,
+        metadata_field_mapping=metadata_field_mapping,
+        shared_owner=shared_owner,
+        resurrect_retired_artifacts=resurrect_retired_artifacts,
+    )
     return jsonify({"artifacts": artifacts}), 201

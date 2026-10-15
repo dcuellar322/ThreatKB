@@ -19,32 +19,38 @@ class Cfg_states(db.Model):
 
     def to_dict(self):
         from app.models import yara_rule, c2dns, c2ip, tasks
+
         return dict(
             state=self.state,
             id=self.id,
             is_release_state=self.is_release_state,
             is_retired_state=self.is_retired_state,
             is_staging_state=self.is_staging_state,
-            sig_count=db.session.query(yara_rule.Yara_rule).filter(yara_rule.Yara_rule.state == self.state).filter(
-                yara_rule.Yara_rule.active > 0).count(),
-            dns_count=db.session.query(c2dns.C2dns).filter(c2dns.C2dns.state == self.state).filter(
-                c2dns.C2dns.active > 0).count(),
-            ip_count=db.session.query(c2ip.C2ip).filter(c2ip.C2ip.state == self.state).filter(
-                c2ip.C2ip.active > 0).count(),
-            task_count=db.session.query(tasks.Tasks).filter(tasks.Tasks.state == self.state).count(),
+            sig_count=db.session.query(yara_rule.Yara_rule)
+            .filter(yara_rule.Yara_rule.state == self.state)
+            .filter(yara_rule.Yara_rule.active > 0)
+            .count(),
+            dns_count=db.session.query(c2dns.C2dns)
+            .filter(c2dns.C2dns.state == self.state)
+            .filter(c2dns.C2dns.active > 0)
+            .count(),
+            ip_count=db.session.query(c2ip.C2ip)
+            .filter(c2ip.C2ip.state == self.state)
+            .filter(c2ip.C2ip.active > 0)
+            .count(),
+            task_count=db.session.query(tasks.Tasks)
+            .filter(tasks.Tasks.state == self.state)
+            .count(),
         )
 
     def __repr__(self):
-        return '<Cfg_states %r>' % self.id
+        return "<Cfg_states %r>" % self.id
 
 
 def verify_state(state_to_verify):
     cfg_state = Cfg_states.query.filter(Cfg_states.state == state_to_verify).first()
     if not cfg_state:
-        entity = Cfg_states(
-            state=state_to_verify,
-            is_release_state=0
-        )
+        entity = Cfg_states(state=state_to_verify, is_release_state=0)
         db.session.add(entity)
         db.session.commit()
 
@@ -60,4 +66,13 @@ def generate_eventid(mapper, connect, target):
 @listens_for(Cfg_states, "before_update")
 def generate_eventid(mapper, connect, target):
     if target.is_release_state > 0:
-        Cfg_states.query.filter(Cfg_states.id != target.id).update(dict(is_release_state=0))
+        Cfg_states.query.filter(Cfg_states.id != target.id).update(
+            dict(is_release_state=0)
+        )
+
+
+@listens_for(Cfg_states, "after_insert")
+@listens_for(Cfg_states, "after_update")
+@listens_for(Cfg_states, "after_delete")
+def invalidate_states(mapper, connection, target):
+    cache.delete_memoized(get_cfg_states)

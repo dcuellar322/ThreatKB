@@ -8,7 +8,10 @@ from app.models.yara_rule import Yara_rule
 from app.models.metadata import Metadata, MetadataMapping
 
 
-@app.route("/ThreatKB/yara_rules/<int:rule_id>/confidence-schedule", methods=["GET", "PUT", "DELETE"])
+@app.route(
+    "/ThreatKB/yara_rules/<int:rule_id>/confidence-schedule",
+    methods=["GET", "PUT", "DELETE"],
+)
 @login_required
 def confidence_schedule(rule_id):
     rule = db.get_or_404(Yara_rule, rule_id)
@@ -28,7 +31,10 @@ def confidence_schedule(rule_id):
             if due.tzinfo is None or not 0 <= confidence <= 100:
                 raise ValueError()
         except (ValueError, KeyError, TypeError):
-            abort(400, description="Provide confidence 0–100 and a timestamp with a timezone.")
+            abort(
+                400,
+                description="Provide confidence 0–100 and a timestamp with a timezone.",
+            )
         schedule = schedule or ScheduledConfidence(rule_id=rule_id)
         schedule.confidence = confidence
         schedule.due_at = due.astimezone(timezone.utc).replace(tzinfo=None)
@@ -41,24 +47,65 @@ def confidence_schedule(rule_id):
 
 def apply_due_confidence(now=None):
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
-    pending = ScheduledConfidence.query.filter(ScheduledConfidence.due_at <= now,
-                                               ScheduledConfidence.applied_at.is_(None)).with_for_update().all()
+    pending = (
+        ScheduledConfidence.query.filter(
+            ScheduledConfidence.due_at <= now, ScheduledConfidence.applied_at.is_(None)
+        )
+        .with_for_update()
+        .all()
+    )
     count = 0
+    rules = (
+        {
+            rule.id: rule
+            for rule in Yara_rule.query.filter(
+                Yara_rule.id.in_([s.rule_id for s in pending]),
+                Yara_rule.active.is_(True),
+            )
+        }
+        if pending
+        else {}
+    )
+    field = (
+        Metadata.query.filter(
+            Metadata.artifact_type == 1,
+            db.func.lower(Metadata.key) == "confidence",
+            Metadata.active.is_(True),
+        ).first()
+        if rules
+        else None
+    )
+    if rules and field is None:
+        field = Metadata(
+            key="confidence",
+            type_="integer",
+            artifact_type=1,
+            created_user_id=pending[0].created_user_id,
+        )
+        db.session.add(field)
+        db.session.flush()
+    mappings = (
+        {
+            row.artifact_id: row
+            for row in MetadataMapping.query.filter(
+                MetadataMapping.metadata_id == field.id,
+                MetadataMapping.artifact_id.in_(rules),
+            )
+        }
+        if field
+        else {}
+    )
     for schedule in pending:
-        rule = db.session.get(Yara_rule, schedule.rule_id)
-        if not rule or not rule.active:
+        rule = rules.get(schedule.rule_id)
+        if rule is None:
             continue
-        field = Metadata.query.filter(Metadata.artifact_type == 1,
-                                      db.func.lower(Metadata.key) == "confidence").first()
-        if field is None:
-            field = Metadata(key="confidence", type_="integer", artifact_type=1,
-                             created_user_id=schedule.created_user_id)
-            db.session.add(field)
-            db.session.flush()
-        mapping = MetadataMapping.query.filter_by(metadata_id=field.id, artifact_id=rule.id).first()
+        mapping = mappings.get(rule.id)
         if mapping is None:
-            mapping = MetadataMapping(metadata_id=field.id, artifact_id=rule.id,
-                                      created_user_id=schedule.created_user_id)
+            mapping = MetadataMapping(
+                metadata_id=field.id,
+                artifact_id=rule.id,
+                created_user_id=schedule.created_user_id,
+            )
         mapping.value = str(schedule.confidence)
         schedule.applied_at = now
         db.session.add(mapping)
@@ -75,4 +122,5 @@ def scheduled_confidence_task():
 @app.cli.command("apply-scheduled-confidence")
 def apply_confidence_command():
     import click
+
     click.echo(f"Applied {apply_due_confidence()} scheduled changes")

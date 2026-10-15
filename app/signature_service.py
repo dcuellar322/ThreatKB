@@ -19,7 +19,7 @@ def _scalar(value, key):
     return value.get(key) if isinstance(value, dict) else value
 
 
-def save_signature(data, entity=None):
+def save_signature(data, entity=None, *, commit=True):
     creating = entity is None
     if (
         not creating
@@ -40,6 +40,13 @@ def save_signature(data, entity=None):
             "state",
         )
     }
+    for field in ("mitre_tactics", "mitre_techniques", "mitre_sub_techniques"):
+        value = data.get(field, getattr(entity, field, []) if entity else [])
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) or len(item) > 64 for item in value
+        ):
+            abort(400, description="MITRE values must be a list of identifiers.")
+        values[field] = sorted(set(value))
     values["state"] = _scalar(values["state"], "state")
     values["category"] = _scalar(values["category"], "category") or "Uncategorized"
     if (
@@ -47,6 +54,10 @@ def save_signature(data, entity=None):
         or not Cfg_states.query.filter_by(state=values["state"]).first()
     ):
         abort(400, description="Choose a configured signature state.")
+    if not current_user.admin:
+        state = Cfg_states.query.filter_by(state=values["state"]).first()
+        if state.is_release_state and (creating or entity.state != state.state):
+            abort(403, description="Only administrators can release signatures.")
     if not isinstance(values["name"], str) or not re.fullmatch(
         r"[A-Za-z_]\w{0,127}", values["name"], re.ASCII
     ):
@@ -145,7 +156,8 @@ def save_signature(data, entity=None):
         from app.routes.comments import persist_draft_comment
 
         persist_draft_comment(data.get("new_comment"), 1, entity.id)
-        db.session.commit()
+        if commit:
+            db.session.commit()
         return entity, False
     try:
         from app.detection import validate_signature
@@ -199,5 +211,6 @@ def save_signature(data, entity=None):
             rule_json=json.dumps(entity.to_revision_dict()),
         )
     )
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return entity, True

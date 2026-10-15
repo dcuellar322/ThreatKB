@@ -1,4 +1,4 @@
-from app import app, db, auto, ENTITY_MAPPING
+from app import app, db, auto, ENTITY_MAPPING, admin_only
 from app.models import c2dns
 from flask import abort, jsonify, request, Response, json
 from flask_login import login_required, current_user
@@ -9,15 +9,19 @@ from app.models.whitelist import WhitelistException
 from app.models.cfg_states import verify_state
 from app.routes.batch import batch_update, batch_delete
 from app.routes.bookmarks import is_bookmarked, delete_bookmarks
-from app.routes.tags_mapping import create_tags_mapping, delete_tags_mapping, get_tags_for_source, \
-    batch_delete_tags_mapping_for_source_id
+from app.routes.tags_mapping import (
+    create_tags_mapping,
+    delete_tags_mapping,
+    get_tags_for_source,
+    batch_delete_tags_mapping_for_source_id,
+)
 from app.routes.comments import create_comment
 from app.compat import strtobool
 
 from app.utilities import filter_entities
 
 
-@app.route('/ThreatKB/c2dns', methods=['GET'])
+@app.route("/ThreatKB/c2dns", methods=["GET"])
 @auto.doc()
 @login_required
 def get_all_c2dns():
@@ -48,37 +52,39 @@ def get_all_c2dns():
         include_inactive = False
         include_active = True
 
-    searches = request.args.get('searches', '{}')
-    page_number = request.args.get('page_number', False)
-    page_size = request.args.get('page_size', False)
-    sort_by = request.args.get('sort_by', False)
-    sort_direction = request.args.get('sort_dir', 'ASC')
-    operator = request.args.get('operator', 'and')
-    exclude_totals = request.args.get('exclude_totals', False)
-    include_metadata = bool(strtobool(request.args.get('include_metadata', "true")))
-    include_tags = bool(strtobool(request.args.get('include_tags', "true")))
-    include_comments = bool(strtobool(request.args.get('include_comments', "true")))
+    searches = request.args.get("searches", "{}")
+    page_number = request.args.get("page_number", False)
+    page_size = request.args.get("page_size", False)
+    sort_by = request.args.get("sort_by", False)
+    sort_direction = request.args.get("sort_dir", "ASC")
+    operator = request.args.get("operator", "and")
+    exclude_totals = request.args.get("exclude_totals", False)
+    include_metadata = bool(strtobool(request.args.get("include_metadata", "true")))
+    include_tags = bool(strtobool(request.args.get("include_tags", "true")))
+    include_comments = bool(strtobool(request.args.get("include_comments", "true")))
 
-    response_dict = filter_entities(entity=c2dns.C2dns,
-                                    artifact_type=ENTITY_MAPPING["DNS"],
-                                    searches=searches,
-                                    page_number=page_number,
-                                    page_size=page_size,
-                                    sort_by=sort_by,
-                                    sort_direction=sort_direction,
-                                    include_metadata=include_metadata,
-                                    include_inactive=include_inactive,
-                                    include_tags=include_tags,
-                                    include_comments=include_comments,
-                                    include_active=include_active,
-                                    exclude_totals=exclude_totals,
-                                    default_sort="c2dns.date_created",
-                                    operator=operator)
+    response_dict = filter_entities(
+        entity=c2dns.C2dns,
+        artifact_type=ENTITY_MAPPING["DNS"],
+        searches=searches,
+        page_number=page_number,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_direction=sort_direction,
+        include_metadata=include_metadata,
+        include_inactive=include_inactive,
+        include_tags=include_tags,
+        include_comments=include_comments,
+        include_active=include_active,
+        exclude_totals=exclude_totals,
+        default_sort="c2dns.date_created",
+        operator=operator,
+    )
 
     return Response(response_dict, mimetype="application/json")
 
 
-@app.route('/ThreatKB/c2dns/<id_or_name>', methods=['GET'])
+@app.route("/ThreatKB/c2dns/<id_or_name>", methods=["GET"])
 @auto.doc()
 def get_c2dns(id_or_name):
     """Return c2dns artifact associated with the given id
@@ -94,12 +100,16 @@ def get_c2dns(id_or_name):
         abort(403)
 
     return_dict = entity.to_dict()
-    return_dict["bookmarked"] = True if is_bookmarked(ENTITY_MAPPING["DNS"], id, current_user.id) else False
+    return_dict["bookmarked"] = (
+        True
+        if is_bookmarked(ENTITY_MAPPING["DNS"], entity.id, current_user.id)
+        else False
+    )
 
     return jsonify(return_dict)
 
 
-@app.route('/ThreatKB/c2dns', methods=['POST', 'PUT'])
+@app.route("/ThreatKB/c2dns", methods=["POST", "PUT"])
 @auto.doc()
 @login_required
 def create_c2dns():
@@ -107,21 +117,23 @@ def create_c2dns():
     From Data: domain_name (str), match_type (str), expiration_timestamp (date), state(str)
     Return: c2dns artifact dictionary"""
     entity = c2dns.C2dns(
-        domain_name=request.json['domain_name'],
+        domain_name=request.json["domain_name"],
         description=request.json.get("description", None),
         references=request.json.get("references", None),
-        expiration_timestamp=parser.parse(request.json['expiration_timestamp'])
-        if request.json.get("expiration_timestamp", None) else None,
-        state=verify_state(request.json['state']['state'])
-        if request.json['state'] and 'state' in request.json['state'] else verify_state(request.json['state']),
+        expiration_timestamp=parser.parse(request.json["expiration_timestamp"])
+        if request.json.get("expiration_timestamp", None)
+        else None,
+        state=verify_state(request.json["state"]["state"])
+        if request.json["state"] and "state" in request.json["state"]
+        else verify_state(request.json["state"]),
         created_user_id=current_user.id,
         modified_user_id=current_user.id,
         owner_user_id=current_user.id,
-        active=request.json.get("active", True)
+        active=request.json.get("active", True),
     )
 
-    if 'match_type' in request.json:
-        entity.match_type = request.json['match_type']
+    if "match_type" in request.json:
+        entity.match_type = request.json["match_type"]
     else:
         entity.match_type = "wildcard" if "*" in entity.domain_name else "exact"
 
@@ -136,20 +148,24 @@ def create_c2dns():
         app.logger.error("Whitelist validation failed.")
         abort(412, description="Whitelist validation failed.")
 
-    entity.tags = create_tags_mapping(entity.__tablename__, entity.id, request.json['tags'])
+    entity.tags = create_tags_mapping(
+        entity.__tablename__, entity.id, request.json["tags"]
+    )
 
-    if request.json.get('new_comment', None):
-        create_comment(request.json['new_comment'],
-                       ENTITY_MAPPING["DNS"],
-                       entity.id,
-                       current_user.id)
+    if request.json.get("new_comment", None):
+        create_comment(
+            request.json["new_comment"],
+            ENTITY_MAPPING["DNS"],
+            entity.id,
+            current_user.id,
+        )
 
     entity.save_metadata(request.json.get("metadata_values", {}))
 
     return jsonify(entity.to_dict()), 201
 
 
-@app.route('/ThreatKB/c2dns/activate/<id_or_name>', methods=['PUT'])
+@app.route("/ThreatKB/c2dns/activate/<id_or_name>", methods=["PUT"])
 @auto.doc()
 @login_required
 def activate_c2dns(id_or_name):
@@ -164,7 +180,7 @@ def activate_c2dns(id_or_name):
     return jsonify(entity.to_dict()), 201
 
 
-@app.route('/ThreatKB/c2dns/<id_or_name>', methods=['PUT'])
+@app.route("/ThreatKB/c2dns/<id_or_name>", methods=["PUT"])
 @auto.doc()
 @login_required
 def update_c2dns(id_or_name):
@@ -181,22 +197,26 @@ def update_c2dns(id_or_name):
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
     entity = c2dns.C2dns(
-        state=verify_state(request.json['state']['state']) if request.json['state'] and 'state' in request.json['state']
-        else verify_state(request.json['state']),
-        domain_name=request.json['domain_name'],
+        state=verify_state(request.json["state"]["state"])
+        if request.json["state"] and "state" in request.json["state"]
+        else verify_state(request.json["state"]),
+        domain_name=request.json["domain_name"],
         description=request.json.get("description", None),
         references=request.json.get("references", None),
-        expiration_timestamp=parser.parse(request.json['expiration_timestamp']) if request.json.get(
-            "expiration_timestamp", None) else None,
+        expiration_timestamp=parser.parse(request.json["expiration_timestamp"])
+        if request.json.get("expiration_timestamp", None)
+        else None,
         id=entity.id,
-        owner_user_id=request.json['owner_user']['id'] if request.json.get("owner_user", None) and request.json[
-            "owner_user"].get("id", None) else None,
+        owner_user_id=request.json["owner_user"]["id"]
+        if request.json.get("owner_user", None)
+        and request.json["owner_user"].get("id", None)
+        else None,
         modified_user_id=current_user.id,
-        active=request.json.get("active", entity.active)
+        active=request.json.get("active", entity.active),
     )
-    
-    if 'match_type' in request.json:
-        entity.match_type = request.json['match_type']
+
+    if "match_type" in request.json:
+        entity.match_type = request.json["match_type"]
     else:
         entity.match_type = "wildcard" if "*" in entity.domain_name else "exact"
 
@@ -212,24 +232,32 @@ def update_c2dns(id_or_name):
         abort(412, description="Whitelist validation failed.")
 
     current_tags = get_tags_for_source(entity.__tablename__, entity.id)
-    new_tags = request.json['tags']
-    tags_to_delete, tags_to_create = [c_tag for c_tag in current_tags if c_tag not in new_tags], [n_tag for n_tag in
-                                                                                                  new_tags if
-                                                                                                  n_tag not in current_tags]
+    new_tags = request.json["tags"]
+    tags_to_delete, tags_to_create = (
+        [c_tag for c_tag in current_tags if c_tag not in new_tags],
+        [n_tag for n_tag in new_tags if n_tag not in current_tags],
+    )
     if tags_to_delete:
-        batch_delete_tags_mapping_for_source_id(entity.__tablename__, entity.id, [tag['id'] for tag in tags_to_delete])
+        batch_delete_tags_mapping_for_source_id(
+            entity.__tablename__, entity.id, [tag["id"] for tag in tags_to_delete]
+        )
     if tags_to_create:
         create_tags_mapping(entity.__tablename__, entity.id, tags_to_create)
 
     entity.save_metadata(request.json.get("metadata_values", {}))
 
     entity = db.session.get(c2dns.C2dns, entity.id)
-    if request.json.get('new_comment'):
-        create_comment(request.json['new_comment'], ENTITY_MAPPING["DNS"], entity.id, current_user.id)
+    if request.json.get("new_comment"):
+        create_comment(
+            request.json["new_comment"],
+            ENTITY_MAPPING["DNS"],
+            entity.id,
+            current_user.id,
+        )
     return jsonify(entity.to_dict()), 200
 
 
-@app.route('/ThreatKB/c2dns/batch/edit', methods=['PUT'])
+@app.route("/ThreatKB/c2dns/batch/edit", methods=["PUT"])
 @auto.doc()
 @login_required
 def batch_update_c2dns():
@@ -243,13 +271,13 @@ def batch_update_c2dns():
                }
     Return: Success Code"""
 
-    if 'batch' in request.json and request.json['batch']:
-        return batch_update(batch=request.json['batch'],
-                            artifact=c2dns.C2dns,
-                            session=db.session)
+    if "batch" in request.json and request.json["batch"]:
+        return batch_update(
+            batch=request.json["batch"], artifact=c2dns.C2dns, session=db.session
+        )
 
 
-@app.route('/ThreatKB/c2dns/<id_or_name>', methods=['DELETE'])
+@app.route("/ThreatKB/c2dns/<id_or_name>", methods=["DELETE"])
 @auto.doc()
 @login_required
 def delete_c2dns(id_or_name):
@@ -260,6 +288,10 @@ def delete_c2dns(id_or_name):
     else:
         entity = c2dns.C2dns.query.filter(c2dns.C2dns.domain_name == id_or_name).first()
 
+    if not entity:
+        abort(404)
+    if not current_user.admin and entity.owner_user_id != current_user.id:
+        abort(403)
     if entity.active:
         entity.active = False
 
@@ -274,15 +306,14 @@ def delete_c2dns(id_or_name):
         delete_tags_mapping(entity.__tablename__, entity.id)
         delete_bookmarks(ENTITY_MAPPING["DNS"], id, current_user.id)
     else:
-        db.session.delete(entity)
-        db.session.commit()
-        delete_tags_mapping(entity.__tablename__, entity.id)
-        delete_bookmarks(ENTITY_MAPPING["DNS"], id, current_user.id)
+        from app.artifact_cleanup import purge_artifacts
 
-    return jsonify(''), 204
+        purge_artifacts(c2dns.C2dns, 2, [entity.id])
+
+    return jsonify(""), 204
 
 
-@app.route('/ThreatKB/c2dns/batch/delete', methods=['PUT'])
+@app.route("/ThreatKB/c2dns/batch/delete", methods=["PUT"])
 @auto.doc()
 @login_required
 def batch_delete_c2dns():
@@ -292,17 +323,26 @@ def batch_delete_c2dns():
                }
     Return: Success Code"""
 
-    if 'batch' in request.json and request.json['batch']:
-        return batch_delete(batch=request.json['batch'],
-                            artifact=c2dns.C2dns,
-                            session=db.session,
-                            entity_mapping=ENTITY_MAPPING["DNS"])
+    if "batch" in request.json and request.json["batch"]:
+        return batch_delete(
+            batch=request.json["batch"],
+            artifact=c2dns.C2dns,
+            session=db.session,
+            entity_mapping=ENTITY_MAPPING["DNS"],
+        )
 
 
-@app.route('/ThreatKB/c2dns/delete_all_inactive', methods=['PUT'])
+@app.route("/ThreatKB/c2dns/delete_all_inactive", methods=["PUT"])
 @auto.doc()
 @login_required
+@admin_only()
 def delete_all_inactive_c2dns():
-    db.session.query(c2dns.C2dns).filter(c2dns.C2dns.active == 0).delete()
-    db.session.commit()
-    return jsonify(''), 200
+    from app.artifact_cleanup import purge_artifacts
+
+    if not current_user.admin:
+        abort(403)
+    identities = db.session.scalars(
+        db.select(c2dns.C2dns.id).where(c2dns.C2dns.active.is_(False))
+    ).all()
+    count = purge_artifacts(c2dns.C2dns, 2, identities)
+    return jsonify(deleted=count), 200

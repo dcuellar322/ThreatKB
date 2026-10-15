@@ -20,7 +20,25 @@ for table, date in [
             ),
         ]
     )
+for table, date in [
+    ("yara_rules", "last_revision_date"),
+    ("c2ip", "date_modified"),
+    ("c2dns", "date_modified"),
+    ("tasks", "date_modified"),
+]:
+    PERFORMANCE_INDEXES.extend(
+        [
+            (f"ix_{table}_active_updated", table, ("active", date, "id")),
+            (f"ix_{table}_state_updated", table, ("active", "state", date, "id")),
+            (
+                f"ix_{table}_owner_updated",
+                table,
+                ("owner_user_id", "active", date, "id"),
+            ),
+        ]
+    )
 PERFORMANCE_INDEXES += [
+    ("ix_files_artifact", "files", ("entity_type", "entity_id", "id")),
     ("ix_activity_date", "activity_log", ("activity_date", "id")),
     (
         "ix_activity_artifact_date",

@@ -69,15 +69,26 @@ def repository():
             check=True,
             capture_output=True,
         )
-    signature = tuple(
-        (str(p), p.stat().st_mtime_ns, p.stat().st_size)
-        for p in sorted(root.rglob("*.yaml"))
-        if ".git" not in p.parts
-    )
+    files = []
+    for folder in (str(root), str(root / "rules")):
+        if os.path.isdir(folder):
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    if entry.name.endswith(".yaml") and entry.is_file():
+                        info = entry.stat()
+                        files.append((entry.path, info.st_mtime_ns, info.st_size))
+    signature = tuple(sorted(files))
     with _guard:
-        if _cache.get("signature") != signature or _cache.get("root") != root:
+        if (
+            _cache.get("signature") != signature
+            or _cache.get("root") != root
+            or _cache.get("corpus") != corpus()
+        ):
             _cache.update(
-                signature=signature, root=root, repo=Repository(root, corpus())
+                signature=signature,
+                root=root,
+                corpus=corpus(),
+                repo=Repository(root, corpus()),
             )
         return _cache["repo"]
 
@@ -102,6 +113,8 @@ def commit_file(path, text, message):
                 "Commit existing content edits before editing through the web interface."
             )
         original = path.read_text() if path.exists() else None
+        if original == text:
+            return
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
@@ -137,8 +150,8 @@ def commit_file(path, text, message):
         _cache.clear()
 
 
-def authorize_group(group):
-    policy = repository().groups.get(group)
+def authorize_group(group, repo=None):
+    policy = (repo or repository()).groups.get(group)
     if policy is None:
         abort(400, description="Unknown policy group.")
     members = list(map(str, policy.get("members", [])))
@@ -171,7 +184,7 @@ def content_overview():
     repo = repository()
     group = request.args.get("group", "default")
     query = request.args.get("q", "").lower()
-    authorize_group(group)
+    authorize_group(group, repo)
     filtered = [
         r
         for r in repo.rules
@@ -249,6 +262,8 @@ def content_rule(identity):
         )
         if value["id"] != identity:
             abort(409, description="A signature UUID is immutable.")
+        for group in value.get("groups", ["default"]):
+            authorize_group(group, repo)
         commit_file(path, text, f"Update signature {identity}")
     return jsonify(
         yaml=path.read_text(),
@@ -314,6 +329,7 @@ def content_release_action(release_id, action):
     if not path.is_file():
         abort(404)
     manifest = json.loads(path.read_text())
+    authorize_group(manifest["group"])
     repo = repository()
     if action == "testing":
         if git("status", "--porcelain"):
@@ -351,6 +367,10 @@ def download_content_build(release_id):
         UUID(release_id)
     except ValueError:
         abort(400)
+    manifest_path = builds() / release_id / "manifest.json"
+    if not manifest_path.is_file():
+        abort(404)
+    authorize_group(json.loads(manifest_path.read_text())["group"])
     path = builds() / f"{release_id}.zip"
     if not path.is_file():
         abort(404)
@@ -478,6 +498,8 @@ def create_content_rule():
     from uuid import uuid4
 
     data = request.get_json()
+    group = data.get("group", "default")
+    authorize_group(group)
     identity = str(uuid4())
     rule = {
         "id": identity,
@@ -488,6 +510,7 @@ def create_content_rule():
         "strings": "",
         "condition": "false",
         "tags": [],
+        "groups": [group],
     }
     Draft202012Validator(RULE_SCHEMA, format_checker=FormatChecker()).validate(rule)
     path = content_root() / "rules" / f"{identity}.yaml"

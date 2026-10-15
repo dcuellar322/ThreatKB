@@ -38,7 +38,7 @@ class ContentError(ValueError):
     pass
 
 
-class UniqueLoader(yaml.SafeLoader):
+class UniqueLoader(getattr(yaml, "CSafeLoader", yaml.SafeLoader)):
     pass
 
 
@@ -171,22 +171,35 @@ class Repository:
         )
 
     def digest(self):
-        files = sorted(
-            path
-            for path in self.root.rglob("*")
-            if path.is_file()
-            and ".git" not in path.parts
-            and path.suffix in (".yaml", ".yml", ".yar", ".yara")
-            and not path.name.startswith("review")
-        )
-        return sha256(
-            b"".join(
-                str(path.relative_to(self.root)).encode() + b"\0" + path.read_bytes()
-                for path in files
-            )
-        ).hexdigest()
+        import os
+
+        root = str(self.root)
+        files = []
+        for folder, dirs, names in os.walk(root):
+            dirs[:] = [name for name in dirs if name != ".git"]
+            for name in names:
+                if name.rsplit(".", 1)[-1] in ("yaml", "yml", "yar", "yara"):
+                    path = os.path.join(folder, name)
+                    if path == os.path.join(root, "review.yaml"):
+                        continue
+                    info = os.stat(path)
+                    files.append((path, info.st_mtime_ns, info.st_size))
+        files.sort()
+        signature = tuple(files)
+        if getattr(self, "_digest_signature", None) != signature:
+            digest = sha256()
+            for path, _, _ in files:
+                digest.update(path[len(root) + 1 :].encode() + b"\0")
+                with open(path, "rb") as handle:
+                    digest.update(handle.read())
+            self._digest_value = digest.hexdigest()
+            self._digest_signature = signature
+        return self._digest_value
 
     def render(self, text):
+        cache = self.__dict__.setdefault("_render_cache", {})
+        if text in cache:
+            return cache[text]
         ast = self.env.parse(text)
         for loop in ast.find_all(nodes.For):
             if any(loop.find_all(nodes.For)):
@@ -204,7 +217,10 @@ class Repository:
                 output.append(part)
         except TemplateError as error:
             raise ContentError(str(error)) from error
-        return "".join(output)
+        rendered = "".join(output)
+        if len(cache) < 512 and len(text) + len(rendered) < 16384:
+            cache[text] = rendered
+        return rendered
 
     def selected(self, group="default"):
         if group not in self.groups:

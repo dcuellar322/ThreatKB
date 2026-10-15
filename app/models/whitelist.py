@@ -23,15 +23,30 @@ class Whitelist(db.Model):
     whitelist_artifact = db.Column(db.String(2048))
     notes = db.Column(db.String(2048))
 
-    created_by_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=True)
-    created_by_user = db.relationship('KBUser', foreign_keys=created_by_user_id,
-                                      primaryjoin="KBUser.id==Whitelist.created_by_user_id")
-    modified_by_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=True)
-    modified_by_user = db.relationship('KBUser', foreign_keys=modified_by_user_id,
-                                       primaryjoin="KBUser.id==Whitelist.modified_by_user_id")
-    created_time = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
-    modified_time = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp(),
-                              onupdate=db.func.current_timestamp())
+    created_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("kb_users.id"), nullable=True
+    )
+    created_by_user = db.relationship(
+        "KBUser",
+        foreign_keys=created_by_user_id,
+        primaryjoin="KBUser.id==Whitelist.created_by_user_id",
+    )
+    modified_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("kb_users.id"), nullable=True
+    )
+    modified_by_user = db.relationship(
+        "KBUser",
+        foreign_keys=modified_by_user_id,
+        primaryjoin="KBUser.id==Whitelist.modified_by_user_id",
+    )
+    created_time = db.Column(
+        db.DateTime(timezone=True), default=db.func.current_timestamp()
+    )
+    modified_time = db.Column(
+        db.DateTime(timezone=True),
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
 
     def to_dict(self):
         return dict(
@@ -39,15 +54,21 @@ class Whitelist(db.Model):
             whitelist_artifact=self.whitelist_artifact,
             notes=self.notes,
             created_time=self.created_time.isoformat(),
-            modified_time=self.modified_time.isoformat()
+            modified_time=self.modified_time.isoformat(),
         )
 
     @staticmethod
     def hits_whitelist(indicator, state):
-        whitelist_enabled = Cfg_settings.get_setting("ENABLE_IP_WHITELIST_CHECK_ON_SAVE")
+        whitelist_enabled = Cfg_settings.get_setting(
+            "ENABLE_IP_WHITELIST_CHECK_ON_SAVE"
+        )
         whitelist_states = Cfg_settings.get_setting("WHITELIST_STATES")
 
-        if not whitelist_enabled or not strtobool(whitelist_enabled) or not whitelist_states:
+        if (
+            not whitelist_enabled
+            or not strtobool(whitelist_enabled)
+            or not whitelist_states
+        ):
             return False
 
         states = []
@@ -94,3 +115,13 @@ class Whitelist(db.Model):
                 return True
 
         return False
+
+
+from sqlalchemy import event
+
+
+@event.listens_for(Whitelist, "after_insert")
+@event.listens_for(Whitelist, "after_update")
+@event.listens_for(Whitelist, "after_delete")
+def invalidate_whitelist(mapper, connection, target):
+    cache.delete_memoized(get_whitelist_cache)

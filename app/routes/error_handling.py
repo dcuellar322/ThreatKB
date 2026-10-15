@@ -1,33 +1,23 @@
-from app import app, auto, db, current_user, request, Response
+from app import app, auto, db, current_user
+from flask import request
 import traceback
 import re
 from app.models.errors import Error
 
 
-@app.errorhandler(401)
-def handle_401(err):
-    return Response("", 401)
+from werkzeug.exceptions import HTTPException
+from flask import jsonify
 
 
-@app.errorhandler(409)
-def handle_409(err):
-    return str(err.description), 409
-
-
-@app.errorhandler(500)
-def handle_500(error):
-    app.logger.error("500 error message '%s'" % (error))
-    return str(error), 500
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
+    db.session.rollback()
+    return jsonify(error=error.description), error.code
 
 
 @app.errorhandler(Exception)
 def handle_exception(exception):
     app.logger.exception(exception)
-    if hasattr(exception, "code") and exception.code == 412:
-        return exception.description, exception.code
-
-    if hasattr(exception, "code") and str(exception.code).startswith("4"):
-        return exception.description, exception.code
 
     db.session.rollback()
 
@@ -46,10 +36,11 @@ def handle_exception(exception):
         db.session.rollback()
         app.logger.exception("Could not persist error report")
     from flask import jsonify
+
     return jsonify(error="An internal error occurred."), 500
 
 
-@app.route('/ThreatKB/error', methods=["GET"])
+@app.route("/ThreatKB/error", methods=["GET"])
 @auto.doc()
 def do_error():
     """Generate a fake HTTP 500 error"""
@@ -61,3 +52,22 @@ def do_error():
 def do_exception():
     """Generate a fake exception"""
     raise Exception("Generic 500 exception")
+
+
+from sqlalchemy.exc import IntegrityError, DataError
+
+
+@app.errorhandler(IntegrityError)
+def handle_conflict(error):
+    db.session.rollback()
+    return jsonify(
+        error="This change conflicts with an existing record or a referenced definition."
+    ), 409
+
+
+@app.errorhandler(DataError)
+def handle_invalid_database_value(error):
+    db.session.rollback()
+    return jsonify(
+        error="A field has an invalid value or exceeds its allowed length."
+    ), 400

@@ -5,7 +5,7 @@ from flask_login import login_required, current_user
 import json
 
 
-@app.route('/ThreatKB/macros', methods=['GET'])
+@app.route("/ThreatKB/macros", methods=["GET"])
 @auto.doc()
 @login_required
 def get_all_macros():
@@ -36,10 +36,13 @@ def get_all_macros():
 
     entities = entities.all()
 
-    return Response(json.dumps([entity.to_dict() for entity in entities]), mimetype='application/json')
+    return Response(
+        json.dumps([entity.to_dict() for entity in entities]),
+        mimetype="application/json",
+    )
 
 
-@app.route('/ThreatKB/macros/<string:tag>', methods=['GET'])
+@app.route("/ThreatKB/macros/<string:tag>", methods=["GET"])
 def get_macro(tag):
     """Return macro associated with tag
     Return: macro dictionary"""
@@ -50,7 +53,7 @@ def get_macro(tag):
     return jsonify(entity.to_dict())
 
 
-@app.route('/ThreatKB/macros', methods=['POST', 'PUT'])
+@app.route("/ThreatKB/macros", methods=["POST", "PUT"])
 @auto.doc()
 @login_required
 def create_macro():
@@ -58,11 +61,11 @@ def create_macro():
     From Data: tag (str), value (str)
     Return: macro dictionary"""
     entity = macros.Macros(
-        tag=request.json['tag'],
-        value=request.json['value'],
+        tag=request.json["tag"],
+        value=request.json["value"],
         active=request.json.get("active", True),
         created_user_id=current_user.id,
-        modified_user_id=current_user.id
+        modified_user_id=current_user.id,
     )
     db.session.add(entity)
     db.session.commit()
@@ -70,11 +73,11 @@ def create_macro():
     return jsonify(entity.to_dict()), 201
 
 
-@app.route('/ThreatKB/macros/activate/<string:tag>', methods=['PUT'])
+@app.route("/ThreatKB/macros/activate/<string:tag>", methods=["PUT"])
 @auto.doc()
 @login_required
 def activate_macro(tag):
-    entity = db.session.get(macros.Macros, tag)
+    entity = db.get_or_404(macros.Macros, tag)
     entity.active = 1
 
     db.session.merge(entity)
@@ -83,7 +86,7 @@ def activate_macro(tag):
     return jsonify(entity.to_dict()), 201
 
 
-@app.route('/ThreatKB/macros/<string:tag>', methods=['PUT'])
+@app.route("/ThreatKB/macros/<string:tag>", methods=["PUT"])
 @auto.doc()
 @login_required
 def update_macro(tag):
@@ -95,9 +98,9 @@ def update_macro(tag):
         abort(404)
     entity = macros.Macros(
         tag=tag,
-        value=request.json['value'],
+        value=request.json["value"],
         modified_user_id=current_user.id,
-        active=request.json.get("active", entity.active)
+        active=request.json.get("active", entity.active),
     )
     db.session.merge(entity)
     db.session.commit()
@@ -107,7 +110,7 @@ def update_macro(tag):
     return jsonify(entity.to_dict()), 200
 
 
-@app.route('/ThreatKB/macros/<tag>', methods=['DELETE'])
+@app.route("/ThreatKB/macros/<tag>", methods=["DELETE"])
 @auto.doc()
 @login_required
 def delete_macro(tag):
@@ -130,4 +133,4 @@ def delete_macro(tag):
         db.session.delete(entity)
         db.session.commit()
 
-    return jsonify(''), 204
+    return jsonify(""), 204

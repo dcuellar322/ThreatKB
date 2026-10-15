@@ -5,21 +5,36 @@ from flask_login import login_required
 import json
 
 
-@app.route('/ThreatKB/cfg_category_range_mapping', methods=['GET'])
+@app.route("/ThreatKB/cfg_category_range_mapping", methods=["GET"])
 @auto.doc()
 @login_required
 def get_all_cfg_category_range_mappings():
     """Return list of all category range mappings
     Return: list of category range mapping dictionaries"""
-    include_inactive = request.args.get("include_inactive", False)
+    from app.compat import strtobool
+
+    include_inactive = strtobool(request.args.get("include_inactive", "false"))
 
     entities = cfg_category_range_mapping.CfgCategoryRangeMapping.query.order_by(
-        cfg_category_range_mapping.CfgCategoryRangeMapping.range_min.asc()).all()
-    return Response(json.dumps([entity.to_dict(include_inactive=include_inactive) for entity in entities]),
-                    mimetype='application/json')
+        cfg_category_range_mapping.CfgCategoryRangeMapping.range_min.asc()
+    ).all()
+    from app.models.yara_rule import Yara_rule
+
+    query = db.session.query(Yara_rule.category, db.func.count(Yara_rule.id))
+    if not include_inactive:
+        query = query.filter(Yara_rule.active.is_(True))
+    counts = dict(query.group_by(Yara_rule.category).all())
+    for entity in entities:
+        entity._sig_count = counts.get(entity.category, 0)
+    return Response(
+        json.dumps(
+            [entity.to_dict(include_inactive=include_inactive) for entity in entities]
+        ),
+        mimetype="application/json",
+    )
 
 
-@app.route('/ThreatKB/cfg_category_range_mapping/<int:id>', methods=['GET'])
+@app.route("/ThreatKB/cfg_category_range_mapping/<int:id>", methods=["GET"])
 @login_required
 @admin_only()
 def get_cfg_category_range_mapping(id):
@@ -31,7 +46,7 @@ def get_cfg_category_range_mapping(id):
     return jsonify(entity.to_dict())
 
 
-@app.route('/ThreatKB/cfg_category_range_mapping', methods=['POST', 'PUT'])
+@app.route("/ThreatKB/cfg_category_range_mapping", methods=["POST", "PUT"])
 @auto.doc()
 @login_required
 @admin_only()
@@ -39,18 +54,18 @@ def create_cfg_category_range_mapping():
     """Create category range mapping
     Retun: category range mapping dictionary"""
     entity = cfg_category_range_mapping.CfgCategoryRangeMapping(
-        category=request.json['category'],
-        range_min=request.json['range_min'],
-        range_max=request.json['range_max'],
-        current=request.json['range_min'],
-        include_in_release_notes=request.json['include_in_release_notes']
+        category=request.json["category"],
+        range_min=request.json["range_min"],
+        range_max=request.json["range_max"],
+        current=request.json["range_min"],
+        include_in_release_notes=request.json["include_in_release_notes"],
     )
     db.session.add(entity)
     db.session.commit()
     return jsonify(entity.to_dict()), 201
 
 
-@app.route('/ThreatKB/cfg_category_range_mapping/<int:id>', methods=['PUT'])
+@app.route("/ThreatKB/cfg_category_range_mapping/<int:id>", methods=["PUT"])
 @auto.doc()
 @login_required
 @admin_only()
@@ -62,11 +77,11 @@ def update_cfg_category_range_mapping(id):
     if not entity:
         abort(404)
     entity = cfg_category_range_mapping.CfgCategoryRangeMapping(
-        category=request.json['category'],
-        range_min=request.json['range_min'],
-        range_max=request.json['range_max'],
-        include_in_release_notes=request.json['include_in_release_notes'],
-        id=id
+        category=request.json["category"],
+        range_min=request.json["range_min"],
+        range_max=request.json["range_max"],
+        include_in_release_notes=request.json["include_in_release_notes"],
+        id=id,
     )
     db.session.merge(entity)
     db.session.commit()
@@ -84,7 +99,7 @@ def update_cfg_category_range_mapping_current(id, current):
         range_max=entity.range_max,
         current=current,
         include_in_release_notes=entity.include_in_release_notes,
-        id=id
+        id=id,
     )
     db.session.merge(entity)
     try:
@@ -95,7 +110,7 @@ def update_cfg_category_range_mapping_current(id, current):
     return
 
 
-@app.route('/ThreatKB/cfg_category_range_mapping/<int:id>', methods=['DELETE'])
+@app.route("/ThreatKB/cfg_category_range_mapping/<int:id>", methods=["DELETE"])
 @auto.doc()
 @login_required
 @admin_only()
@@ -107,4 +122,4 @@ def delete_cfg_category_range_mapping(id):
         abort(404)
     db.session.delete(entity)
     db.session.commit()
-    return jsonify(''), 204
+    return jsonify(""), 204

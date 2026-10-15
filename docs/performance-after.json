@@ -1,0 +1,262 @@
+[
+  {
+    "path": "/dashboard",
+    "cold_ms": 72.44,
+    "warm_median_ms": 35.53,
+    "warm_samples_ms": [
+      36.24,
+      33.55,
+      34.82,
+      42.3
+    ],
+    "queries": 9,
+    "bytes": 3202,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/yara_rules?page_size=25&short=true",
+    "cold_ms": 102.21,
+    "warm_median_ms": 36.67,
+    "warm_samples_ms": [
+      36.16,
+      37.19,
+      38.98,
+      30.14
+    ],
+    "queries": 9,
+    "bytes": 65450,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/c2ips?page_size=25",
+    "cold_ms": 37.92,
+    "warm_median_ms": 39.55,
+    "warm_samples_ms": [
+      37.59,
+      35.31,
+      41.51,
+      52.18
+    ],
+    "queries": 8,
+    "bytes": 21907,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/c2dns?page_size=25",
+    "cold_ms": 39.9,
+    "warm_median_ms": 30.15,
+    "warm_samples_ms": [
+      31.44,
+      33.47,
+      27.21,
+      28.86
+    ],
+    "queries": 8,
+    "bytes": 22303,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/tasks?page_size=25",
+    "cold_ms": 18.45,
+    "warm_median_ms": 19.11,
+    "warm_samples_ms": [
+      17.26,
+      19.23,
+      18.99,
+      21.66
+    ],
+    "queries": 6,
+    "bytes": 20177,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/activity_log?page_size=25",
+    "cold_ms": 20.72,
+    "warm_median_ms": 13.38,
+    "warm_samples_ms": [
+      14.26,
+      13.59,
+      12.83,
+      13.17
+    ],
+    "queries": 4,
+    "bytes": 9184,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/cfg_states",
+    "cold_ms": 48.35,
+    "warm_median_ms": 42.38,
+    "warm_samples_ms": [
+      48.18,
+      44.74,
+      39.02,
+      40.02
+    ],
+    "queries": 6,
+    "bytes": 926,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/metadata",
+    "cold_ms": 17.4,
+    "warm_median_ms": 7.97,
+    "warm_samples_ms": [
+      9.91,
+      7.83,
+      7.43,
+      8.11
+    ],
+    "queries": 3,
+    "bytes": 1297,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/tags",
+    "cold_ms": 5.5,
+    "warm_median_ms": 4.92,
+    "warm_samples_ms": [
+      4.72,
+      4.98,
+      4.86,
+      5.37
+    ],
+    "queries": 2,
+    "bytes": 193,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/notifications",
+    "cold_ms": 18.45,
+    "warm_median_ms": 9.73,
+    "warm_samples_ms": [
+      10.27,
+      9.94,
+      9.52,
+      9.18
+    ],
+    "queries": 4,
+    "bytes": 42,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/bookmarks",
+    "cold_ms": 15.54,
+    "warm_median_ms": 9.14,
+    "warm_samples_ms": [
+      8.91,
+      10.17,
+      9.38,
+      8.8
+    ],
+    "queries": 5,
+    "bytes": 726,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/content",
+    "cold_ms": 1287.77,
+    "warm_median_ms": 113.27,
+    "warm_samples_ms": [
+      113.89,
+      116.12,
+      112.65,
+      112.32
+    ],
+    "queries": 1,
+    "bytes": 12519,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  },
+  {
+    "path": "/search?all=Synthetic&limit=25",
+    "cold_ms": 93.94,
+    "warm_median_ms": 91.38,
+    "warm_samples_ms": [
+      83.28,
+      84.81,
+      97.96,
+      103.0
+    ],
+    "queries": 28,
+    "bytes": 129621,
+    "statuses": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ]
+  }
+]
