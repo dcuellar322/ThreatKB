@@ -223,7 +223,7 @@ class C2ip(db.Model):
                 db.session.query(MetadataMapping)
                 .join(Metadata, Metadata.id == MetadataMapping.metadata_id)
                 .filter(Metadata.key == name)
-                .filter(Metadata.artifact_type == ENTITY_MAPPING["DNS"])
+                .filter(Metadata.artifact_type == ENTITY_MAPPING["IP"])
                 .filter(MetadataMapping.artifact_id == self.id)
                 .first()
             )

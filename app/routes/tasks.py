@@ -18,7 +18,10 @@ def persist_task_tags(entity, values):
     if not isinstance(values, list):
         abort(400, description="Tags must be a list.")
     texts = [tag.get("text") if isinstance(tag, dict) else tag for tag in values]
-    if any(not isinstance(tag, str) or not tag.strip() or len(tag) > 256 for tag in texts):
+    if any(
+        not isinstance(tag, str) or not tag.strip() or len(tag) > 256
+        for tag in texts
+    ):
         abort(400, description="Tags require 1–256 characters.")
     texts = set(texts)
     tags = {tag.text: tag for tag in Tags.query.filter(Tags.text.in_(texts))}
@@ -27,14 +30,68 @@ def persist_task_tags(entity, values):
         db.session.add(tag)
         tags[text] = tag
     db.session.flush()
-    mappings = Tags_mapping.query.filter_by(source_table="tasks", source_id=entity.id).all()
+    mappings = Tags_mapping.query.filter_by(
+        source_table="tasks", source_id=entity.id
+    ).all()
     wanted = {tag.id for tag in tags.values()}
     existing = {mapping.tag_id for mapping in mappings}
     for mapping in mappings:
         if mapping.tag_id not in wanted:
             db.session.delete(mapping)
     for identity in wanted - existing:
-        db.session.add(Tags_mapping(source_table="tasks", source_id=entity.id, tag_id=identity))
+        db.session.add(Tags_mapping(
+            source_table="tasks", source_id=entity.id, tag_id=identity
+        ))
+
+
+def persist_task_metadata(entity, values):
+    from app.models.metadata import Metadata, MetadataMapping
+    from dateutil.parser import isoparse
+
+    if not isinstance(values, dict):
+        abort(400, description="Metadata must be an object.")
+    fields = {
+        field.key: field
+        for field in Metadata.query.filter_by(artifact_type=4, active=True)
+    }
+    mappings = {
+        field.key: mapping
+        for mapping, field in db.session.query(MetadataMapping, Metadata)
+        .join(Metadata)
+        .filter(
+            Metadata.artifact_type == 4,
+            Metadata.active.is_(True),
+            MetadataMapping.artifact_id == entity.id,
+        )
+    }
+    if values.keys() - fields.keys():
+        abort(400, description="Choose an active task metadata field.")
+    for key, field in fields.items():
+        mapping = mappings.get(key)
+        value = values.get(key, mapping.value if mapping else field.default)
+        value = value.get("value") if isinstance(value, dict) else value
+        value = str(value) if value is not None else None
+        if field.required and not value:
+            abort(400, description=f"{key} is required.")
+        if value:
+            if field.type_ == "select" and value not in {
+                choice.choice for choice in field.choices
+            }:
+                abort(400, description=f"Invalid choice for {key}.")
+            try:
+                if field.type_ == "integer":
+                    int(value)
+                elif field.type_ == "date":
+                    isoparse(value)
+            except (ValueError, TypeError, OverflowError):
+                abort(400, description=f"Invalid {field.type_} value for {key}.")
+        if mapping:
+            mapping.value = value
+        elif value is not None:
+            db.session.add(MetadataMapping(
+                metadata_id=field.id, artifact_id=entity.id,
+                created_user_id=current_user.id, value=value,
+            ))
 
 
 def task_owner(data, default=None):
@@ -68,7 +125,7 @@ def get_all_tasks():
     sort_by = request.args.get("sort_by", False)
     sort_direction = request.args.get("sort_dir", "ASC")
     exclude_totals = request.args.get("exclude_totals", False)
-    include_metadata = bool(strtobool(request.args.get("include_metadata", "false")))
+    include_metadata = bool(strtobool(request.args.get("include_metadata", "true")))
     include_tags = bool(strtobool(request.args.get("include_tags", "true")))
     include_comments = bool(strtobool(request.args.get("include_comments", "true")))
 
@@ -139,6 +196,7 @@ def create_tasks():
 
     persist_draft_comment(data.get("new_comment"), ENTITY_MAPPING["TASK"], entity.id)
     persist_task_tags(entity, data.get("tags", []))
+    persist_task_metadata(entity, data.get("metadata_values", {}))
     db.session.commit()
 
     return jsonify(entity.to_dict()), 201
@@ -173,6 +231,7 @@ def update_tasks(id):
 
     if "tags" in request.json:
         persist_task_tags(entity, request.json["tags"])
+    persist_task_metadata(entity, request.json.get("metadata_values", {}))
     db.session.commit()
 
     entity = tasks.Tasks.query.filter(tasks.Tasks.id == entity.id).first()

@@ -158,6 +158,19 @@ export function ArtifactEditor({
     try {
       const payload = {
         ...value,
+        metadata_values: Object.fromEntries(
+          definitions
+            .filter((definition: any) => definition.active)
+            .map((definition: any) => [
+              definition.key,
+              {
+                value:
+                  value.metadata_values?.[definition.key]?.value ??
+                  definition.default ??
+                  "",
+              },
+            ]),
+        ),
         ...(isRule && !initial.new
           ? { do_not_bump_revision: keepRevision }
           : {}),
@@ -589,7 +602,22 @@ export function ArtifactEditor({
                             ) : (
                               <input
                                 required={!!definition.required}
-                                value={item?.value ?? definition.default ?? ""}
+                                ref={(element) =>
+                                  element?.setCustomValidity(
+                                    definition.type === "integer" &&
+                                      element.value &&
+                                      !Number.isInteger(Number(element.value))
+                                      ? "Enter a whole number."
+                                      : "",
+                                  )
+                                }
+                                value={
+                                  definition.type === "date"
+                                    ? String(
+                                        item?.value ?? definition.default ?? "",
+                                      ).slice(0, 10)
+                                    : (item?.value ?? definition.default ?? "")
+                                }
                                 type={
                                   ["number", "integer"].includes(
                                     definition.type,

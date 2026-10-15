@@ -371,7 +371,12 @@ export function Configuration({
                     const input = {
                       "aria-label": label,
                       id: "config-" + key,
-                      value: value[key] ?? "",
+                      value:
+                        tab === "Metadata" &&
+                        key === "default" &&
+                        value.type === "date"
+                          ? String(value[key] ?? "").slice(0, 10)
+                          : (value[key] ?? ""),
                       onChange: (e: any) =>
                         setValue({
                           ...value,
@@ -426,7 +431,29 @@ export function Configuration({
                           ) : (
                             <input
                               {...input}
-                              type={type}
+                              ref={(element) => {
+                                if (
+                                  element &&
+                                  tab === "Metadata" &&
+                                  key === "default"
+                                )
+                                  element.setCustomValidity(
+                                    value.type === "integer" &&
+                                      element.value &&
+                                      !Number.isInteger(Number(element.value))
+                                      ? "Enter a whole number."
+                                      : "",
+                                  );
+                              }}
+                              type={
+                                tab === "Metadata" && key === "default"
+                                  ? value.type === "date"
+                                    ? "date"
+                                    : value.type === "integer"
+                                      ? "number"
+                                      : type
+                                  : type
+                              }
                               pattern={
                                 tab === "Sources" && key === "name"
                                   ? "[A-Za-z0-9_.\\-]{1,64}"

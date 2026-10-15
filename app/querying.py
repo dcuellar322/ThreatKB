@@ -174,7 +174,7 @@ def serialize_page(
     table = model.__tablename__
     tags = {table: {identity: [] for identity in ids}}
     comments = {table: {identity: [] for identity in ids}}
-    metadata = {label: {} for label in ("SIGNATURE", "DNS", "IP")}
+    metadata = {label: {} for label in ("SIGNATURE", "DNS", "IP", "TASK")}
     user_ids = {
         getattr(row, field, None)
         for row in rows
@@ -199,7 +199,7 @@ def serialize_page(
             .order_by(Comments.id)
         ):
             comments[table][row.entity_id].append(row.to_dict())
-    if include_metadata and kind in (1, 2, 3):
+    if include_metadata and kind in (1, 2, 3, 4):
         fields = (
             Metadata.query.options(
                 joinedload(Metadata.created_user), selectinload(Metadata.choices)
@@ -211,7 +211,7 @@ def serialize_page(
         definitions = defaultdict(list)
         for field in fields:
             definitions[field.type_].append(field.to_dict())
-        label = {1: "SIGNATURE", 2: "DNS", 3: "IP"}[kind]
+        label = {1: "SIGNATURE", 2: "DNS", 3: "IP", 4: "TASK"}[kind]
         metadata[label] = {
             identity: {
                 "metadata": dict(definitions),
@@ -229,7 +229,12 @@ def serialize_page(
     result = []
     for row in rows:
         if kind == 4:
-            value = row.to_dict(include_comments=False, users_cache=users, include_tags=False)
+            value = row.to_dict(
+                include_comments=False, users_cache=users,
+                include_tags=False, include_metadata=False,
+            )
+            if include_metadata:
+                value.update(metadata["TASK"][row.id])
             if include_comments:
                 value["comments"] = comments[table][row.id]
             if include_tags:

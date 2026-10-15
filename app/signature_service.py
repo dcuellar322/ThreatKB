@@ -131,6 +131,9 @@ def save_signature(data, entity=None, *, commit=True):
     }
     for key, value in metadata_values.items():
         if key not in fields:
+            if key in old_metadata and value == old_metadata[key]:
+                # Deactivated definitions retain their historical mappings.
+                continue
             abort(400, description=f"Unknown signature metadata field: {key}")
         field = fields[key]
         if field.required and not value:

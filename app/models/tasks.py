@@ -57,7 +57,10 @@ class Tasks(db.Model):
         % (ENTITY_MAPPING["TASK"]),
     )
 
-    def to_dict(self, include_comments=True, users_cache=None, include_tags=True):
+    def to_dict(
+        self, include_comments=True, users_cache=None,
+        include_tags=True, include_metadata=True,
+    ):
         task = dict(
             active=self.active,
             date_created=self.date_created.isoformat(),
@@ -85,9 +88,25 @@ class Tasks(db.Model):
             task["tags"] = list(db.session.scalars(
                 db.select(Tags.text)
                 .join(Tags_mapping, Tags_mapping.tag_id == Tags.id)
-                .where(Tags_mapping.source_table == "tasks", Tags_mapping.source_id == self.id)
+                .where(
+                    Tags_mapping.source_table == "tasks",
+                    Tags_mapping.source_id == self.id,
+                )
                 .order_by(Tags.text)
             ))
+        if include_metadata:
+            from app.models.metadata import Metadata, MetadataMapping
+
+            task["metadata"] = Metadata.get_metadata_dict("TASK")
+            task["metadata_values"] = {
+                field.key: mapping.to_dict()
+                for mapping, field in db.session.query(MetadataMapping, Metadata)
+                .join(Metadata)
+                .filter(
+                    Metadata.active.is_(True), Metadata.artifact_type == 4,
+                    MetadataMapping.artifact_id == self.id,
+                )
+            }
         if include_comments:
             task["comments"] = [
                 comment.to_dict()
