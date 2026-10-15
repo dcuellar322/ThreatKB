@@ -1,7 +1,7 @@
 from app.compat import strtobool
 
 from app import app, db, auto, ENTITY_MAPPING
-from app.models import tasks, cfg_settings
+from app.models import tasks, cfg_settings, cfg_states
 from flask import abort, jsonify, request, Response
 from flask_login import login_required, current_user
 from app.routes.batch import batch_update, batch_delete
@@ -81,11 +81,19 @@ def create_tasks():
     """Create new task
     From Data: title (str), description (str), final_artifact(str), state (str)
     Return: task dictionary"""
+    data = request.get_json()
+    state = data.get('state')
+    state = state.get('state') if isinstance(state, dict) else state
+    if not state or not cfg_states.Cfg_states.query.filter_by(state=state).first():
+        abort(400, description='Choose a valid task state.')
+    title = data.get('title', '').strip()
+    if not title or len(title) > 256:
+        abort(400, description='Task title is required and limited to 256 characters.')
     entity = tasks.Tasks(
-        title=request.json['title'],
-        description=request.json['description'],
-        final_artifact=request.json['final_artifact'],
-        state=request.json['state']['state'] if 'state' in request.json['state'] else None,
+        title=title,
+        description=data.get('description', ''),
+        final_artifact=data.get('final_artifact', ''),
+        state=state,
         created_user_id=current_user.id,
         modified_user_id=current_user.id,
         owner_user_id=current_user.id
