@@ -12,6 +12,10 @@ def state_in_use(name):
     from app.models.c2dns import C2dns
     from app.models.tasks import Tasks
 
+    from app.models.yara_rule import Yara_rule_history
+
+    if db.session.query(Yara_rule_history.id).filter_by(state=name).first() is not None:
+        return True
     return any(
         db.session.query(model.id).filter_by(state=name).first() is not None
         for model in (Yara_rule, C2ip, C2dns, Tasks)

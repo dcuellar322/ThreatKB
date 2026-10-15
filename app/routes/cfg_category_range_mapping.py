@@ -76,6 +76,14 @@ def update_cfg_category_range_mapping(id):
     entity = db.session.get(cfg_category_range_mapping.CfgCategoryRangeMapping, id)
     if not entity:
         abort(404)
+    if request.json["category"] != entity.category:
+        from app.models.yara_rule import Yara_rule
+
+        if db.session.query(Yara_rule.id).filter_by(category=entity.category).first():
+            abort(
+                409,
+                description="Move existing signatures out of this category before renaming it.",
+            )
     entity = cfg_category_range_mapping.CfgCategoryRangeMapping(
         category=request.json["category"],
         range_min=request.json["range_min"],
@@ -120,6 +128,13 @@ def delete_cfg_category_range_mapping(id):
     entity = db.session.get(cfg_category_range_mapping.CfgCategoryRangeMapping, id)
     if not entity:
         abort(404)
+    from app.models.yara_rule import Yara_rule
+
+    if db.session.query(Yara_rule.id).filter_by(category=entity.category).first():
+        abort(
+            409,
+            description="Move existing signatures out of this category before deleting it.",
+        )
     db.session.delete(entity)
     db.session.commit()
     return jsonify(""), 204

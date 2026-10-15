@@ -336,3 +336,51 @@ def test_purge_removes_test_children_and_schedules(authenticated):
         == ScheduledConfidence.query.count()
         == 0
     )
+
+
+def test_used_definitions_cannot_orphan_release_content(authenticated):
+    from app.models.cfg_category_range_mapping import CfgCategoryRangeMapping
+
+    category = CfgCategoryRangeMapping(
+        category="UsedCategory", range_min=20000, range_max=29999, current=20000
+    )
+    state = Cfg_states(state="HistoricRelease", is_release_state=1)
+    db.session.add_all(
+        [category, state, Cfg_states(state="Vetting", is_staging_state=1)]
+    )
+    db.session.commit()
+    category_id, state_id = category.id, state.id
+    response = authenticated.post(
+        "/ThreatKB/yara_rules",
+        json={
+            "name": "DefinitionFixture",
+            "category": "UsedCategory",
+            "state": "Vetting",
+            "condition": "true",
+        },
+    )
+    assert response.status_code == 201, response.json
+    assert (
+        authenticated.put(
+            "/ThreatKB/cfg_category_range_mapping/" + str(category_id),
+            json={
+                "category": "Renamed",
+                "range_min": 20000,
+                "range_max": 29999,
+                "include_in_release_notes": True,
+            },
+        ).status_code
+        == 409
+    )
+    assert (
+        authenticated.delete(
+            "/ThreatKB/cfg_category_range_mapping/" + str(category_id)
+        ).status_code
+        == 409
+    )
+    history = Yara_rule_history.query.first()
+    history.state = "HistoricRelease"
+    db.session.commit()
+    assert (
+        authenticated.delete("/ThreatKB/cfg_states/" + str(state_id)).status_code == 409
+    )
