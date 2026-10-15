@@ -98,24 +98,9 @@ def get_all_tasks():
 def get_tasks(id):
     """Return task associated with given id
     Return: task dictionary"""
-    entity = db.session.get(tasks.Tasks, id)
-    if not entity:
-        abort(404)
+    from app.authorization import require_artifact
 
-    show_for_non_admin = cfg_settings.Cfg_settings.get_setting(
-        "ENABLE_NON_ADMIN_TASK_VISIBILITY"
-    )
-    show_for_non_admin = (
-        bool(strtobool(show_for_non_admin)) if show_for_non_admin else False
-    )
-
-    if not show_for_non_admin and not (
-        current_user.admin
-        or entity.owner_user_id == current_user.id
-        or entity.owner_user_id is None
-    ):
-        return jsonify({})
-
+    entity = require_artifact(ENTITY_MAPPING["TASK"], id)
     return_dict = entity.to_dict()
     return_dict["bookmarked"] = (
         True if is_bookmarked(ENTITY_MAPPING["TASK"], id, current_user.id) else False
@@ -166,10 +151,9 @@ def update_tasks(id):
     """Update task associated with given id
     From Data: title (str), description (str), final_artifact(str), state (str)
     Return: task dictionary"""
-    entity = db.session.get(tasks.Tasks, id)
-    if not entity:
-        abort(404)
+    from app.authorization import require_artifact
 
+    entity = require_artifact(ENTITY_MAPPING["TASK"], id, write=True)
     entity.title = request.json["title"]
     entity.description = request.json["description"]
     entity.final_artifact = request.json["final_artifact"]

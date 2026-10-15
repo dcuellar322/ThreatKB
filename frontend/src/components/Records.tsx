@@ -122,6 +122,9 @@ export function Records({ page, version, notify, refresh, user }: any) {
     };
   }, [showColumns]);
   const editable = !!kinds[page];
+  const canEditRow = (row: any) =>
+    user.admin ||
+    Number(row.owner_user?.id ?? row.owner_user_id) === Number(user.id);
   useEffect(() => {
     if (query === debounced) return;
     const timer = setTimeout(() => {
@@ -173,7 +176,8 @@ export function Records({ page, version, notify, refresh, user }: any) {
   useEffect(() => {
     if (allRef.current)
       allRef.current.indeterminate =
-        selected.size > 0 && selected.size < (data?.data?.length || 0);
+        selected.size > 0 &&
+        selected.size < (data?.data?.filter(canEditRow).length || 0);
   }, [selected, data]);
   useEffect(() => {
     if (!editable) return;
@@ -431,6 +435,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
     return () => clearTimeout(timer);
   }, [page, data]);
   const pending = loading || query !== debounced;
+  const selectable = data?.data?.filter(canEditRow) || [];
   const total = data?.total_count || 0,
     pages = Math.max(1, Math.ceil(total / size));
   return (
@@ -776,15 +781,15 @@ export function Records({ page, version, notify, refresh, user }: any) {
                         ref={allRef}
                         type="checkbox"
                         aria-label="Select all visible records"
-                        disabled={pending || !data.data.length}
+                        disabled={pending || !selectable.length}
                         checked={
-                          data.data.length > 0 &&
-                          data.data.every((row: any) => selected.has(row.id))
+                          selectable.length > 0 &&
+                          selectable.every((row: any) => selected.has(row.id))
                         }
                         onChange={(e) =>
                           setSelected(
                             e.target.checked
-                              ? new Set(data.data.map((row: any) => row.id))
+                              ? new Set(selectable.map((row: any) => row.id))
                               : new Set(),
                           )
                         }
@@ -851,7 +856,7 @@ export function Records({ page, version, notify, refresh, user }: any) {
                           aria-label={
                             "Select " + (row[nameKeys[page]] || row.id)
                           }
-                          disabled={pending}
+                          disabled={pending || !canEditRow(row)}
                           checked={selected.has(row.id)}
                           onChange={() =>
                             setSelected((old) => {
@@ -913,7 +918,11 @@ export function Records({ page, version, notify, refresh, user }: any) {
                             )}
                             aria-label={"State for " + row[nameKeys[page]]}
                             value={row.state || ""}
-                            disabled={loading || savingRow === row.id}
+                            disabled={
+                              loading ||
+                              savingRow === row.id ||
+                              !canEditRow(row)
+                            }
                             onChange={(e: any) => {
                               if (e.target.value !== row.state)
                                 quickEdit(row, "state", e.target.value);
@@ -965,7 +974,11 @@ export function Records({ page, version, notify, refresh, user }: any) {
                             className="cell-select owner-select"
                             aria-label={"Owner for " + row[nameKeys[page]]}
                             value={row.owner_user?.id || ""}
-                            disabled={loading || savingRow === row.id}
+                            disabled={
+                              loading ||
+                              savingRow === row.id ||
+                              !canEditRow(row)
+                            }
                             onChange={(e: any) => {
                               if (
                                 String(e.target.value) !==

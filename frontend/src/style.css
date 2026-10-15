@@ -2769,3 +2769,10 @@ label.file-row {
   font-size: 12px;
   margin: 0 0 6px;
 }
+
+.artifact-form-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}

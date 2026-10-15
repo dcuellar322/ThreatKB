@@ -55,6 +55,11 @@ export function ArtifactEditor({
     [destinations, setDestinations] = useState<any[]>([]),
     [destination, setDestination] = useState("");
   const actionsId = useId();
+  const canEdit =
+    initial.new ||
+    user?.admin ||
+    Number(initial.owner_user?.id ?? initial.owner_user_id) ===
+      Number(user?.id);
   const baseline = useRef(initial);
   const dirty = JSON.stringify(value) !== JSON.stringify(baseline.current);
   const revisions = (initial.revisions || []).filter(
@@ -73,7 +78,7 @@ export function ArtifactEditor({
       if (merging) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        if (!busy)
+        if (!busy && canEdit)
           (
             document.getElementById("artifact-form") as HTMLFormElement
           )?.requestSubmit();
@@ -85,7 +90,7 @@ export function ArtifactEditor({
     };
     document.addEventListener("keydown", shortcut);
     return () => document.removeEventListener("keydown", shortcut);
-  }, [busy, dirty, merging]);
+  }, [busy, dirty, merging, canEdit]);
   useEffect(() => {
     if (!merging) return;
     const timer = setTimeout(
@@ -148,6 +153,7 @@ export function ArtifactEditor({
     setValue((x: any) => ({ ...x, [name]: v }));
   async function save(e: any) {
     e.preventDefault();
+    if (!canEdit) return;
     setBusy(true);
     try {
       const payload = {
@@ -219,7 +225,15 @@ export function ArtifactEditor({
         <div className="dialog-body">
           {tab === "Content" ? (
             <form id="artifact-form" onSubmit={save}>
-              <div className="form-grid artifact-fields">
+              {!canEdit && (
+                <p>
+                  <Badge value="Read only" />
+                </p>
+              )}
+              <fieldset
+                className="form-grid artifact-fields artifact-form-fields"
+                disabled={!canEdit}
+              >
                 <label className="span2">
                   {isRule
                     ? "Rule name"
@@ -647,7 +661,7 @@ export function ArtifactEditor({
                     </label>
                   </>
                 )}
-              </div>
+              </fieldset>
             </form>
           ) : tab === "Source" ? (
             <div>
@@ -1185,18 +1199,21 @@ export function ArtifactEditor({
                   {following ? "Unfollow" : "Follow"}
                 </button>
               )}
-              {isRule && (initial.active === false || initial.active === 0) && (
-                <button
-                  onClick={async () => {
-                    await write("/yara_rules/" + initial.id + "/restore", {});
-                    onSaved();
-                    notify("Signature restored.");
-                  }}
-                >
-                  Restore signature
-                </button>
-              )}
-              {!initial.new &&
+              {canEdit &&
+                isRule &&
+                (initial.active === false || initial.active === 0) && (
+                  <button
+                    onClick={async () => {
+                      await write("/yara_rules/" + initial.id + "/restore", {});
+                      onSaved();
+                      notify("Signature restored.");
+                    }}
+                  >
+                    Restore signature
+                  </button>
+                )}
+              {canEdit &&
+                !initial.new &&
                 !initial.release &&
                 initial.active !== false &&
                 initial.active !== 0 && (
@@ -1221,7 +1238,8 @@ export function ArtifactEditor({
               {isRule && !initial.new && (
                 <button onClick={() => setMerging(true)}>Merge into…</button>
               )}
-              {!isRule &&
+              {canEdit &&
+                !isRule &&
                 !initial.new &&
                 (initial.active === false || initial.active === 0) && (
                   <button
@@ -1247,7 +1265,7 @@ export function ArtifactEditor({
                 )}
             </div>
             <button onClick={close}>Close</button>
-            {tab === "Content" && (
+            {tab === "Content" && canEdit && (
               <button
                 className="primary"
                 type="submit"
