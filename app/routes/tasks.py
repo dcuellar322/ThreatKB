@@ -11,6 +11,32 @@ from app.utilities import filter_entities
 from app.models.users import KBUser
 
 
+def persist_task_tags(entity, values):
+    from app.models.tags import Tags
+    from app.models.tags_mapping import Tags_mapping
+
+    if not isinstance(values, list):
+        abort(400, description="Tags must be a list.")
+    texts = [tag.get("text") if isinstance(tag, dict) else tag for tag in values]
+    if any(not isinstance(tag, str) or not tag.strip() or len(tag) > 256 for tag in texts):
+        abort(400, description="Tags require 1–256 characters.")
+    texts = set(texts)
+    tags = {tag.text: tag for tag in Tags.query.filter(Tags.text.in_(texts))}
+    for text in texts - tags.keys():
+        tag = Tags(text=text)
+        db.session.add(tag)
+        tags[text] = tag
+    db.session.flush()
+    mappings = Tags_mapping.query.filter_by(source_table="tasks", source_id=entity.id).all()
+    wanted = {tag.id for tag in tags.values()}
+    existing = {mapping.tag_id for mapping in mappings}
+    for mapping in mappings:
+        if mapping.tag_id not in wanted:
+            db.session.delete(mapping)
+    for identity in wanted - existing:
+        db.session.add(Tags_mapping(source_table="tasks", source_id=entity.id, tag_id=identity))
+
+
 def task_owner(data, default=None):
     owner = data.get("owner_user", data.get("owner_user_id", default))
     owner = owner.get("id") if isinstance(owner, dict) else owner
@@ -127,6 +153,7 @@ def create_tasks():
     from app.routes.comments import persist_draft_comment
 
     persist_draft_comment(data.get("new_comment"), ENTITY_MAPPING["TASK"], entity.id)
+    persist_task_tags(entity, data.get("tags", []))
     db.session.commit()
 
     return jsonify(entity.to_dict()), 201
@@ -160,6 +187,8 @@ def update_tasks(id):
         request.json.get("new_comment"), ENTITY_MAPPING["TASK"], entity.id
     )
 
+    if "tags" in request.json:
+        persist_task_tags(entity, request.json["tags"])
     db.session.commit()
 
     entity = tasks.Tasks.query.filter(tasks.Tasks.id == entity.id).first()
@@ -183,7 +212,7 @@ def batch_update_tasks():
             batch=request.json["batch"],
             artifact=tasks.Tasks,
             session=db.session,
-            include_tags=False,
+            include_tags=True,
         )
 
 

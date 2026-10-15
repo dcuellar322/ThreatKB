@@ -57,7 +57,7 @@ class Tasks(db.Model):
         % (ENTITY_MAPPING["TASK"]),
     )
 
-    def to_dict(self, include_comments=True, users_cache=None):
+    def to_dict(self, include_comments=True, users_cache=None, include_tags=True):
         task = dict(
             active=self.active,
             date_created=self.date_created.isoformat(),
@@ -78,6 +78,16 @@ class Tasks(db.Model):
             else (self.owner_user.to_dict() if self.owner_user else None),
         )
 
+        if include_tags:
+            from app.models.tags import Tags
+            from app.models.tags_mapping import Tags_mapping
+
+            task["tags"] = list(db.session.scalars(
+                db.select(Tags.text)
+                .join(Tags_mapping, Tags_mapping.tag_id == Tags.id)
+                .where(Tags_mapping.source_table == "tasks", Tags_mapping.source_id == self.id)
+                .order_by(Tags.text)
+            ))
         if include_comments:
             task["comments"] = [
                 comment.to_dict()

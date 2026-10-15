@@ -229,7 +229,7 @@ def serialize_page(
     result = []
     for row in rows:
         if kind == 4:
-            value = row.to_dict(include_comments=False, users_cache=users)
+            value = row.to_dict(include_comments=False, users_cache=users, include_tags=False)
             if include_comments:
                 value["comments"] = comments[table][row.id]
             if include_tags:

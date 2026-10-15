@@ -1,3 +1,4 @@
+import json
 import pytest
 import yara
 from app import app, db, bcrypt
@@ -384,3 +385,22 @@ def test_used_definitions_cannot_orphan_release_content(authenticated):
     assert (
         authenticated.delete("/ThreatKB/cfg_states/" + str(state_id)).status_code == 409
     )
+
+
+def test_task_tags_persist_through_create_edit_and_bulk(authenticated):
+    db.session.add(Cfg_states(state="Vetting"))
+    db.session.commit()
+    payload = dict(title="Tagged task", state="Vetting", description="Initial", final_artifact="", tags=["first", "second"])
+    response = authenticated.post("/ThreatKB/tasks", json=payload)
+    assert response.status_code == 201
+    identity = response.json["id"]
+    assert response.json["tags"] == ["first", "second"]
+    payload["tags"] = [{"text": "third"}]
+    assert authenticated.put(f"/ThreatKB/tasks/{identity}", json=payload).json["tags"] == ["third"]
+    assert authenticated.put("/ThreatKB/tasks/batch/edit", json={"batch": {"ids": [identity], "tags": ["bulk"]}}).status_code == 200
+    assert authenticated.get(f"/ThreatKB/tasks/{identity}").json["tags"] == ["bulk", "third"]
+    listed = authenticated.get("/ThreatKB/tasks", query_string={"searches": json.dumps({"tags": "bulk"})}).json
+    assert listed["total_count"] == 1 and listed["data"][0]["tags"] == ["bulk", "third"]
+    payload["tags"] = []
+    assert authenticated.put(f"/ThreatKB/tasks/{identity}", json=payload).json["tags"] == []
+
