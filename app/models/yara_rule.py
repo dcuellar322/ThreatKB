@@ -252,85 +252,36 @@ class Yara_rule(db.Model):
 
     @staticmethod
     def to_yara_rule_string(yara_dict, include_imports=True):
-        yr = Yara_rule()
-        metadata_fields_to_show = ["creation_date", "last_revision_date", "revision",
-                                    "name", "category", "eventid",
-                                   "description", "references", "mitre_tactics", "mitre_techniques"]
-
-        metadata_field_mapping = [attr for attr in dir(yr) if
-                                  not callable(getattr(yr, attr)) and not attr.startswith("__")]
-
-        yara_rule_text = ""
-
-        if yara_dict.get("imports", None) and include_imports:
-            yara_rule_text = yara_dict.get("imports") + "\n\n"
-
-        yara_rule_text += "rule %s\n{\n\n" % (yara_dict.get("name"))
-        yara_rule_text += "\tmeta:\n"
-        metadata_strings = []
-        for field in metadata_field_mapping:
-            if yara_dict.get(field, None) and not "metadata" in field and field in metadata_fields_to_show:
-                try:
-                    yara_dict[field] = re.sub("[^\x00-\x7F]", "", yara_dict[field])
-                except:
-                    pass
-
-                if field.lower() == "references":
-                    r_val = str(yara_dict[field]).replace("\"", "'").replace("\n", ",")
-                elif field.lower().startswith("mitre"):
-                    r_val = ",".join(yara_dict[field])
-                else:
-                    r_val = str(yara_dict[field]).replace("\"", "'")
-
-                metadata_strings.append("\t\t%s = \"%s\"\n" % (field.title() if not field.lower() == "eventid" else "EventID", r_val))
-
-        try:
-            for type_, metalist in yara_dict["metadata"].items():
-                for meta in metalist:
-                    if meta["export_with_release"]:
-                        value = yara_dict["metadata_values"][meta["key"]]["value"] if "value" in \
-                                                                                      yara_dict["metadata_values"][
-                                                                                          meta["key"]] else "NA"
-                        try:
-                            value = re.sub("[^\x00-\x7F]", "", value)
-                        except:
-                            pass
-                        metadata_strings.append("\t\t%s = \"%s\"\n" % (meta["key"], str(value).replace("\"", "'")))
-        except Exception as e:
-            pass
-
-        yara_rule_text += "".join(sorted(metadata_strings))
-        formatted_strings = ""
-
-        if yara_dict["strings"] and yara_dict["strings"].strip() and not "strings:" in yara_dict["strings"]:
-            formatted_strings = "\n\tstrings:\n\t\t"
-            formatted_strings += "\n".join([line for line in yara_dict["strings"].split("\n")])
-            # yara_rule_text += "\n\tstrings:\n\t\t%s" % (yara_dict["strings"])
-        else:
-            if not yara_dict["strings"] or not yara_dict["strings"].strip():
-                formatted_strings += ""
-            else:
-                formatted_strings = "\n\tstrings:\n\t\t"
-                formatted_strings += "\n".join([line for line in yara_dict["strings"].split("\n")[1:]])
-                # yara_rule_text += "\n\t%s" % (yara_dict["strings"])
-
-        yara_rule_text += formatted_strings
-        formatted_condition = ""
-
-        if not "condition" in yara_dict["condition"]:
-            formatted_condition = "\n\tcondition:\n\t\t"
-            formatted_condition += "\n".join([line for line in yara_dict["condition"].split("\n")])
-            #yara_rule_text += "\n\tcondition:\n\t\t%s\n\n}" % (yara_dict["condition"])
-        else:
-            formatted_condition = "\n\tcondition:\n\t\t"
-            formatted_condition += "\n".join([line for line in yara_dict["condition"].split("\n")[1:]])
-            # yara_rule_text += "\n\t%s\n\n}" % (yara_dict["condition"])
-
-        yara_rule_text += formatted_condition + "\n}\n"
-
-        yara_rule_text = Yara_rule.expand_macros(yara_rule_text)
-
-        return yara_rule_text
+        metadata = {}
+        for field in ("creation_date", "last_revision_date", "revision", "name", "category", "eventid",
+                      "description", "references", "mitre_tactics", "mitre_techniques"):
+            value = yara_dict.get(field)
+            if value is None or value == "" or value == []:
+                continue
+            key = "EventID" if field == "eventid" else field.title()
+            metadata[key] = ",".join(value) if isinstance(value, list) else str(value)
+        for fields in yara_dict.get("metadata", {}).values():
+            for field in fields:
+                if field.get("export_with_release"):
+                    value = yara_dict.get("metadata_values", {}).get(field["key"], {}).get("value")
+                    if value is not None:
+                        key = re.sub(r"\W", "_", field["key"])
+                        if not key or key[0].isdigit():
+                            key = "meta_" + key
+                        metadata[key] = str(value)
+        lines = []
+        if include_imports and yara_dict.get("imports"):
+            lines.append(yara_dict["imports"])
+        lines.append(f"rule {yara_dict['name']} {{")
+        if metadata:
+            lines.append("    meta:")
+            lines.extend(f"        {key} = {json.dumps(value, ensure_ascii=False)}" for key, value in sorted(metadata.items()))
+        strings = re.sub(r"^\s*strings:\s*", "", yara_dict.get("strings") or "").strip()
+        if strings:
+            lines.extend(["    strings:", strings])
+        condition = re.sub(r"^\s*condition:\s*", "", yara_dict.get("condition") or "false").strip()
+        lines.extend(["    condition:", condition, "}"])
+        return Yara_rule.expand_macros("\n".join(lines) + "\n")
 
     @staticmethod
     def expand_macros(yara_rule_text):
@@ -346,7 +297,6 @@ class Yara_rule(db.Model):
             return ""
 
         type_ = "%s:" if not type_.endswith(":") else type_
-        text = re.sub("[^\x00-\x7f]", "", text)
         return "\n".join([string for string in text.split("\n") if type_ not in string]).strip()
 
     @classmethod
