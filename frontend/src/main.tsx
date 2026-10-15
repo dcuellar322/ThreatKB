@@ -56,6 +56,8 @@ async function api(path: string, options: any = {}) {
   } catch {
     value = text;
   }
+  if (r.status === 401 && path !== "/login" && path !== "/users/me")
+    window.dispatchEvent(new Event("threatkb:unauthorized"));
   if (!r.ok)
     throw new Error(
       typeof value === "object"
@@ -271,8 +273,16 @@ function App() {
       });
     const fn = () =>
       setPage(location.hash.replace(/^#!?\//, "").split("?")[0] || "dashboard");
+    const expired = () => {
+      sessionStorage.setItem("threatkb.returnTo", location.hash);
+      setUser(null);
+    };
     window.addEventListener("hashchange", fn);
-    return () => window.removeEventListener("hashchange", fn);
+    window.addEventListener("threatkb:unauthorized", expired);
+    return () => {
+      window.removeEventListener("hashchange", fn);
+      window.removeEventListener("threatkb:unauthorized", expired);
+    };
   }, []);
   useEffect(() => {
     if (!user) return;
@@ -299,6 +309,7 @@ function App() {
           onLogin={(u: any) => {
             setUser(u);
             const saved = sessionStorage.getItem("threatkb.returnTo");
+            sessionStorage.removeItem("threatkb.returnTo");
             go(saved?.startsWith("#/") ? saved.slice(2) : "dashboard");
           }}
         />
