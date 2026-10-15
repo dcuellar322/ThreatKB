@@ -498,55 +498,42 @@ export function ArtifactEditor({
                     )}
                     {isRule && (
                       <>
-                        <label>
-                          MITRE tactics
-                          <input
-                            aria-label="MITRE tactics"
-                            value={(value.mitre_tactics || []).join(", ")}
-                            onChange={(e) =>
-                              field(
-                                "mitre_tactics",
-                                e.target.value
-                                  .split(",")
-                                  .map((v) => v.trim())
-                                  .filter(Boolean),
-                              )
+                        <div className="field ">
+                          <span>MITRE tactics</span>
+                          <TagInput
+                            label="MITRE tactics"
+                            suggest={false}
+                            placeholder="Add identifier…"
+                            value={value.mitre_tactics || []}
+                            onChange={(ids: string[]) =>
+                              field("mitre_tactics", ids)
                             }
                           />
-                        </label>
-                        <label>
-                          MITRE techniques
-                          <input
-                            aria-label="MITRE techniques"
-                            value={(value.mitre_techniques || []).join(", ")}
-                            onChange={(e) =>
-                              field(
-                                "mitre_techniques",
-                                e.target.value
-                                  .split(",")
-                                  .map((v) => v.trim())
-                                  .filter(Boolean),
-                              )
+                        </div>
+                        <div className="field ">
+                          <span>MITRE techniques</span>
+                          <TagInput
+                            label="MITRE techniques"
+                            suggest={false}
+                            placeholder="Add identifier…"
+                            value={value.mitre_techniques || []}
+                            onChange={(ids: string[]) =>
+                              field("mitre_techniques", ids)
                             }
                           />
-                        </label>
-                        <label className="span2">
-                          MITRE sub-techniques
-                          <input
-                            value={(value.mitre_sub_techniques || []).join(
-                              ", ",
-                            )}
-                            onChange={(e) =>
-                              field(
-                                "mitre_sub_techniques",
-                                e.target.value
-                                  .split(",")
-                                  .map((v) => v.trim())
-                                  .filter(Boolean),
-                              )
+                        </div>
+                        <div className="field span2">
+                          <span>MITRE sub-techniques</span>
+                          <TagInput
+                            label="MITRE sub-techniques"
+                            suggest={false}
+                            placeholder="Add identifier…"
+                            value={value.mitre_sub_techniques || []}
+                            onChange={(ids: string[]) =>
+                              field("mitre_sub_techniques", ids)
                             }
                           />
-                        </label>
+                        </div>
                       </>
                     )}
                     <div className="field span2">

@@ -3,7 +3,13 @@ import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { api } from "../lib/api";
 
-export function TagInput({ value = [], onChange, label = "Tags" }: any) {
+export function TagInput({
+  value = [],
+  onChange,
+  label = "Tags",
+  suggest = true,
+  placeholder = "Add tags…",
+}: any) {
   const [query, setQuery] = useState(""),
     [suggestions, setSuggestions] = useState<string[]>([]),
     [focused, setFocused] = useState(false),
@@ -17,13 +23,14 @@ export function TagInput({ value = [], onChange, label = "Tags" }: any) {
     typeof t === "string" ? t : t.text,
   );
   useEffect(() => {
+    if (!suggest) return;
     const controller = new AbortController();
     api("/tags", { signal: controller.signal })
       .then((r) => setSuggestions(r.map((t: any) => t.text)))
       .catch(() => {});
     return () => controller.abort();
-  }, []);
-  const matches = suggestions
+  }, [suggest]);
+  const matches = (suggest ? suggestions : [])
     .filter(
       (s) => !tags.includes(s) && s.toLowerCase().includes(query.toLowerCase()),
     )
@@ -101,7 +108,7 @@ export function TagInput({ value = [], onChange, label = "Tags" }: any) {
           aria-activedescendant={
             active >= 0 && matches[active] ? id + "-" + active : undefined
           }
-          placeholder={tags.length ? "Add tag…" : "Add tags…"}
+          placeholder={placeholder}
           value={query}
           onFocus={() => setFocused(true)}
           onChange={(e) => {
