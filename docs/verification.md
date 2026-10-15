@@ -83,3 +83,7 @@ Fork master now requires the `verify` status check, an independent PR approval
 (including approval after the last push), resolved review conversations and stale
 approval dismissal. These rules apply to administrators; force pushes and branch
 deletion are disabled. The modernization PR remains a draft for independent review.
+
+## Performance and UI review follow-up
+
+The October 2026 follow-up passes **70 tests locally and in the production Docker image**. All independent Sigpack, Feedpack and Codepack pipelines pass in that image. MySQL migrations were applied to the main development database and a separate browser-QA database. The frontend production build and unused-declaration checks pass. Real-browser workflows and before/after query measurements are recorded in [2026-review.md](2026-review.md); screenshots remain local under `output/playwright/`.
