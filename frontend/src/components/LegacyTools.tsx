@@ -99,6 +99,11 @@ export function LegacyTools({ page, version, notify, user }: any) {
         }) * (direction === "ASC" ? 1 : -1),
     );
   const count = page === "tests" ? total : filtered.length;
+  useEffect(() => {
+    setIndex((current) =>
+      Math.min(current, Math.max(0, Math.ceil(count / size) - 1)),
+    );
+  }, [count, size]);
   const visible =
     page === "tests"
       ? filtered

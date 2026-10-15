@@ -158,7 +158,18 @@ export function Records({ page, version, notify, refresh, user }: any) {
   ]);
   useEffect(() => {
     setSelected(new Set());
-  }, [page, index, size, query, debounced, view, filters, operator, sort, direction]);
+  }, [
+    page,
+    index,
+    size,
+    query,
+    debounced,
+    view,
+    filters,
+    operator,
+    sort,
+    direction,
+  ]);
   useEffect(() => {
     if (allRef.current)
       allRef.current.indeterminate =
@@ -231,11 +242,12 @@ export function Records({ page, version, notify, refresh, user }: any) {
     api("/" + page + "?" + params, { signal: controller.signal })
       .then((value) => {
         if (controller.signal.aborted) return;
-        setData(
-          Array.isArray(value)
-            ? { data: value, total_count: value.length }
-            : value,
-        );
+        const next = Array.isArray(value)
+          ? { data: value, total_count: value.length }
+          : value;
+        const lastPage = Math.max(0, Math.ceil(next.total_count / size) - 1);
+        if (index > lastPage) setIndex(lastPage);
+        setData(next);
       })
       .catch((e: any) => {
         if (e.name !== "AbortError") setError(e.message);
