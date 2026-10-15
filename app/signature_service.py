@@ -83,8 +83,9 @@ def save_signature(data, entity=None):
     if not changed:
         return entity, False
     try:
-        yara.compile(source=Yara_rule.to_yara_rule_string(dict(values)))
-    except yara.Error as error:
+        from app.detection import validate_signature
+        validate_signature(values, entity.id if entity else None)
+    except (yara.Error, ValueError) as error:
         abort(422, description=f'YARA validation failed: {error}')
     if creating:
         entity = Yara_rule(created_user_id=current_user.id, revision=1)

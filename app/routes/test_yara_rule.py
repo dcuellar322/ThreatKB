@@ -270,19 +270,12 @@ def test_yara_rule(yara_rule_entity, files_to_test, user, is_async=False, is_neg
 
 
 def does_rule_compile(yara_dict):
-    rule = Yara_rule.to_yara_rule_string(yara_dict, include_imports=True)
-    rule_temp_path = "/tmp/%s.yar" % (str(uuid.uuid4()).replace("-", "")[0:8])
-    with open(rule_temp_path, "w") as f:
-        f.write(rule)
-
-    yara_command = Cfg_settings.get_setting("SIGNATURE_TESTING_COMMAND")
-
-    command = yara_command.replace("RULE", rule_temp_path).replace("FILE_PATH", rule_temp_path)
-    proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    proc.wait()
-    stdout, stderr = proc.communicate()
-    return_code = proc.returncode
-    return (return_code == 0, return_code, stdout, stderr)
+    from app.detection import validate_signature
+    try:
+        validate_signature(yara_dict, yara_dict.get("id"))
+        return True, 0, "", ""
+    except (yara.Error, ValueError) as error:
+        return False, 1, "", str(error)
 
 
 def get_yara_rule(yara_rule_entity):
