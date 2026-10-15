@@ -15,7 +15,11 @@ from ipaddress import ip_address
 
 def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared_reference=None,
                    shared_description=None, shared_state=None, shared_match_type=None, shared_owner=None, metadata_field_mapping={},
-                   resurrect_retired_artifacts=True):
+                   resurrect_retired_artifacts=True, shared_tags=None):
+    if shared_tags is None:
+        shared_tags = request.get_json(silent=True).get("tags", []) if request.is_json else []
+    if not isinstance(shared_tags, list):
+        abort(400, description="tags must be a list")
     default_state = "Imported"
     return_artifacts = []
     duplicate_artifacts = []
@@ -188,6 +192,9 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
                                                            yara_rule_id=yr.id,
                                                            state=yr.state))
 
+                if shared_tags:
+                    from app.routes.tags_mapping import create_tags_mapping
+                    create_tags_mapping("yara_rules", yr.id, shared_tags)
                 return_artifacts.append(yr)
                 fields_to_add[yr] = fta
         except Exception as e:
