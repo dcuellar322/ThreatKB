@@ -2759,3 +2759,13 @@ label.file-row {
     justify-self: end;
   }
 }
+
+.editor-fallback textarea {
+  width: 100%;
+  min-height: 100px;
+  font-family: monospace;
+}
+.editor-fallback > p {
+  font-size: 12px;
+  margin: 0 0 6px;
+}
