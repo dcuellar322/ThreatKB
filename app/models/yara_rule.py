@@ -72,7 +72,7 @@ class Yara_rule(db.Model):
 
     test_history = db.relationship("Yara_testing_history", foreign_keys="Yara_testing_history.yara_rule_id",
                                    primaryjoin="Yara_testing_history.yara_rule_id==Yara_rule.id",
-                                   cascade="all,delete", uselist=True)
+                                   cascade="all,delete", uselist=True, back_populates="yara_rule")
 
     @property
     def mitre_techniques(self):
@@ -519,7 +519,7 @@ class Yara_testing_history(db.Model):
     avg_millis_per_file = db.Column(db.Float, nullable=False)
 
     yara_rule = db.relationship('Yara_rule', foreign_keys=[yara_rule_id],
-                                primaryjoin='Yara_rule.id==Yara_testing_history.yara_rule_id')
+                                primaryjoin='Yara_rule.id==Yara_testing_history.yara_rule_id', back_populates='test_history')
     user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
     user = db.relationship('KBUser', foreign_keys=[user_id],
                            primaryjoin="KBUser.id==Yara_testing_history.user_id")
@@ -559,6 +559,8 @@ class Yara_testing_history_files_matches(db.Model):
     stderr = db.Column(db.String(2000))
     command = db.Column(db.String(2000))
     command_match_test_regex = db.Column(db.String(2000))
+    matched = db.Column(db.Boolean, nullable=False, default=True)
+    sha256 = db.Column(db.String(64))
 
     history_id = db.Column(db.Integer, db.ForeignKey('yara_testing_history.id'), nullable=False)
     history = db.relationship('Yara_testing_history', foreign_keys=[history_id],
@@ -570,6 +572,8 @@ class Yara_testing_history_files_matches(db.Model):
             id=self.id,
             run_time=self.run_time,
             path=self.path,
+            matched=self.matched,
+            sha256=self.sha256,
             stdout=self.stdout,
             stderr=self.stderr,
             command=self.command,

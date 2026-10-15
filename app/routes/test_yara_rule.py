@@ -116,7 +116,7 @@ def test_yara_rule_rest(rule_id):
                 if not file_store_path:
                     raise Exception('FILE_STORE_PATH configuration setting not set.')
                 print(f"path is {f.id} {f.filename} {f.full_path}")
-                files_to_test.append(f.full_path)
+                files_to_test.append(os.path.join(f.full_path, f.filename))
                 #files_to_test.append(os.path.join(file_store_path,
                 #                                  str(f.entity_type) if f.entity_type is not None else "",
                 #                                  str(f.entity_id) if f.entity_id is not None else "",
@@ -127,7 +127,7 @@ def test_yara_rule_rest(rule_id):
             test_yara_rule_task.delay(yara_rule_entity.id, current_user.id, is_neg_test)
             return jsonify({"status": "ok", "message": "Background job created"}), 200
     except Exception as e:
-        return e.message, 500
+        return str(e), 422
 
 
 @app.route('/ThreatKB/tests/<int:test_id>', methods=['GET'])
@@ -160,113 +160,51 @@ def test_yara_rule_task(rule_id, user, is_neg_test):
 
 
 def test_yara_rule(yara_rule_entity, files_to_test, user, is_async=False, is_neg_test=False):
-    if type(yara_rule_entity) is int:
-        yara_rule_entity = yara_rule.Yara_rule.query.get(yara_rule_entity)
-
-    old_avg = db.session.query(func.avg(Yara_testing_history.avg_millis_per_file).label('average')) \
-        .filter(Yara_testing_history.yara_rule_id == yara_rule_entity.id) \
-        .scalar()
-
-    start_time = time.time()
-    start_time_str = datetime.datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
-
-    rule = get_yara_rule(yara_rule_entity)
-
-    total_file_count, count_of_files_matched, tests_terminated, total_file_time, errors_encountered = 0, 0, 0, 0, 0
-    error_msgs = []
-    files_matches = []
-    threshold = float(Cfg_settings.get_setting("MAX_MILLIS_PER_FILE_THRESHOLD") or 3.0)
-    yara_command = Cfg_settings.get_setting("SIGNATURE_TESTING_COMMAND")
-    yara_test_regex = Cfg_settings.get_setting("SIGNATURE_TESTING_COMMAND_SUCCESS_REGEX")
-
-    yrh = Yara_testing_history(yara_rule_id=yara_rule_entity.id,
-                               revision=yara_rule_entity.revision,
-                               start_time=start_time_str,
-                               end_time=None,
-                               files_tested=0,
-                               files_matched=0,
-                               avg_millis_per_file=0,
-                               total_files=len(files_to_test),
-                               status=Yara_testing_history.STATUS_RUNNING,
-                               test_type=Yara_testing_history.TEST_TYPE_NEGATIVE if is_neg_test else Yara_testing_history.TEST_TYPE_POSITIVE,
-                               user_id=user)
-    db.session.add(yrh)
-    db.session.commit()
-
-    processes = []
-    manager_dicts = []
-    for file_path in files_to_test:
-        total_file_count += 1
-
-        if (total_file_count % 10) == 0:
-            yrh.files_tested = total_file_count
-            db.session.add(yrh)
+    from pathlib import Path
+    from hashlib import file_digest
+    from app.detection import validate_signature
+    if isinstance(yara_rule_entity, int):
+        yara_rule_entity = db.get_or_404(Yara_rule, yara_rule_entity)
+    values = {key: getattr(yara_rule_entity, key) for key in ('name', 'strings', 'condition', 'imports')}
+    compiled = validate_signature(values, yara_rule_entity.id)
+    started = time.monotonic()
+    history = Yara_testing_history(yara_rule_id=yara_rule_entity.id, revision=yara_rule_entity.revision,
+        start_time=datetime.datetime.now(), files_tested=0, files_matched=0,
+        avg_millis_per_file=0, total_files=len(files_to_test), status='RUNNING',
+        test_type='NEGATIVE' if is_neg_test else 'POSITIVE', user_id=user)
+    db.session.add(history)
+    db.session.flush()
+    matched, errors = 0, []
+    timeout = min(60, max(1, int(Cfg_settings.get_setting('SCAN_TIMEOUT_SECONDS') or 15)))
+    for index, file_path in enumerate(files_to_test):
+        before = time.monotonic()
+        digest, hit, error = None, False, ''
+        try:
+            with open(file_path, 'rb') as sample:
+                digest = file_digest(sample, 'sha256').hexdigest()
+            hits = compiled.match(filepath=str(file_path), timeout=timeout)
+            hit = any(item.rule == yara_rule_entity.name for item in hits)
+        except (OSError, yara.Error) as exception:
+            error = str(exception)
+            errors.append(f'{Path(file_path).name}: {error}')
+        elapsed = time.monotonic() - before
+        matched += int(hit)
+        db.session.add(Yara_testing_history_files_matches(history_id=history.id,
+            path=str(file_path), sha256=digest, matched=hit, run_time=elapsed,
+            stdout=yara_rule_entity.name if hit else '', stderr=error[:2000],
+            command='yara-python', command_match_test_regex=''))
+        history.files_tested = index + 1
+        history.files_matched = matched
+        if (index + 1) % 25 == 0:
             db.session.commit()
-
-        if not os.path.exists(file_path):
-            errors_encountered += 1
-            error_msgs.append(ntpath.basename(file_path) + " not in File Store Path.")
-            continue
-
-        if not is_async:
-            manager = multiprocessing.Manager()
-            manager_dict = manager.dict()
-            if old_avg:
-                p = multiprocessing.Process(target=perform_rule_match,
-                                            args=(rule, file_path, manager_dict, yara_command, yara_test_regex))
-                processes.append(p)
-                p.start()
-            else:
-                perform_rule_match(rule, file_path, manager_dict, yara_command, yara_test_regex)
-            manager_dicts.append(manager_dict)
-        else:
-            manager_dicts.append(perform_rule_match(rule, file_path, dict(), yara_command, yara_test_regex))
-
-    if old_avg and not is_async:
-        time.sleep((old_avg * threshold) / 1000.0)
-        for p in processes:
-            p.join()
-
-            if p.is_alive():
-                tests_terminated += 1
-                p.terminate()
-                p.join()
-
-    for managers in manager_dicts:
-        if managers['duration']:
-            total_file_time += managers['duration']
-        if managers['match']:
-            count_of_files_matched += 1
-            files_matches.append(Yara_testing_history_files_matches(run_time=managers['duration'],
-                                                                    path=managers['file_path'],
-                                                                    stdout=managers['stdout'],
-                                                                    stderr=managers['stderr'],
-                                                                    command=managers['command'],
-                                                                    command_match_test_regex=managers[
-                                                                        'command_match_test_regex']))
-
-    end_time = time.time()
-    end_time_str = datetime.datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
-
-    if total_file_count > 0:
-        yrh.status = Yara_testing_history.STATUS_COMPLETE
-        yrh.end_time = end_time_str
-        yrh.files_tested = total_file_count
-        yrh.files_matched = count_of_files_matched
-        yrh.avg_millis_per_file = ((total_file_time) / total_file_count)
-        db.session.add(yrh)
-        db.session.commit()
-        for match in files_matches:
-            match.history = yrh
-            db.session.add(match)
-        db.session.commit()
-
-    return dict(duration=(total_file_time * 1000),
-                files_tested=total_file_count,
-                files_matched=count_of_files_matched,
-                tests_terminated=tests_terminated,
-                errors_encountered=errors_encountered,
-                error_msgs=error_msgs)
+    duration = (time.monotonic() - started) * 1000
+    history.end_time = datetime.datetime.now()
+    history.avg_millis_per_file = duration / len(files_to_test) if files_to_test else 0
+    history.status = 'ERROR' if errors else 'COMPLETE'
+    db.session.commit()
+    return dict(history_id=history.id, duration=duration, files_tested=len(files_to_test),
+                files_matched=matched, tests_terminated=0, errors_encountered=len(errors), error_msgs=errors,
+                passed=not errors and (matched == 0 if is_neg_test else matched == len(files_to_test)))
 
 
 def does_rule_compile(yara_dict):
@@ -342,3 +280,34 @@ if __name__ == "__main__":
     a = perform_rule_match(rule, "/Users/danny/Desktop/temp/hello.yar", multiprocessing.Manager().dict(),
                            "/usr/local/bin/yara RULE FILE_PATH", "[A-Za-z0-9]")
     sys.stdout.write(str(a))
+
+
+@app.get('/ThreatKB/yara_rules/<int:rule_id>/sample-results')
+@login_required
+def sample_result_comparison(rule_id):
+    rule = db.get_or_404(Yara_rule, rule_id)
+    if not current_user.admin and rule.owner_user_id != current_user.id:
+        abort(403)
+    histories = Yara_testing_history.query.filter_by(yara_rule_id=rule_id).order_by(Yara_testing_history.id.desc()).all()
+    if not histories:
+        return jsonify(files=[], current_history_id=None)
+    latest = histories[0].id
+    rows = db.session.query(Yara_testing_history_files_matches).join(Yara_testing_history).filter(
+        Yara_testing_history.yara_rule_id == rule_id).order_by(Yara_testing_history_files_matches.history_id).all()
+    results = {}
+    for result in rows:
+        item = results.setdefault(result.path, dict(path=result.path, ever_matched=False, matched=None,
+                                                    sha256=result.sha256))
+        item['ever_matched'] |= result.matched
+        if result.history_id == latest:
+            item['matched'] = result.matched
+            item['sha256'] = result.sha256
+            item['error'] = result.stderr
+    show_all = request.args.get('show_all', 'false').lower() == 'true'
+    output = []
+    for item in results.values():
+        item['status'] = ('not_tested' if item['matched'] is None else 'matched' if item['matched']
+                          else 'regressed' if item['ever_matched'] else 'never_matched')
+        if show_all or item['ever_matched']:
+            output.append(item)
+    return jsonify(files=output, current_history_id=latest)
