@@ -38,49 +38,31 @@ class CfgCategoryRangeMapping(db.Model):
 
     @staticmethod
     def get_next_category_eventid(category=None, connection=None):
-        default_category_min = 10000
-        default_category_max = 20000
-
-        if not category or not CfgCategoryRangeMapping.query.filter(
-                CfgCategoryRangeMapping.category == category).first():
-            category = CfgCategoryRangeMapping.query.filter(
-                CfgCategoryRangeMapping.category == CfgCategoryRangeMapping.DEFAULT_CATEGORY).first()
-            if not category:
-                if not CfgCategoryRangeMapping.COMMITTED_DEFAULT:
-                    category = CfgCategoryRangeMapping(category=CfgCategoryRangeMapping.DEFAULT_CATEGORY,
-                                                       range_max=default_category_max,
-                                                       range_min=default_category_min, current=default_category_min)
-                    if connection:
-                        connection.execute(CfgCategoryRangeMapping.__table__.insert().values(
-                            category=bindparam("category"),
-                            range_max=bindparam("range_max"),
-                            range_min=bindparam("range_min"),
-                            current=bindparam("current")
-                        ), {
-                            "category": category.category,
-                            "range_max": category.range_max,
-                            "range_min": category.range_min,
-                            "current": category.current
-                        })
-                        category = CfgCategoryRangeMapping.query.filter(
-                            CfgCategoryRangeMapping.category == CfgCategoryRangeMapping.DEFAULT_CATEGORY).first()
-                    CfgCategoryRangeMapping.COMMITTED_DEFAULT = category
-                else:
-                    category = CfgCategoryRangeMapping.COMMITTED_DEFAULT
-            eventid = category.current + 1
-
-            ## Make sure its not already taken by an imported signature
-            while yara_rule.Yara_rule.query.filter_by(eventid=eventid).first():
-                eventid = eventid + 1
-            category.current = eventid
-        else:
-            category = CfgCategoryRangeMapping.query.filter(CfgCategoryRangeMapping.category == category).first()
-            eventid = category.current + 1
-            category.current = eventid
-
-        db.session.execute(
-            text("UPDATE cfg_category_range_mapping SET current=:current WHERE id=:id"),
-            {"current": category.current, "id": category.id})
+        from sqlalchemy import select, insert, update
+        from sqlalchemy.exc import IntegrityError
+        connection = connection or db.session.connection()
+        table = CfgCategoryRangeMapping.__table__
+        requested = category or CfgCategoryRangeMapping.DEFAULT_CATEGORY
+        row = connection.execute(select(table).where(table.c.category == requested).with_for_update()).mappings().first()
+        if row is None:
+            requested = CfgCategoryRangeMapping.DEFAULT_CATEGORY
+            row = connection.execute(select(table).where(table.c.category == requested).with_for_update()).mappings().first()
+        if row is None:
+            try:
+                with connection.begin_nested():
+                    connection.execute(insert(table).values(category=requested, range_min=10000,
+                                                            range_max=20000, current=10000))
+            except IntegrityError:
+                pass
+            row = connection.execute(select(table).where(table.c.category == requested).with_for_update()).mappings().one()
+        eventid = max(row["current"] or row["range_min"], row["range_min"]) + 1
+        rules = yara_rule.Yara_rule.__table__
+        while connection.execute(select(rules.c.id).where(rules.c.eventid == eventid).limit(1)).first():
+            eventid += 1
+        if eventid > row["range_max"]:
+            from flask import abort
+            abort(409, description="Category EventID range is exhausted.")
+        connection.execute(update(table).where(table.c.id == row["id"]).values(current=eventid))
         return eventid
 
     def __repr__(self):

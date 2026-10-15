@@ -36,7 +36,7 @@ class Yara_rule(db.Model):
     description = db.Column(db.TEXT(), index=True)
     references = db.Column(db.TEXT(), index=True)
     active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    eventid = db.Column(db.Integer(), index=True, nullable=False)
+    eventid = db.Column(db.Integer(), index=True, nullable=False, unique=True)
     _mitre_techniques = db.Column(db.String(256), index=True)
     _mitre_tactics = db.Column(db.String(256), index=True)
     _mitre_sub_techniques = db.Column(db.String(256), index=True)

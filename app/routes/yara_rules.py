@@ -369,8 +369,6 @@ def create_yara_rule():
                     rule_state) + " and the rule could not be saved because it does not compile.\n\nerror_code=" + str(
                     return_code) + "\n\n" + stderr)
 
-    if request.json['category'] and 'category' in request.json['category']:
-        new_sig_id = request.json['category']['current'] + 1
 
     entity = yara_rule.Yara_rule(
         state=request.json['state']['state'] if 'state' in request.json['state'] else None,
@@ -527,16 +525,6 @@ def update_yara_rule(id):
 
     temp_sig_id = entity.eventid
     get_new_sig_id = False
-    if request.json['category'] and 'category' in request.json['category'] and not entity.category == \
-                                                                                   request.json['category']['category']:
-        get_new_sig_id = True
-        if not request.json['category']['current']:
-            temp_sig_id = request.json['category']['range_min']
-        else:
-            temp_sig_id = request.json['category']['current'] + 1
-
-        if temp_sig_id > request.json['category']['range_max']:
-            abort(400)
 
     entity = yara_rule.Yara_rule(
         state=request.json['state']['state'] if request.json['state'] and 'state' in request.json['state'] else
