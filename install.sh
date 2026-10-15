@@ -1,33 +1,16 @@
-#!/bin/bash
-# Bootstrap script to setup environment for ThreatKB
-
-python3 -m venv env
-if [ $? -ne 0 ]; then
-    echo "error: failed to setup virtual environment!"
-    exit 1
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
+if [ -f .env ]; then
+    set -a
+    . ./.env
+    set +a
 fi
-
-env/bin/python3 setup.py sdist
-if [ $? -ne 0 ]; then
-    echo "error: failed to install python3 setup.py sdist"
-    exit 1
+if command -v uv >/dev/null 2>&1; then
+    uv venv --python 3.14 --allow-existing .venv
+    uv pip sync --python .venv/bin/python requirements.txt
+else
+    python3.14 -m venv .venv
+    .venv/bin/python -m pip install -r requirements.txt
 fi
-
-env/bin/pip3 install -r requirements.txt
-if [ $? -ne 0 ]; then
-    echo "error: failed to install pip3 requirements.txt"
-    exit 1
-fi
-
-env/bin/python3 manage.py db upgrade
-if [ $? -ne 0 ]; then
-    echo "error: failed to run 'python3 db upgrade'"
-    exit 1
-fi
-
-bower install
-if [ $? -ne 0 ]; then
-    echo "error: failed to install bower requirements!"
-    exit 1
-fi
-
+.venv/bin/flask --app app db upgrade

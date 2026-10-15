@@ -1,10 +1,9 @@
-#!/bin/bash
-
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
 if [ -f .env ]; then
-  . .env
+    set -a
+    . ./.env
+    set +a
 fi
-
-env
-/bin/bash install.sh
-
-env/bin/celery -A app.celery worker --loglevel=info
+exec .venv/bin/celery -A app.celery worker --loglevel=info
