@@ -818,6 +818,8 @@ function Records({ page, version, query, setQuery, notify, refresh }: any) {
             )}
             <button
               className={wrap ? "selected-button" : ""}
+              aria-pressed={wrap}
+              aria-controls="records-table"
               onClick={() => setWrap(!wrap)}
             >
               {" "}
@@ -891,7 +893,7 @@ function Records({ page, version, query, setQuery, notify, refresh }: any) {
           <Empty text="No matching records." />
         ) : (
           <div className="table-scroll">
-            <table className={wrap ? "wrap" : ""}>
+            <table id="records-table" className={wrap ? "wrap" : ""}>
               <thead>
                 <tr>
                   {editable && (
