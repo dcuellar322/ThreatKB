@@ -10,6 +10,7 @@ import zipfile
 import zlib
 import re
 import datetime
+import tempfile
 from flask_login import current_user
 
 
@@ -387,7 +388,8 @@ class Release(db.Model):
 
         dns.sort()
 
-        memzip = io.BytesIO()
+        from app.release_storage import release_workspace
+        memzip = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode='w+b', dir=release_workspace())
         z = zipfile.ZipFile(memzip, mode="w", compression=zipfile.ZIP_DEFLATED)
         for category, rules in combined_rules.items():
             imports = []
@@ -413,6 +415,8 @@ class Release(db.Model):
         if dns:
             z.writestr(dns_text_filename, "\n".join([d for d in dns]))
 
+        z.close()
+        memzip.seek(0)
         return memzip
 
     def __repr__(self):
