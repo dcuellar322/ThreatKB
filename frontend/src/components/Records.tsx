@@ -56,7 +56,14 @@ function downloadText(text: string, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function Records({ page, version, notify, refresh, user }: any) {
+export function Records({
+  page,
+  version,
+  notify,
+  refresh,
+  user,
+  navigate,
+}: any) {
   const key = "threatkb.table." + page;
   const saved = () => {
     try {
@@ -293,7 +300,8 @@ export function Records({ page, version, notify, refresh, user }: any) {
   const closeEditor = () => {
     // Remove the dialog guard before navigating after a successful save or close.
     flushSync(() => setEditor(null));
-    if (recordId || location.hash.includes("new=")) location.hash = "#/" + page;
+    if (recordId || location.hash.includes("new="))
+      flushSync(() => navigate(page));
   };
   const quickEdit = async (row: any, field: string, value: any) => {
     setSavingRow(row.id);

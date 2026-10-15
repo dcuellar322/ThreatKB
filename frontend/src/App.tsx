@@ -43,7 +43,17 @@ export function App() {
     if (!error) noticeTimer.current = setTimeout(() => setNotice(null), 5000);
   }, []);
   const go = (next: string) => {
-    location.hash = "/" + next;
+    const target = normalizeHash("#/" + next);
+    if (
+      target !== currentRoute.current &&
+      !window.dispatchEvent(
+        new Event("threatkb:before-navigate", { cancelable: true }),
+      )
+    )
+      return;
+    currentRoute.current = target;
+    setRoute(target);
+    location.hash = target;
     setMobile(false);
   };
   const refresh = () => setVersion((v) => v + 1);
@@ -321,6 +331,7 @@ export function App() {
                 notify={notify}
                 refresh={refresh}
                 user={user}
+                navigate={go}
               />
             )}
           </section>
