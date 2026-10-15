@@ -282,3 +282,5 @@ from app import dev_seed
 from app.routes import jobs
 
 from app.routes import ingestion_health
+
+from app.routes import notifications

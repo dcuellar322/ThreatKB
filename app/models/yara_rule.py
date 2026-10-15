@@ -405,7 +405,7 @@ def yara_created(mapper, connection, target):
                               activity_type=list(ACTIVITY_TYPE.keys())[list(ACTIVITY_TYPE.keys()).index("ARTIFACT_CREATED")],
                               activity_text=target.name,
                               activity_date=target.creation_date,
-                              entity_type=ENTITY_MAPPING["TASK"],
+                              entity_type=ENTITY_MAPPING["SIGNATURE"],
                               entity_id=target.id,
                               user_id=target.created_user_id)
 

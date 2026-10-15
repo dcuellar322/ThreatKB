@@ -50,10 +50,23 @@ def get_all_bookmarks():
         except Exception as e:
             app.logger.exception(e)
 
-    return Response(json.dumps([bookmark.to_dict(bookmark.artifact_name, bookmark.permalink_prefix)
-                                for bookmark in bookmarks if
-                                hasattr(bookmark, "artifact_name") and hasattr(bookmark, "permalink_prefix")]),
-                    mimetype='application/json')
+    from app.models.activity_log import ActivityLog
+    output = []
+    for bookmark in bookmarks:
+        if not hasattr(bookmark, 'artifact_name') or not hasattr(bookmark, 'permalink_prefix'):
+            continue
+        item = bookmark.to_dict(bookmark.artifact_name, bookmark.permalink_prefix)
+        updated = db.session.query(db.func.max(ActivityLog.activity_date)).filter_by(
+            entity_type=bookmark.entity_type, entity_id=bookmark.entity_id).scalar()
+        item['last_updated'] = updated.isoformat() if updated else None
+        if bookmark.entity_type == 1:
+            rule = db.session.get(Yara_rule, bookmark.entity_id)
+            if rule:
+                item['revision'] = rule.revision
+                item['last_revision_date'] = rule.last_revision_date.isoformat() if rule.last_revision_date else None
+        output.append(item)
+    return jsonify(output)
+
 
 
 @app.route('/ThreatKB/bookmarks', methods=['POST', 'PUT'])
