@@ -24,6 +24,18 @@ import string
 import base64
 
 
+@app.post('/ThreatKB/yara_rules/<int:id>/restore')
+@login_required
+def restore_yara_rule(id):
+    entity = db.get_or_404(Yara_rule, id)
+    if not current_user.admin and entity.owner_user_id != current_user.id:
+        abort(403)
+    entity.active = True
+    entity.modified_user_id = current_user.id
+    db.session.commit()
+    return jsonify(entity.to_dict(short=True))
+
+
 @app.route('/ThreatKB/yara_rules/merge_signatures', methods=['POST'])
 def merge_signatures():
     signatures = request.json.get('signatures', [])
