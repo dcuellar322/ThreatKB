@@ -241,3 +241,40 @@ def test_overview_restores_scoped_ownership_and_category_aggregates(authenticate
     ]
     assert scoped["categories"] == [{"category": "Uncategorized", "count": 59}]
     assert scoped["releases"] == []
+
+
+
+def test_empty_text_and_date_only_comparisons(authenticated):
+    fixtures()
+    for identity, description in [(1, ""), (2, "Present")]:
+        db.session.execute(
+            Yara_rule.__table__.update()
+            .where(Yara_rule.id == identity)
+            .values(description=description)
+        )
+    field = Metadata(key="DueAt", type_="date", artifact_type=1, created_user_id=1)
+    db.session.add(field)
+    db.session.flush()
+    for identity, date in [(1, "2000-01-01"), (2, "2999-01-01")]:
+        db.session.add(MetadataMapping(
+            metadata_id=field.id, artifact_id=identity, value=date, created_user_id=1,
+        ))
+    db.session.commit()
+
+    def get(field, operation):
+        return authenticated.get(
+            "/ThreatKB/yara_rules",
+            query_string={
+                "searches": json.dumps({field: {"op": operation}}),
+                "page_size": 100,
+            },
+        )
+
+    response = get("description", "empty")
+    assert response.status_code == 200
+    assert response.json["total_count"] == 59
+    assert {row["id"] for row in response.json["data"]} == set(range(1, 61)) - {2}
+    for field in ("name", "tags", "owner_user.email", "FieldA"):
+        assert get(field, "before_now").status_code == 400
+    assert [row["id"] for row in get("DueAt", "before_now").json["data"]] == [1]
+    assert [row["id"] for row in get("DueAt", "after_now").json["data"]] == [2]

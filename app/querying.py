@@ -4,7 +4,7 @@ import json
 from collections import defaultdict
 from flask import abort, request
 from flask_login import current_user
-from sqlalchemy import and_, or_, select, exists, DateTime
+from sqlalchemy import and_, or_, select, exists, DateTime, String
 from sqlalchemy.orm import joinedload, selectinload
 from datetime import datetime
 from app import db
@@ -47,6 +47,16 @@ def search_predicate(model, kind, key, raw):
         ):
             abort(400, description="Unknown filter operation.")
         raw = raw.get("value", "")
+    if operation in ("before_now", "after_now"):
+        column = model.__table__.columns.get(key)
+        date_column = column is not None and isinstance(column.type, DateTime)
+        if not date_column and (
+            not isinstance(kind, int)
+            or not Metadata.query.filter_by(
+                artifact_type=kind, key=key, active=True, type_="date"
+            ).first()
+        ):
+            abort(400, description="Date comparisons require a date field.")
     value = str(raw)
     missing = operation == "empty" or value == "~"
     negative = operation in ("not_contains", "neq") or (
@@ -95,7 +105,11 @@ def search_predicate(model, kind, key, raw):
     elif key in model.__table__.columns:
         column = getattr(model, key)
         if missing:
-            return column.is_(None)
+            return (
+                or_(column.is_(None), column == "")
+                if isinstance(column.type, String)
+                else column.is_(None)
+            )
         if isinstance(column.type, DateTime) and value in ("<now", ">now"):
             return (
                 column < datetime.now() if value == "<now" else column > datetime.now()

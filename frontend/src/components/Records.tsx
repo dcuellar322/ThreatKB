@@ -606,7 +606,18 @@ export function Records({ page, version, notify, refresh, user }: any) {
                 aria-label="Field"
                 value={newFilter.field}
                 onChange={(e) =>
-                  setNewFilter({ ...newFilter, field: e.target.value })
+                  setNewFilter({
+                    ...newFilter,
+                    field: e.target.value,
+                    op:
+                      ["before_now", "after_now"].includes(newFilter.op) &&
+                      !definitions.some(
+                        (field) =>
+                          field.key === e.target.value && field.type === "date",
+                      )
+                        ? "contains"
+                        : newFilter.op,
+                  })
                 }
               >
                 {fieldOptions.map(([value, label]) => (
@@ -632,8 +643,15 @@ export function Records({ page, version, notify, refresh, user }: any) {
                   ["neq", "does not equal"],
                   ["prefix", "starts with"],
                   ["empty", "is empty"],
-                  ["before_now", "is before now"],
-                  ["after_now", "is after now"],
+                  ...(definitions.some(
+                    (field) =>
+                      field.key === newFilter.field && field.type === "date",
+                  )
+                    ? [
+                        ["before_now", "is before now"],
+                        ["after_now", "is after now"],
+                      ]
+                    : []),
                 ].map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
