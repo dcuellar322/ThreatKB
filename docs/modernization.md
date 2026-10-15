@@ -38,3 +38,13 @@ Started 2026-10-15. Dependency cutoff: 2026-10-05 (stable releases only).
 External TAC product deployment, customer instances, private corpora and production
 telemetry require those systems to be available; do not report simulated checks as
 production verification.
+
+## Upstream synchronization
+
+Both upstream branches were fetched on 2026-10-15. Upstream master at `83fde23`
+(2026-08-12) is newer by commit date; rc at `d57fa30` (2025-07-08) has ten commits
+absent from master, while master has three absent from rc. Both histories were
+merged into this modernization branch. The personal fork's master was fast-forwarded
+by 113 commits and its rc branch now matches upstream rc. No force pushes were used.
+An idempotent migration adds the upstream ports column only when absent and never
+drops externally maintained values on downgrade.
