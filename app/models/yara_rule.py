@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer, joinedload
 
 from app import db, current_user, ENTITY_MAPPING, ACTIVITY_TYPE
 from app.models.files import Files
@@ -185,9 +185,10 @@ class Yara_rule(db.Model):
                 yara_dict["owner_user"] = self.owner_user.to_dict() if self.owner_user else None
 
         if not short:
+            revisions = []
             if include_revisions:
-                revision_limit = int(cfg_settings.Cfg_settings.get_setting("FETCH_REVISION_COUNT_LIMIT") or 25)
-                revisions = Yara_rule_history.query.filter_by(yara_rule_id=self.id).order_by(Yara_rule_history.date_created.desc()).limit(revision_limit).all()
+                revision_limit = min(100, max(1, int(cfg_settings.Cfg_settings.get_setting("FETCH_REVISION_COUNT_LIMIT") or 25)))
+                revisions = Yara_rule_history.query.options(defer(Yara_rule_history._rule_json), joinedload(Yara_rule_history.user)).filter_by(yara_rule_id=self.id).order_by(Yara_rule_history.date_created.desc(), Yara_rule_history.id.desc()).limit(revision_limit).all()
             comments = Comments.query.filter_by(entity_id=self.id).filter_by(
                 entity_type=ENTITY_MAPPING["SIGNATURE"]).all()
             files = Files.query.filter_by(entity_id=self.id).filter_by(entity_type=ENTITY_MAPPING["SIGNATURE"]).all()
@@ -491,7 +492,7 @@ class Yara_rule_history(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    date_created = db.Column(db.DateTime(timezone=True))
+    date_created = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
     revision = db.Column(db.Integer())
     state = db.Column(db.String(32), index=True)
 
@@ -523,7 +524,7 @@ class Yara_rule_history(db.Model):
         releases = ",".join([release_metadata[release]["name"] for release in
                              release_mapping[self.id]]) if self.id in release_mapping else None
         yara_history_dict = dict(
-            date_created=self.date_created.isoformat(),
+            date_created=self.date_created.isoformat() if self.date_created else None,
             revision=self.revision,
             yara_rule_id=self.yara_rule_id,
             user=self.user.to_dict(),

@@ -207,7 +207,7 @@ def get_all_yara_rules():
         include_active = True
 
     include_yara_string = bool(strtobool(request.args.get("include_yara_string", "False")))
-    short = bool(strtobool(request.args.get("short", "false")))
+    short = bool(strtobool(request.args.get("short", "true")))
     include_metadata = bool(strtobool(request.args.get('include_metadata', "true")))
     include_tags = bool(strtobool(request.args.get('include_tags', "true")))
     include_comments = bool(strtobool(request.args.get('include_comments', "true")))
@@ -253,7 +253,7 @@ def get_yara_rule(id):
     """Return yara_rule artifact associated with the given id
     Return: yara_rule artifact dictionary"""
     include_yara_string = request.args.get("include_yara_string", False)
-    include_revisions = request.args.get("include_revisions", True)
+    include_revisions = strtobool(request.args.get("include_revisions", "true"))
     include_metadata = request.args.get("include_metadata", True)
     short = strtobool(request.args.get("short", "false"))
 
@@ -266,7 +266,8 @@ def get_yara_rule(id):
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
 
-    return_dict = entity.to_dict(include_yara_string, short, include_revisions, include_metadata)
+    return_dict = entity.to_dict(include_yara_rule_string=include_yara_string, short=short,
+                                 include_revisions=include_revisions, include_metadata=include_metadata)
     return_dict["bookmarked"] = True if is_bookmarked(ENTITY_MAPPING["SIGNATURE"], id, current_user.id) \
         else False
 
