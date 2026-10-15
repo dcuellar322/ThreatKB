@@ -32,7 +32,7 @@ class Comments(db.Model):
     @staticmethod
     def get_comment_cache():
         mapper = {1: "yara_rules", 2: "c2dns", 3: "c2ip", 4: "tasks"}
-        r = {}
+        r = {"yara_rules": {}, "c2dns": {}, "c2ip": {}, "tasks": {}}
         comments = Comments.query.all()
         for comment in comments:
             t = mapper[comment.entity_type]

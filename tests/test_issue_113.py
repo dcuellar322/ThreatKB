@@ -5,11 +5,19 @@ from app.routes.scheduled_confidence import apply_due_confidence
 
 
 def test_confidence_is_scheduled_applied_once_and_cancelable(authenticated):
-    db.session.execute(Yara_rule.__table__.insert().values(name="scheduled", eventid=10001,
-                                                         created_user_id=1, modified_user_id=1))
+    db.session.execute(
+        Yara_rule.__table__.insert().values(
+            name="scheduled", eventid=10001, created_user_id=1, modified_user_id=1
+        )
+    )
     db.session.commit()
     path = "/ThreatKB/yara_rules/1/confidence-schedule"
-    assert authenticated.put(path, json={"confidence": 90, "due_at": "2020-01-01T00:00:00Z"}).status_code == 200
+    assert (
+        authenticated.put(
+            path, json={"confidence": 90, "due_at": "2020-01-01T00:00:00Z"}
+        ).status_code
+        == 200
+    )
     assert apply_due_confidence() == 1
     assert apply_due_confidence() == 0
     assert MetadataMapping.query.one().value == "90"

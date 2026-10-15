@@ -88,7 +88,7 @@ def get_c2ip(id_or_ip):
 
     Return: c2ip artifact dictionary"""
     if id_or_ip.isdigit():
-        entity = c2ip.C2ip.query.get(int(id_or_ip))
+        entity = db.session.get(c2ip.C2ip, int(id_or_ip))
     else:
         entity = c2ip.C2ip.query.filter(c2ip.C2ip.ip == id_or_ip).first()
 
@@ -156,7 +156,7 @@ def create_c2ip():
 @login_required
 def activate_c2ip(id_or_ip):
     if id_or_ip.isdigit():
-        entity = c2ip.C2ip.query.get(int(id_or_ip))
+        entity = db.session.get(c2ip.C2ip, int(id_or_ip))
     else:
         entity = c2ip.C2ip.query.filter(c2ip.C2ip.ip == id_or_ip).first()
 
@@ -174,7 +174,7 @@ def update_c2ip(id_or_ip):
     From Data: ip (str), asn (str), country (str), expiration_timestamp (date), state(str)
     Return: c2dns artifact dictionary"""
     if id_or_ip.isdigit():
-        entity = c2ip.C2ip.query.get(int(id_or_ip))
+        entity = db.session.get(c2ip.C2ip, int(id_or_ip))
     else:
         entity = c2ip.C2ip.query.filter(c2ip.C2ip.ip == id_or_ip).first()
 
@@ -227,7 +227,7 @@ def update_c2ip(id_or_ip):
 
     entity.save_metadata(request.json.get("metadata_values", {}))
 
-    entity = c2ip.C2ip.query.get(entity.id)
+    entity = db.session.get(c2ip.C2ip, entity.id)
     if request.json.get('new_comment'):
         create_comment(request.json['new_comment'], ENTITY_MAPPING["IP"], entity.id, current_user.id)
     return jsonify(entity.to_dict()), 200
@@ -259,7 +259,7 @@ def delete_c2ip(id_or_ip):
     """Delete c2ip artifact associated with id
     Return: None"""
     if id_or_ip.isdigit():
-        entity = c2ip.C2ip.query.get(int(id_or_ip))
+        entity = db.session.get(c2ip.C2ip, int(id_or_ip))
     else:
         entity = c2ip.C2ip.query.filter(c2ip.C2ip.ip == id_or_ip).first()
 

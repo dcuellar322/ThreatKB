@@ -26,7 +26,7 @@ def run_script(script_id):
     arguments = request.json.get("arguments", None)
     arguments = re.split("[\\s\\t]", arguments)
     highlight_lines_matching = request.json.get("highlight_lines_matching", None)
-    script = scripts.Scripts.query.get(script_id)
+    script = db.session.get(scripts.Scripts, script_id)
     if not script:
         abort(404)
 
@@ -40,7 +40,7 @@ def run_script(script_id):
 def get_script_by_id(script_id):
     """Return script associated with script_id
     Return: script dictionary"""
-    entity = scripts.Scripts.query.get(script_id)
+    entity = db.session.get(scripts.Scripts, script_id)
 
     if not entity:
         abort(404)
@@ -55,7 +55,7 @@ def get_script_by_id(script_id):
 def update_script(id):
     """Update script associated with given id
     Return: script dictionary"""
-    entity = scripts.Scripts.query.get(id)
+    entity = db.session.get(scripts.Scripts, id)
     if not entity:
         abort(404)
 
@@ -71,7 +71,7 @@ def update_script(id):
     db.session.merge(entity)
     db.session.commit()
 
-    script = scripts.Scripts.query.get(entity.id)
+    script = db.session.get(scripts.Scripts, entity.id)
     return jsonify(script.to_dict()), 200
 
 
@@ -107,7 +107,7 @@ def create_script():
 def delete_script(script_id):
     """Delete script associated with script_id
     Return: None"""
-    entity = scripts.Scripts.query.get(script_id)
+    entity = db.session.get(scripts.Scripts, script_id)
     if not entity:
         abort(404)
 

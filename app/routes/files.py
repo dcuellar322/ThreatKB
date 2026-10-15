@@ -45,14 +45,29 @@ def upload_file():
     if f.filename == '':
         return jsonify({})
 
+    entity_type = request.values.get('entity_type', type=int)
+    entity_id = request.values.get('entity_id', type=int)
+    if entity_type is not None or entity_id is not None:
+        from app.models.yara_rule import Yara_rule
+        from app.models.c2ip import C2ip
+        from app.models.c2dns import C2dns
+        from app.models.tasks import Tasks
+        models = {1: Yara_rule, 2: C2dns, 3: C2ip, 4: Tasks}
+        if entity_type not in models or not entity_id or entity_id < 1:
+            abort(400, description='Choose a valid artifact for this file.')
+        artifact = db.get_or_404(models[entity_type], entity_id)
+        if not current_user.admin and artifact.owner_user_id != current_user.id:
+            abort(403)
+    elif request.values.get('entity_type') or request.values.get('entity_id'):
+        abort(400, description='Artifact identifiers must be integers.')
     files_added = {}
     files_skipped = {}
     if f:
         file_store_path_root = cfg_settings.Cfg_settings.get_setting("FILE_STORE_PATH") or "/tmp"
         filename = secure_filename(f.filename)
         full_path = os.path.join(file_store_path_root,
-                                 request.values['entity_type'] if 'entity_type' in request.values else "",
-                                 request.values['entity_id'] if 'entity_id' in request.values else "",
+                                 str(entity_type) if entity_type is not None else "None",
+                                 str(entity_id) if entity_id is not None else "None",
                                  filename)
 
         try:
@@ -74,8 +89,8 @@ def upload_file():
         sha256 = hashlib.sha256(open(full_path, 'rb').read()).hexdigest()
 
         new_directory = os.path.join(file_store_path_root,
-                                     request.values['entity_type'] if 'entity_type' in request.values else "",
-                                     request.values['entity_id'] if 'entity_id' in request.values else "",
+                                     str(entity_type) if entity_type is not None else "None",
+                                     str(entity_id) if entity_id is not None else "None",
                                      sha1)
 
         if os.path.exists(new_directory):
@@ -93,8 +108,8 @@ def upload_file():
         files_added["UPLOADED"] = [filename]
 
         file_entity = files.Files.query.filter_by(
-            entity_type=(request.values['entity_type'] if 'entity_type' in request.values else None),
-            entity_id=(request.values['entity_id'] if 'entity_id' in request.values else None),
+            entity_type=entity_type,
+            entity_id=entity_id,
             sha1=sha1,
             filename=filename).first()
 
@@ -102,8 +117,8 @@ def upload_file():
             file_entity = files.Files(
                 filename=f.filename,
                 content_type=f.content_type,
-                entity_type=(request.values['entity_type'] if 'entity_type' in request.values else None),
-                entity_id=(request.values['entity_id'] if 'entity_id' in request.values else None),
+                entity_type=entity_type,
+                entity_id=entity_id,
                 user_id=current_user.id,
                 sha1=sha1,
                 md5=md5,
@@ -178,7 +193,7 @@ def upload_file():
                     full_path_temp = os.path.join(file_store_path_root,
                                                   request.values[
                                                       'entity_type'] if 'entity_type' in request.values else "",
-                                                  request.values['entity_id'] if 'entity_id' in request.values else "",
+                                                  str(entity_id) if entity_id is not None else "None",
                                                   parent_file.sha1,
                                                   path,
                                                   name)
@@ -192,8 +207,8 @@ def upload_file():
 
                     shutil.move(current_tempfile, full_path_temp)
                     file_entity = files.Files.query.filter_by(
-                        entity_type=(request.values['entity_type'] if 'entity_type' in request.values else None),
-                        entity_id=(request.values['entity_id'] if 'entity_id' in request.values else None),
+                        entity_type=entity_type,
+                        entity_id=entity_id,
                         sha1=sha1,
                         parent_sha1=parent_file.sha1,
                         filename=name).first()
@@ -203,8 +218,8 @@ def upload_file():
                         file_entity = files.Files(
                             filename=name,
                             content_type=mime.from_file(full_path_temp),
-                            entity_type=(request.values['entity_type'] if 'entity_type' in request.values else None),
-                            entity_id=(request.values['entity_id'] if 'entity_id' in request.values else None),
+                            entity_type=entity_type,
+                            entity_id=entity_id,
                             user_id=current_user.id,
                             sha1=sha1,
                             md5=md5,
@@ -243,7 +258,7 @@ def upload_file():
 def get_file_for_entity(entity_type, entity_id, file_id):
     """Return file associated with file_id, entity_id, and entity_type
     Return: file (streamed for downloading)"""
-    file_entity = files.Files.query.get(file_id)
+    file_entity = db.session.get(files.Files, file_id)
 
     if not file_entity:
         abort(404)
@@ -265,7 +280,7 @@ def get_file_for_entity(entity_type, entity_id, file_id):
 def delete_file(file_id):
     """Delete file associated with given file_id
     Return: None"""
-    entity = files.Files.query.get(file_id)
+    entity = db.session.get(files.Files, file_id)
     if not entity:
         abort(404)
 

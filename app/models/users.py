@@ -17,15 +17,18 @@ class KBUser(db.Model):
     last_name = db.Column(db.String(255), nullable=True)
     picture = db.Column(db.LargeBinary, nullable=True)
 
+    @property
     def is_authenticated(self):
-        return True
+        return bool(self.active)
 
+    @property
     def is_active(self):
         return self.active
 
     def is_admin(self):
         return self.admin
 
+    @property
     def is_anonymous(self):
         return False
 
@@ -64,5 +67,5 @@ class KBUser(db.Model):
             data = s.loads(token)
         except BadSignature:
             return None  # invalid token
-        user = KBUser.query.get(data['id'])
+        user = db.session.get(KBUser, data['id'])
         return user if user and user.active else None

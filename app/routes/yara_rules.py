@@ -30,6 +30,11 @@ def restore_yara_rule(id):
     entity = db.get_or_404(Yara_rule, id)
     if not current_user.admin and entity.owner_user_id != current_user.id:
         abort(403)
+    from app.detection import validate_signature
+    try:
+        validate_signature({key: getattr(entity, key) for key in ("name", "strings", "condition", "imports")}, entity.id)
+    except Exception as error:
+        abort(422, description=f"Repair this signature before restoring it: {error}")
     entity.active = True
     entity.modified_user_id = current_user.id
     db.session.commit()
@@ -290,7 +295,7 @@ def get_yara_rule(id):
     if include_yara_string:
         include_yara_string = True
 
-    entity = yara_rule.Yara_rule.query.get(id)
+    entity = db.session.get(yara_rule.Yara_rule, id)
     if not entity:
         abort(404)
     if not current_user.admin and entity.owner_user_id != current_user.id:
@@ -311,7 +316,7 @@ def get_yara_rule_release_mapping(id):
     """Return yara_rule artifact associated with the given id
     Return: yara_rule artifact dictionary"""
 
-    entity = yara_rule.Yara_rule.query.get(id)
+    entity = db.session.get(yara_rule.Yara_rule, id)
     if not entity:
         abort(404)
     if not current_user.admin and entity.owner_user_id != current_user.id:
@@ -344,7 +349,7 @@ def get_yara_rule_string_from_revision(yara_rule_id, revision):
     """Return yara_rule string associated with the given yara rule and revision number
     Return: yara_rule string representation"""
 
-    current_entity = yara_rule.Yara_rule.query.get(yara_rule_id)
+    current_entity = db.session.get(yara_rule.Yara_rule, yara_rule_id)
     revision_entity = Yara_rule_history.query \
         .filter_by(yara_rule_id=yara_rule_id) \
         .filter_by(revision=revision) \
@@ -412,7 +417,7 @@ def batch_update_yara_rules():
 def delete_yara_rule(id):
     """INACTIVATE yara_rule artifact associated with id
     Return: None"""
-    entity = yara_rule.Yara_rule.query.get(id)
+    entity = db.session.get(yara_rule.Yara_rule, id)
 
     if entity.active:
         entity.active = False
@@ -480,7 +485,7 @@ def copy_yara_rules():
     if 'copy' in request.json and request.json['copy'] \
             and 'ids' in request.json['copy'] and request.json['copy']['ids']:
         for sig_id in request.json['copy']['ids']:
-            sig = yara_rule.Yara_rule.query.get(sig_id)
+            sig = db.session.get(yara_rule.Yara_rule, sig_id)
             if not sig:
                 abort(404)
             if not current_user.admin and sig.owner_user_id != current_user.id:

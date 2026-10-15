@@ -32,19 +32,19 @@ def get_all_bookmarks():
     for bookmark in bookmarks:
         try:
             if bookmark.entity_type == ENTITY_MAPPING["DNS"]:
-                entity = C2dns.query.get(bookmark.entity_id)
+                entity = db.session.get(C2dns, bookmark.entity_id)
                 bookmark.artifact_name = entity.domain_name
                 bookmark.permalink_prefix = "c2dns"
             elif bookmark.entity_type == ENTITY_MAPPING["IP"]:
-                entity = C2ip.query.get(bookmark.entity_id)
+                entity = db.session.get(C2ip, bookmark.entity_id)
                 bookmark.permalink_prefix = "c2ips"
                 bookmark.artifact_name = entity.ip
             elif bookmark.entity_type == ENTITY_MAPPING["SIGNATURE"]:
-                entity = Yara_rule.query.get(bookmark.entity_id)
+                entity = db.session.get(Yara_rule, bookmark.entity_id)
                 bookmark.permalink_prefix = "yara_rules"
                 bookmark.artifact_name = entity.name
             elif bookmark.entity_type == ENTITY_MAPPING["TASK"]:
-                entity = Tasks.query.get(bookmark.entity_id)
+                entity = db.session.get(Tasks, bookmark.entity_id)
                 bookmark.artifact_name = entity.title
                 bookmark.permalink_prefix = "tasks"
         except Exception as e:

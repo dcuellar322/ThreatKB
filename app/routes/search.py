@@ -1,5 +1,5 @@
 from flask import request, Response, json, abort
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import or_, and_
 from app import app, db, auto, ENTITY_MAPPING
 from app.models import comments, yara_rule, c2dns, c2ip, tasks, tags, tags_mapping, metadata
@@ -20,6 +20,7 @@ def get_caches():
 
 @app.route('/ThreatKB/search', methods=['GET'])
 @auto.doc()
+@login_required
 def do_search():
     tag = request.args.get("tag", None)
     state = request.args.get('state', None)
@@ -30,6 +31,9 @@ def do_search():
     # Pagination parameters with defaults
     limit = request.args.get("limit", default=100, type=int)
     offset = request.args.get("offset", default=0, type=int)
+
+    if not 1 <= limit <= 200 or offset < 0:
+        abort(400, description="Use limit 1–200 and a nonnegative offset.")
 
     if not tag and not state and not category and not artifact_type and not all:
         abort(400)

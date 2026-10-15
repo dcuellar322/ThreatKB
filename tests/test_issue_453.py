@@ -8,12 +8,16 @@ from app.release_storage import release_workspace
 
 
 def test_release_workspace_is_configurable_and_export_zip_is_finished(client, tmp_path):
-    db.session.add(Cfg_settings(key='RELEASE_DATA_PATH', value=str(tmp_path)))
-    db.session.execute(Cfg_states.__table__.insert().values(state='Released', is_release_state=1))
+    db.session.add(Cfg_settings(key="RELEASE_DATA_PATH", value=str(tmp_path)))
+    db.session.execute(
+        Cfg_states.__table__.insert().values(state="Released", is_release_state=1)
+    )
     db.session.commit()
     assert release_workspace() == tmp_path
     release = Release()
-    release.release_data = json.dumps({'Signatures': {'Signatures': {}}, 'IP': {'IP': {}}, 'DNS': {'DNS': {}}})
+    release.release_data = json.dumps(
+        {"Signatures": {"Signatures": {}}, "IP": {"IP": {}}, "DNS": {"DNS": {}}}
+    )
     stream = release.generate_artifact_export()
     with zipfile.ZipFile(stream) as archive:
         assert archive.testzip() is None

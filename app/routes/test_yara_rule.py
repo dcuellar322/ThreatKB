@@ -102,7 +102,7 @@ def get_all_tests():
 def test_yara_rule_rest(rule_id):
     """Synchronously test yara rule associated with rule_id against all files attached to it
     Return: results dictionary"""
-    yara_rule_entity = yara_rule.Yara_rule.query.get(rule_id)
+    yara_rule_entity = db.session.get(yara_rule.Yara_rule, rule_id)
     if not yara_rule_entity:
         abort(500)
 
@@ -135,7 +135,7 @@ def test_yara_rule_rest(rule_id):
 @auto.doc()
 @login_required
 def get_test_results(test_id):
-    yrh = Yara_testing_history.query.get(test_id)
+    yrh = db.session.get(Yara_testing_history, test_id)
     return jsonify(yrh.to_dict(include_results=True)), 200
 
 
@@ -143,7 +143,7 @@ def get_test_results(test_id):
 def test_yara_rule_task(rule_id, user, is_neg_test):
     print("in test_yara_rule_task")
     files_to_test = []
-    yara_rule_entity = yara_rule.Yara_rule.query.get(rule_id)
+    yara_rule_entity = db.session.get(yara_rule.Yara_rule, rule_id)
     if not yara_rule_entity:
         abort(500)
 

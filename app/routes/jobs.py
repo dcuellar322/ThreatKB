@@ -88,7 +88,8 @@ def background_jobs():
     if not current_user.admin:
         query = query.filter_by(created_user_id=current_user.id)
     limit = min(200, max(1, request.args.get('limit', 50, type=int)))
-    return jsonify(data=[job.to_dict() for job in query.order_by(Job.created_at.desc()).limit(limit)], total_count=query.count())
+    offset=max(0,request.args.get('page_number',0,type=int))*limit
+    return jsonify(data=[job.to_dict() for job in query.order_by(Job.created_at.desc()).offset(offset).limit(limit)], total_count=query.count())
 
 
 @app.get('/ThreatKB/jobs/<job_id>')

@@ -43,7 +43,7 @@ def get_all_macros():
 def get_macro(tag):
     """Return macro associated with tag
     Return: macro dictionary"""
-    entity = macros.Macros.query.get(tag)
+    entity = db.session.get(macros.Macros, tag)
 
     if not entity:
         abort(404)
@@ -74,7 +74,7 @@ def create_macro():
 @auto.doc()
 @login_required
 def activate_macro(tag):
-    entity = macros.Macros.query.get(tag)
+    entity = db.session.get(macros.Macros, tag)
     entity.active = 1
 
     db.session.merge(entity)
@@ -90,7 +90,7 @@ def update_macro(tag):
     """Update macro associated with tag
     From Data: tag (str), value (str)
     Return: macro dictionary"""
-    entity = macros.Macros.query.get(tag)
+    entity = db.session.get(macros.Macros, tag)
     if not entity:
         abort(404)
     entity = macros.Macros(
@@ -102,7 +102,7 @@ def update_macro(tag):
     db.session.merge(entity)
     db.session.commit()
 
-    entity = macros.Macros.query.get(entity.tag)
+    entity = db.session.get(macros.Macros, entity.tag)
 
     return jsonify(entity.to_dict()), 200
 
@@ -113,7 +113,7 @@ def update_macro(tag):
 def delete_macro(tag):
     """Delete macro associated with tag
     Return: None"""
-    entity = macros.Macros.query.get(tag)
+    entity = db.session.get(macros.Macros, tag)
 
     if entity.active:
         entity.active = False

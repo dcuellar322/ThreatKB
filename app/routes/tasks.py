@@ -69,7 +69,7 @@ def get_all_tasks():
 def get_tasks(id):
     """Return task associated with given id
     Return: task dictionary"""
-    entity = tasks.Tasks.query.get(id)
+    entity = db.session.get(tasks.Tasks, id)
     if not entity:
         abort(404)
 
@@ -126,7 +126,7 @@ def update_tasks(id):
     """Update task associated with given id
     From Data: title (str), description (str), final_artifact(str), state (str)
     Return: task dictionary"""
-    entity = tasks.Tasks.query.get(id)
+    entity = db.session.get(tasks.Tasks, id)
     if not entity:
         abort(404)
 
@@ -172,7 +172,7 @@ def batch_update_tasks():
 def delete_tasks(id):
     """Delete task associated with the given id
     Return: None"""
-    entity = tasks.Tasks.query.get(id)
+    entity = db.session.get(tasks.Tasks, id)
 
     if not entity:
         abort(404)

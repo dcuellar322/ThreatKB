@@ -78,3 +78,6 @@ version
 instance/
 coverage.xml
 playwright-report/
+app/static/workbench/
+output/playwright/
+.playwright-cli/

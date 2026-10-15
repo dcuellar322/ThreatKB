@@ -25,7 +25,7 @@ def get_all_tags_mapping():
 def get_tags_mapping(id):
     """Return tag mapping associated with the given id
     Return: tag mapping dictionary"""
-    entity = tags_mapping.Tags_mapping.query.get(id)
+    entity = db.session.get(tags_mapping.Tags_mapping, id)
     if not entity:
         abort(404)
     return jsonify(entity.to_dict())
@@ -169,7 +169,7 @@ def batch_delete_tags_mapping_for_source_id(table, source_id, list_of_tag_ids):
 @admin_only()
 def delete_tags_mapping_by_id(id):
     app.logger.debug(f"delete_tags_mapping_by_id {request.url} {id}")
-    entity = tags_mapping.Tags_mapping.query.get(id)
+    entity = db.session.get(tags_mapping.Tags_mapping, id)
     if not entity:
         abort(404)
     db.session.delete(entity)

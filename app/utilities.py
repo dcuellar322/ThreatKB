@@ -30,7 +30,7 @@ sys.dont_write_bytecode
 
 def extract_ips_text(text):
     regex = cfg_settings.Cfg_settings.get_setting(key="IMPORT_IP_REGEX")
-    ip_regex = regex if regex else '(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,3})?)'
+    ip_regex = regex if regex else r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,3})?)'
     return re.compile(ip_regex).findall(text.replace("[.]", "."))
 
 
@@ -39,7 +39,7 @@ def extract_ips_text(text):
 def extract_dns_text(text):
     hostnames = []
     regex = cfg_settings.Cfg_settings.get_setting(key="IMPORT_DNS_REGEX")
-    url_regex = regex if regex else 'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+    url_regex = regex if regex else r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
     for dns in re.compile(url_regex).findall(text.replace("[.]", ".")):
         try:
             hostnames.append(dns)
@@ -108,7 +108,7 @@ def filter_entities(entity,
 
         if not (show_for_non_admin or current_user.admin):
             entities = entities.filter(or_(entity.owner_user_id == current_user.id, entity.owner_user_id == None))
-    elif not current_user.admin:
+    elif artifact_type != "ACTIVITY_LOG" and not current_user.admin:
         entities = entities.filter_by(owner_user_id=current_user.id)
 
     if include_inactive and not include_active and hasattr(entity, "active"):
@@ -207,14 +207,17 @@ def filter_entities(entity,
     if not include_merged:
         entities = entities.filter(or_(entity.state != 'Merged', entity.state == None))
 
-    entities = entities.filter(operator(*clauses))
+    if clauses:
+        entities = entities.filter(operator(*clauses))
     filtered_entities = entities
     total_count = entities.count()
 
-    if sort_by:
-        filtered_entities = filtered_entities.order_by(text("%s %s" % (f"{entity.__tablename__}.{sort_by}" if not "." in sort_by else sort_by, sort_direction)))
-    else:
-        filtered_entities = filtered_entities.order_by(text("%s DESC" % (f"{entity.__tablename__}.{default_sort}" if not "." in default_sort else default_sort)))
+    from flask import abort
+    name = (sort_by or default_sort).split('.')[-1]
+    if name not in entity.__table__.columns or str(sort_direction).upper() not in ('ASC', 'DESC'):
+        abort(400, description='Choose a valid sort column and direction.')
+    column = getattr(entity, name)
+    filtered_entities = filtered_entities.order_by(column.asc() if sort_by and str(sort_direction).upper() == 'ASC' else column.desc())
 
     if page_size:
         filtered_entities = filtered_entities.limit(int(page_size))
@@ -249,8 +252,8 @@ def filter_entities(entity,
 def get_strings_and_conditions(rule):
     segment_headers = \
         {
-            "strings": "^\s*strings:\s*\r?\n?",
-            "condition": "^\s*condition:\s*\r?\n?",
+            "strings": "^\\s*strings:\\s*\r?\n?",
+            "condition": "^\\s*condition:\\s*\r?\n?",
         }
     segments = \
         {

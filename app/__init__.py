@@ -182,8 +182,7 @@ from app.geo_ip_helper import get_geo_for_ip
 # DB functions below used by unit tests.
 def connect_db():
     """Connects to the specific database."""
-    rv = SQLAlchemy(app)
-    return rv
+    return db
 
 
 def get_db():
@@ -195,8 +194,6 @@ def get_db():
 
 def init_db():
     """Initializes the database."""
-    db = get_db()
-    migrate = Migrate(app, db)
 
     def upgrade(revision="head"):
         with app.app_context():
@@ -208,8 +205,6 @@ def init_db():
 
 def deinit_db():
     """Deinitializes the database."""
-    db = get_db()
-    migrate = Migrate(app, db)
 
     def downgrade(revision="base"):
         with app.app_context():
@@ -240,10 +235,12 @@ def load_user(userid):
 
 @login_manager.request_loader
 def load_user_from_request(request):
-    token = request.args.get('token')
-    s_key = str(request.args.get('secret_key'))
+    authorization = request.headers.get('Authorization', '')
+    token = authorization[7:] if authorization.startswith('Bearer ') else request.args.get('token')
+    s_key = request.headers.get('X-ThreatKB-Secret') or request.args.get('secret_key')
     if token and s_key:
-        valid_token = access_keys.is_token_active(token)
+        from app.routes.access_keys import is_token_active
+        valid_token = is_token_active(token)
         if valid_token:
             user = users.KBUser.verify_auth_token(str(token), s_key)
             if user:
@@ -284,3 +281,5 @@ from app.routes import jobs
 from app.routes import ingestion_health
 
 from app.routes import notifications
+from app.routes import dashboard
+from app.routes import content

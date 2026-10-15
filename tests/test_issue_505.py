@@ -14,4 +14,6 @@ def test_eventid_allocation_and_database_uniqueness(authenticated):
     db.session.execute(Yara_rule.__table__.insert().values(**row))
     with pytest.raises(IntegrityError):
         with db.session.begin_nested():
-            db.session.execute(Yara_rule.__table__.insert().values(**{**row, "name": "second"}))
+            db.session.execute(
+                Yara_rule.__table__.insert().values(**{**row, "name": "second"})
+            )

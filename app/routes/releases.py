@@ -18,8 +18,12 @@ from sqlalchemy import bindparam
 def get_all_releases():
     """Return all releases in ThreatKB
     Return: list of release dictionaries"""
-    entities = releases.Release.query.options(db.defer("_release_data")).filter_by().all()
-    return Response(json.dumps([entity.to_small_dict() for entity in entities]), mimetype="application/json")
+    query = releases.Release.query.options(db.defer(releases.Release._release_data)).order_by(releases.Release.id.desc())
+    if request.args.get('page_size'):
+        size=min(200,max(1,request.args.get('page_size',25,type=int)))
+        page=max(0,request.args.get('page_number',0,type=int))
+        return jsonify(data=[entity.to_small_dict() for entity in query.offset(page*size).limit(size)],total_count=query.count())
+    return Response(json.dumps([entity.to_small_dict() for entity in query]), mimetype="application/json")
 
 
 @app.route('/ThreatKB/releases/<int:release_id>', methods=['GET'])
@@ -29,7 +33,7 @@ def get_all_releases():
 def get_release(release_id):
     """Return release associated with release_id
     Return: release dictionary"""
-    entity = releases.Release.query.get(release_id)
+    entity = db.session.get(releases.Release, release_id)
 
     if not entity:
         abort(404)
@@ -53,7 +57,7 @@ def get_releases_latest():
     except:
         count = 1
 
-    entities = releases.Release.query.options(db.defer("_release_data")).filter(
+    entities = releases.Release.query.options(db.defer(releases.Release._release_data)).filter(
         releases.Release.is_test_release == 0).order_by(
         releases.Release.id.desc()).limit(count)
 
@@ -78,7 +82,7 @@ def get_releases_latest():
 def generate_release_notes(release_id):
     """Generate and return release notes for release associated with release_id
     Return: release text file"""
-    entity = releases.Release.query.get(release_id)
+    entity = db.session.get(releases.Release, release_id)
 
     if not entity:
         abort(404)
@@ -99,7 +103,7 @@ def generate_release_notes(release_id):
 def generate_artifact_export(release_id):
     """Generate and return artifact export zip file for the release associated with release_id
     Return: release zip file with a single file for all IPs, single file for all DNS, and consolidated category yara files"""
-    entity = releases.Release.query.get(release_id)
+    entity = db.session.get(releases.Release, release_id)
 
     if not entity:
         abort(404)
@@ -199,7 +203,7 @@ def create_release():
 def delete_release(release_id):
     """Delete release associated with release_id
     Return: None"""
-    entity = releases.Release.query.get(release_id)
+    entity = db.session.get(releases.Release, release_id)
     if not entity:
         abort(404)
 

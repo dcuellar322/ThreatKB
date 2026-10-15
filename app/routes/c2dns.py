@@ -84,7 +84,7 @@ def get_c2dns(id_or_name):
     """Return c2dns artifact associated with the given id
     Return: c2dns artifact dictionary"""
     if id_or_name.isdigit():
-        entity = c2dns.C2dns.query.get(int(id_or_name))
+        entity = db.session.get(c2dns.C2dns, int(id_or_name))
     else:
         entity = c2dns.C2dns.query.filter(c2dns.C2dns.domain_name == id_or_name).first()
 
@@ -154,7 +154,7 @@ def create_c2dns():
 @login_required
 def activate_c2dns(id_or_name):
     if id_or_name.isdigit():
-        entity = c2dns.C2dns.query.get(int(id))
+        entity = db.session.get(c2dns.C2dns, int(id))
     else:
         entity = c2dns.C2dns.query.filter(c2dns.C2dns.domain_name == id_or_name).first()
 
@@ -172,7 +172,7 @@ def update_c2dns(id_or_name):
     From Data: domain_name (str), match_type (str), expiration_timestamp (date), state(str)
     Return: c2dns artifact dictionary"""
     if id_or_name.isdigit():
-        entity = c2dns.C2dns.query.get(int(id_or_name))
+        entity = db.session.get(c2dns.C2dns, int(id_or_name))
     else:
         entity = c2dns.C2dns.query.filter(c2dns.C2dns.domain_name == id_or_name).first()
 
@@ -223,7 +223,7 @@ def update_c2dns(id_or_name):
 
     entity.save_metadata(request.json.get("metadata_values", {}))
 
-    entity = c2dns.C2dns.query.get(entity.id)
+    entity = db.session.get(c2dns.C2dns, entity.id)
     if request.json.get('new_comment'):
         create_comment(request.json['new_comment'], ENTITY_MAPPING["DNS"], entity.id, current_user.id)
     return jsonify(entity.to_dict()), 200
@@ -256,7 +256,7 @@ def delete_c2dns(id_or_name):
     """Delete c2dns artifact associated with id
     Return: None"""
     if id_or_name.isdigit():
-        entity = c2dns.C2dns.query.get(id_or_name)
+        entity = db.session.get(c2dns.C2dns, id_or_name)
     else:
         entity = c2dns.C2dns.query.filter(c2dns.C2dns.domain_name == id_or_name).first()
 

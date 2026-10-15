@@ -23,7 +23,7 @@ def get_all_tags():
 def get_tags(id):
     """Return tag associated with given id
     Return: tag dictionary"""
-    entity = tags.Tags.query.get(id)
+    entity = db.session.get(tags.Tags, id)
     if not entity:
         abort(404)
     return jsonify(entity.to_dict())
@@ -58,7 +58,7 @@ def update_tags(id):
     """Update tag associatd with given id
     From Data: text
     Return: tag dictionary"""
-    entity = tags.Tags.query.get(id)
+    entity = db.session.get(tags.Tags, id)
     if not entity:
         abort(404)
 
@@ -83,7 +83,7 @@ def update_tags(id):
 def delete_tags(id):
     """Delete tag associated with given id
     Return: None"""
-    entity = tags.Tags.query.get(id)
+    entity = db.session.get(tags.Tags, id)
     if not entity:
         abort(404)
     db.session.delete(entity)

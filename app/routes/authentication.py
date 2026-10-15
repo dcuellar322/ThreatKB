@@ -70,7 +70,7 @@ def get_all_users():
 def get_user_by_id(user_id):
     """Return the user associated with the given user id.
     Return: user dictionary"""
-    user = KBUser.query.get(user_id)
+    user = db.session.get(KBUser, user_id)
     if not user:
         abort(404)
     return jsonify(user.to_dict())
@@ -83,7 +83,7 @@ def get_user_by_id(user_id):
 def delete_user_by_id(user_id):
     """Return the user associated with the given user id.
     Return: user dictionary"""
-    user = KBUser.query.get(user_id)
+    user = db.session.get(KBUser, user_id)
     if not user:
         abort(404)
     if user.id == current_user.id:
@@ -105,7 +105,7 @@ def delete_user_by_id(user_id):
 def get_user_me():
     """Return the user associated with the given user id.
     Return: user dictionary"""
-    user = KBUser.query.get(current_user.id)
+    user = db.session.get(KBUser, current_user.id)
     if not user:
         abort(404)
     return jsonify(user.to_dict())
@@ -177,7 +177,7 @@ def update_my_password():
 def get_user_picture_by_id(user_id):
     """Return the user's picture as a binary image.
     Return: user image"""
-    user = KBUser.query.get(user_id)
+    user = db.session.get(KBUser, user_id)
     if not user:
         abort(404)
 
@@ -199,7 +199,7 @@ def create_user():
     user = KBUser(
         email=request.json['email'],
         admin=request.json['admin'],
-        password=bcrypt.generate_password_hash(request.json['password']),
+        password=bcrypt.generate_password_hash(request.json['password']).decode(),
         active=request.json['active']
     )
 
@@ -216,16 +216,19 @@ def update_user(user_id):
     """Update the user associated with the given user_id
     From Data: email (str), admin (bool), password (str), active (bool)
     Return: user dictionary"""
-    user = KBUser.query.get(user_id)
+    user = db.session.get(KBUser, user_id)
     if not user:
         abort(404)
 
     if not current_user.admin and not user.id == current_user.id:
         return abort(403)
 
+    if not current_user.admin and (request.json.get('admin', user.admin) != user.admin or request.json.get('active', user.active) != user.active):
+        abort(403)
+
     user = KBUser(
         email=request.json['email'],
-        password=bcrypt.generate_password_hash(request.json['password'])
+        password=bcrypt.generate_password_hash(request.json['password']).decode()
         if 'password' in request.json else user.password,
         admin=request.json['admin'],
         active=request.json['active'],
@@ -241,7 +244,7 @@ def update_user(user_id):
 
     db.session.merge(user)
     db.session.commit()
-    user = KBUser.query.get(user_id)
+    user = db.session.get(KBUser, user_id)
 
     return jsonify(user.to_dict()), 200
 

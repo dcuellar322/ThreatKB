@@ -23,7 +23,7 @@ def get_all_cfg_settings():
 def get_cfg_settings(key):
     """Return config settings associated with key if it is public
     Return: config settings dictionary"""
-    entity = cfg_settings.Cfg_settings.query.get(key)
+    entity = db.session.get(cfg_settings.Cfg_settings, key)
 
     if not entity or not entity.public:
         abort(404)
@@ -58,7 +58,7 @@ def update_cfg_settings(key):
     """Update config setting associated with key
     From Data: key (str), value (str), public (bool)
     Return: config setting dictionary"""
-    entity = cfg_settings.Cfg_settings.query.get(key)
+    entity = db.session.get(cfg_settings.Cfg_settings, key)
     if not entity:
         abort(404)
     entity = cfg_settings.Cfg_settings(
@@ -70,7 +70,7 @@ def update_cfg_settings(key):
     db.session.merge(entity)
     db.session.commit()
 
-    entity = cfg_settings.Cfg_settings.query.get(entity.key)
+    entity = db.session.get(cfg_settings.Cfg_settings, entity.key)
 
     return jsonify(entity.to_dict()), 200
 
@@ -82,7 +82,7 @@ def update_cfg_settings(key):
 def delete_cfg_settings(key):
     """Delete config setting associated with key
     Return: None"""
-    entity = cfg_settings.Cfg_settings.query.get(key)
+    entity = db.session.get(cfg_settings.Cfg_settings, key)
 
     if not entity or not entity.public:
         abort(404)

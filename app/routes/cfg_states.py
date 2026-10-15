@@ -26,7 +26,7 @@ def get_all_cfg_states():
 def get_cfg_states(id):
     """Return config state associated with given id
     Return: config state dictionary"""
-    entity = cfg_states.Cfg_states.query.get(id)
+    entity = db.session.get(cfg_states.Cfg_states, id)
     if not entity:
         abort(404)
 
@@ -80,7 +80,7 @@ def update_cfg_states(id):
     """Update config state associated with the given id
     From Data: state (str), is_release_state (bool)
     Return: config setting dictionary"""
-    entity = cfg_states.Cfg_states.query.get(id)
+    entity = db.session.get(cfg_states.Cfg_states, id)
     if not entity:
         abort(404)
     entity = cfg_states.Cfg_states(
@@ -119,7 +119,7 @@ def update_cfg_states(id):
 def delete_cfg_states(id):
     """Delete config state associated with the given id
     Return: None"""
-    entity = cfg_states.Cfg_states.query.get(id)
+    entity = db.session.get(cfg_states.Cfg_states, id)
     if not entity:
         abort(404)
     db.session.delete(entity)

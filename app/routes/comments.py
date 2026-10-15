@@ -31,7 +31,7 @@ def get_all_comments():
 def get_comments(id):
     """Return comment associated with the given id
     Return: comment dictionary"""
-    entity = comments.Comments.query.get(id)
+    entity = db.session.get(comments.Comments, id)
     if not entity:
         abort(404)
     return jsonify(entity.to_dict())
@@ -80,7 +80,7 @@ def persist_draft_comment(text, entity_type, entity_id):
 def delete_comments(id):
     """Delete comment associated with the given id
     Return: None"""
-    entity = comments.Comments.query.get(id)
+    entity = db.session.get(comments.Comments, id)
     if not entity:
         abort(404)
     db.session.delete(entity)

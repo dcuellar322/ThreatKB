@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
+if [ -f .env ]; then
+    set -a
+    . ./.env
+    set +a
+fi
+exec .venv/bin/celery -A app.celery beat --schedule=instance/celerybeat-schedule --loglevel=info

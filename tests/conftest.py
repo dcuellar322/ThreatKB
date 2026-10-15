@@ -15,14 +15,20 @@ def client():
     with app.app_context():
         db.create_all()
         cache.clear()
-        user = KBUser(email="analyst@example.test", password=bcrypt.generate_password_hash("test-password").decode(),
-                      admin=True, active=True)
+        user = KBUser(
+            email="analyst@example.test",
+            password=bcrypt.generate_password_hash("test-password").decode(),
+            admin=True,
+            active=True,
+        )
         db.session.add(user)
         db.session.commit()
+
         # Tests retain an app context for direct database assertions. Reset the
         # login cache on each request to reproduce real per-request contexts.
         def reset_login_cache(sender, **kwargs):
-            g.pop('_login_user', None)
+            g.pop("_login_user", None)
+
         request_started.connect(reset_login_cache, app)
         yield app.test_client()
         request_started.disconnect(reset_login_cache, app)
@@ -33,7 +39,10 @@ def client():
 
 @pytest.fixture
 def authenticated(client):
-    response = client.post("/ThreatKB/login", json={"email": "analyst@example.test", "password": "test-password"})
+    response = client.post(
+        "/ThreatKB/login",
+        json={"email": "analyst@example.test", "password": "test-password"},
+    )
     assert response.status_code == 200
     assert response.json["result"] is True
     return client

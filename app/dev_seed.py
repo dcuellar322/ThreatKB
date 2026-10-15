@@ -85,6 +85,11 @@ def seed_database(user_id, rules=2500, ips=10000, domains=5000, tasks=400, conte
         if values:
             db.session.execute(model.__table__.insert(), values)
         added[key] = len(values)
+    if content_dir:
+        goodware = Path(app.instance_path) / "dev-goodware"
+        goodware.mkdir(parents=True, exist_ok=True)
+        for index in range(25):
+            (goodware / f"document-{index}.txt").write_text(f"Ordinary synthetic document {index}. No detection markers.\n")
     db.session.commit()
     cache.clear()
     return added

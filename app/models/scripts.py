@@ -34,19 +34,15 @@ class Scripts(db.Model):
         )
 
     def run_script(self, arguments, highlight_lines_matching=None, timeout=10):
-        temp_script = "%s/%s" % (tempfile.gettempdir(), re.sub("[^A-Za-z0-9_\.]", "", self.name))
-        with open(temp_script, "w") as s:
-            s.write(self.code)
-
-        command = [self.interpreter, temp_script]
-        command.extend(arguments)
-        # results = envoy.run(" ".join(command), timeout=timeout)
-        proc = subprocess.Popen(" ".join(command), stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)
-        proc.wait()
-        stdout, stderr = proc.communicate()
-
-        results = {"stdout": stdout, "stderr": stderr, "retcode": proc.returncode,
-                   "command": " ".join(command)}
+        import shlex
+        with tempfile.TemporaryDirectory(prefix="threatkb-script-") as folder:
+            from pathlib import Path
+            path = Path(folder) / "script"
+            path.write_text(self.code)
+            command = [*shlex.split(self.interpreter), str(path), *map(str, arguments)]
+            proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+        results = {"stdout": proc.stdout, "stderr": proc.stderr, "retcode": proc.returncode,
+                   "command": shlex.join(command)}
 
         try:
             if self.match_regex:

@@ -40,7 +40,7 @@ def get_all_metadata():
 def get_metadata(id):
     """Return task associated with given id
     Return: task dictionary"""
-    entity = metadata.Metadata.query.get(id)
+    entity = db.session.get(metadata.Metadata, id)
     if not entity:
         abort(404)
 
@@ -155,7 +155,7 @@ def delete_metadata_by_id_in_param():
     """Delete metadata associated with the given id
     Return: None"""
     id = request.args.get("id")
-    entity = metadata.Metadata.query.get(id)
+    entity = db.session.get(metadata.Metadata, id)
 
     if not entity:
         abort(404)
@@ -174,7 +174,7 @@ def delete_metadata_by_id_in_param():
 def delete_metadata(id):
     """Delete metadata associated with the given id
     Return: None"""
-    entity = metadata.Metadata.query.get(id)
+    entity = db.session.get(metadata.Metadata, id)
 
     if not entity:
         abort(404)

@@ -22,7 +22,7 @@ def get_all_errors():
 def get_error(error_id):
     """Return error associated with error_id
     Return: error dictionary"""
-    entity = errors.Error.query.get(error_id)
+    entity = db.session.get(errors.Error, error_id)
 
     if not entity:
         abort(404)

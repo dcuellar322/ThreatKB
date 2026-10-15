@@ -55,7 +55,7 @@ def get_active_inactive_key_count():
 def get_access_key(key_id):
     """Return access key associated with given key_id
     Return: access key dictionary"""
-    key = AccessKeys.query.get(key_id)
+    key = db.session.get(AccessKeys, key_id)
     if not key:
         abort(404)
     if not key.user_id == current_user.id:
@@ -70,7 +70,7 @@ def create_access_key():
     Secret key is generated, token is serialized with secret key and contains id of current user.
     Secret key (s_key) is included in return dictionary.
     Return: access key dictionary"""
-    user = KBUser.query.get(current_user.id)
+    user = db.session.get(KBUser, current_user.id)
     if not user:
         abort(403)
     active_inactive_count = json.loads(get_active_inactive_key_count().data)
@@ -117,7 +117,7 @@ def update_key(key_id):
     Able to soft delete, but can't make active/inactive after status is Deleted.
     From Data: status(str)
     Return: access key dictionary"""
-    key = AccessKeys.query.get(key_id)
+    key = db.session.get(AccessKeys, key_id)
     if not key:
         abort(404)
     if not key.user_id == current_user.id:
@@ -136,7 +136,7 @@ def update_key(key_id):
     db.session.merge(key)
     db.session.commit()
 
-    key = AccessKeys.query.get(key_id)
+    key = db.session.get(AccessKeys, key_id)
 
     return jsonify(key.to_dict()), 200
 

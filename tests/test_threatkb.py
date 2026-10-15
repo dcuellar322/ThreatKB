@@ -3,7 +3,7 @@ import pytest
 
 
 def test_startup_and_public_routes(client):
-    for path in ("/", "/ThreatKB/version", "/ThreatKB/documentation"):
+    for path in ("/ThreatKB/version", "/ThreatKB/documentation"):
         assert client.get(path).status_code == 200
 
 

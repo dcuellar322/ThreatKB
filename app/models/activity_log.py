@@ -53,8 +53,8 @@ def get_modified_changes(target):
                 before = attr_hist.deleted[0][0] if isinstance(attr_hist.deleted[0], tuple) else attr_hist.deleted[0]
                 after = attr_hist.added[0][0] if isinstance(attr_hist.added[0], tuple) else attr_hist.added[0]
 
-                before = users.KBUser.query.get(int(before)).email if before is not None else None
-                after = users.KBUser.query.get(int(after)).email if after is not None else None
+                before = db.session.get(users.KBUser, int(before)).email if before is not None else None
+                after = db.session.get(users.KBUser, int(after)).email if after is not None else None
             else:
                 before = attr_hist.deleted[0]
                 after = attr_hist.added[0]

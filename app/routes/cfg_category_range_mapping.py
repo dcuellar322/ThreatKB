@@ -25,7 +25,7 @@ def get_all_cfg_category_range_mappings():
 def get_cfg_category_range_mapping(id):
     """Return category range mapping associated with the given id
     Return: category range mapping dictionary"""
-    entity = cfg_category_range_mapping.CfgCategoryRangeMapping.query.get(id)
+    entity = db.session.get(cfg_category_range_mapping.CfgCategoryRangeMapping, id)
     if not entity:
         abort(404)
     return jsonify(entity.to_dict())
@@ -58,7 +58,7 @@ def update_cfg_category_range_mapping(id):
     """Update category range mapping associated with the given id
     From Data: category (str), range_min (int), range_max (int)
     Return: category range mapping dictionary"""
-    entity = cfg_category_range_mapping.CfgCategoryRangeMapping.query.get(id)
+    entity = db.session.get(cfg_category_range_mapping.CfgCategoryRangeMapping, id)
     if not entity:
         abort(404)
     entity = cfg_category_range_mapping.CfgCategoryRangeMapping(
@@ -75,7 +75,7 @@ def update_cfg_category_range_mapping(id):
 
 def update_cfg_category_range_mapping_current(id, current):
     db.session.rollback()
-    entity = cfg_category_range_mapping.CfgCategoryRangeMapping.query.get(id)
+    entity = db.session.get(cfg_category_range_mapping.CfgCategoryRangeMapping, id)
     if not entity:
         return
     entity = cfg_category_range_mapping.CfgCategoryRangeMapping(
@@ -102,7 +102,7 @@ def update_cfg_category_range_mapping_current(id, current):
 def delete_cfg_category_range_mapping(id):
     """Delete category range mapping associated with the given id
     Return: None"""
-    entity = cfg_category_range_mapping.CfgCategoryRangeMapping.query.get(id)
+    entity = db.session.get(cfg_category_range_mapping.CfgCategoryRangeMapping, id)
     if not entity:
         abort(404)
     db.session.delete(entity)

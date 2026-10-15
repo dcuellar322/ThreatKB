@@ -23,7 +23,7 @@ def get_all_whitelist():
 def get_whitelist(id):
     """Return whitelist associated with given id
     Return: whitelist dictionary"""
-    entity = whitelist.Whitelist.query.get(id)
+    entity = db.session.get(whitelist.Whitelist, id)
     if not entity:
         abort(404)
     return jsonify(entity.to_dict())
@@ -58,7 +58,7 @@ def update_whitelist(id):
     """Update tag associated with given id
     From Data: whitelist_artifact(str), notes (str)
     Return: whitelist dictionary"""
-    entity = whitelist.Whitelist.query.get(id)
+    entity = db.session.get(whitelist.Whitelist, id)
     if not entity:
         abort(404)
 
@@ -73,7 +73,7 @@ def update_whitelist(id):
     db.session.merge(entity)
     db.session.commit()
 
-    entity = whitelist.Whitelist.query.get(id)
+    entity = db.session.get(whitelist.Whitelist, id)
     return jsonify(entity.to_dict()), 200
 
 
@@ -83,7 +83,7 @@ def update_whitelist(id):
 def delete_whitelist(id):
     """Delete whitelist associated with given id
     Return: None"""
-    entity = whitelist.Whitelist.query.get(id)
+    entity = db.session.get(whitelist.Whitelist, id)
     if not entity:
         abort(404)
     db.session.delete(entity)

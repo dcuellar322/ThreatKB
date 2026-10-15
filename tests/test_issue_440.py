@@ -2,7 +2,7 @@ from app.models.yara_rule import Yara_rule, Yara_rule_history
 
 
 def test_import_preserves_condition_and_commits_history(authenticated):
-    source = '''rule SUSP_certificate_payload {
+    source = """rule SUSP_certificate_payload {
     meta:
       author = "Didier Stevens, Florian Roth"
     strings:
@@ -15,9 +15,16 @@ def test_import_preserves_condition_and_commits_history(authenticated):
       and not 1 of ($fp*)
     }
     rule brace_literal { strings: $a = "{x}" condition: $a }
-    '''
-    response = authenticated.post('/ThreatKB/import', json={"import_text": source, "autocommit": True,
-                                                           "extract_ip": False, "extract_dns": False})
+    """
+    response = authenticated.post(
+        "/ThreatKB/import",
+        json={
+            "import_text": source,
+            "autocommit": True,
+            "extract_ip": False,
+            "extract_dns": False,
+        },
+    )
     assert response.status_code == 200
     result = response.json["artifacts"]
     assert result["errors"] == []
