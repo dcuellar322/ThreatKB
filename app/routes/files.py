@@ -8,7 +8,6 @@ import errno
 import tempfile
 import uuid
 import shutil
-import delegator
 import hashlib
 import re
 import shutil
@@ -71,7 +70,7 @@ def upload_file():
 
         f.save(full_path)
         sha1 = hashlib.sha1(open(full_path, 'rb').read()).hexdigest()
-        md5 = hashlib.md5(open(full_path, 'rb').read()).hexdigest(),
+        md5 = hashlib.md5(open(full_path, 'rb').read()).hexdigest()
         sha256 = hashlib.sha256(open(full_path, 'rb').read()).hexdigest()
 
         new_directory = os.path.join(file_store_path_root,
@@ -122,7 +121,8 @@ def upload_file():
 
         ## POSTPROCESSOR FUNCTIONALITY ##
         app.logger.debug("POSTPROCESSOR STARTING")
-        postprocessors = cfg_settings.Cfg_settings.get_settings("POSTPROCESSOR%")
+        postprocessors = cfg_settings.Cfg_settings.get_settings("POSTPROCESSOR%") or []
+        postprocessors = [item for item in postprocessors if not item.key.startswith(("POSTPROCESSOR_TIMEOUT", "POSTPROCESSOR_DFI_IMAGE"))]
         postprocessing_exclude_files_regex = cfg_settings.Cfg_settings.get_setting("POSTPROCESSING_EXCLUDE_FILES_REGEX")
         for postprocessor in postprocessors:
             app.logger.debug("POSTPROCESSOR STARTING '%s'" % (postprocessor.key))
@@ -137,31 +137,26 @@ def upload_file():
                 pass
 
             current_path = os.getcwd()
-            os.chdir(tempdir)
             app.logger.debug("POSTPROCESSOR CWD is now '%s'" % (tempdir))
-            app.logger.debug("POSTPROCESSOR DIRLIST is:\n\n%s" % (os.listdir(".")))
+            app.logger.debug("POSTPROCESSOR DIRLIST is:\n\n%s" % (os.listdir(tempdir)))
             try:
-                # command = "%s %s/%s %s/%s-pp" % (postprocessor.value, filename) if not "{FILENAME}" in postprocessor.value else str(
-                #     postprocessor.value).replace("{FILENAME}", "%s/%s" % (tempdir, filename))
-                command = f"{postprocessor.value}" if not "{FILENAME}" in postprocessor.value else postprocessor.value.replace(
-                    "{FILENAME}", f"{tempdir}/{filename}")
-                app.logger.debug("POSTPROCESSOR COMMAND '%s'" % (command))
-                # proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-                # proc.wait()
-                proc = delegator.run(command, env={'DOCKER_HOST': 'unix:///var/run/docker.sock'})
-                stdout, stderr, return_code = proc.out, proc.err, proc.return_code
+                from app.postprocessing import run_postprocessor
+                image = cfg_settings.Cfg_settings.get_setting('POSTPROCESSOR_DFI_IMAGE') if 'DFI' in postprocessor.key else None
+                timeout = cfg_settings.Cfg_settings.get_setting('POSTPROCESSOR_TIMEOUT') or 120
+                stdout, stderr, return_code = run_postprocessor(postprocessor.value, filename, tempdir, timeout, image)
                 app.logger.debug("POSTPROCESSOR STDOUT is:\n\n%s" % (stdout))
                 app.logger.debug("POSTPROCESSOR STDERR is: \n\n%s" % (stderr))
                 app.logger.debug("POSTPROCESSOR RETCODE is: \n\n%s" % (return_code))
             except Exception as e:
-                app.logger.exception(e)
+                shutil.rmtree(tempdir, ignore_errors=True)
+                abort(422, description=f'Postprocessor {postprocessor.key} failed: {e}')
 
-            app.logger.debug("POSTPROCESSOR DIRLIST is now:\n\n%s" % (os.listdir(".")))
+            app.logger.debug("POSTPROCESSOR DIRLIST is now:\n\n%s" % (os.listdir(tempdir)))
             for root, dirs, files_local in os.walk(tempdir, topdown=False):
                 for name in files_local:
                     current_tempfile = os.path.join(root, name)
                     sha1 = hashlib.sha1(open(current_tempfile, 'rb').read()).hexdigest()
-                    md5 = hashlib.md5(open(current_tempfile, 'rb').read()).hexdigest(),
+                    md5 = hashlib.md5(open(current_tempfile, 'rb').read()).hexdigest()
                     sha256 = hashlib.sha256(open(current_tempfile, 'rb').read()).hexdigest()
                     path = root.replace(tempdir, "").lstrip(os.path.sep)
 
@@ -234,7 +229,6 @@ def upload_file():
                         file_entity.parent_sha1 = parent_file.sha1
                         file_entity.parenty_md5 = parent_file.md5
 
-            os.chdir(current_path)
             shutil.rmtree(tempdir)
 
         db.session.commit()

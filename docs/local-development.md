@@ -52,3 +52,14 @@ in `instance/dev-corpus`, with a SHA-256 reference in its YAML representation.
 YAML signatures. Its first seed is committed automatically. Counts are configurable
 with `--rules`, `--ips`, `--domains`, and `--tasks`. These are synthetic fixtures,
 not intelligence or production-quality detections.
+
+## DFI and sample preprocessing
+
+Existing POSTPROCESSOR command settings remain supported, with `{FILENAME}` and
+`{WORKDIR}` argument placeholders and a bounded POSTPROCESSOR_TIMEOUT (seconds).
+For DFI entries, set POSTPROCESSOR_DFI_IMAGE to an explicit image tag or digest to
+use a container adapter instead of a machine-specific pp-dev wrapper. It runs with
+network disabled, receives the sample path under `/work`, and writes extracted
+files into the mounted work directory. The external image must support that
+entrypoint contract. No DFI image was available in this local installation, so
+only the command adapter and error paths have been verified so far.
