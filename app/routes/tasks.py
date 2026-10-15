@@ -8,6 +8,18 @@ from app.routes.batch import batch_update, batch_delete
 from app.routes.bookmarks import is_bookmarked, delete_bookmarks
 
 from app.utilities import filter_entities
+from app.models.users import KBUser
+
+
+def task_owner(data, default=None):
+    owner = data.get('owner_user', data.get('owner_user_id', default))
+    owner = owner.get('id') if isinstance(owner, dict) else owner
+    if owner is not None:
+        user = db.session.get(KBUser, owner)
+        if not user or not user.active:
+            abort(400, description='Choose an active task owner or leave unassigned.')
+        owner = user.id
+    return owner
 
 
 @app.route('/ThreatKB/tasks', methods=['GET'])
@@ -96,7 +108,7 @@ def create_tasks():
         state=state,
         created_user_id=current_user.id,
         modified_user_id=current_user.id,
-        owner_user_id=current_user.id
+        owner_user_id=task_owner(data, current_user.id)
     )
     db.session.add(entity)
     db.session.commit()
@@ -120,10 +132,8 @@ def update_tasks(id):
     entity.final_artifact = request.json['final_artifact']
     entity.state = request.json['state']['state'] if request.json['state'] and 'state' in request.json['state'] else \
         request.json['state']
-    entity.created_user_id = current_user.id
     entity.modified_user_id = current_user.id
-    entity.owner_user_id = request.json['owner_user']['id'] if request.json.get("owner_user", None) and request.json[
-        "owner_user"].get("id", None) else None,
+    entity.owner_user_id = task_owner(request.json, entity.owner_user_id)
 
     db.session.commit()
 
