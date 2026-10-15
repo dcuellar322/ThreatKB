@@ -8,6 +8,8 @@ from plyara import Plyara
 
 from more_itertools import unique_everseen
 from sqlalchemy import and_, not_, or_, text, select, exists
+from sqlalchemy import DateTime
+from datetime import datetime
 
 from app import ENTITY_MAPPING
 from app.models import cfg_settings
@@ -174,12 +176,18 @@ def filter_entities(entity,
             column = getattr(entity, column)
             if is_null:
                 clauses.append(column.is_(None))
+            elif isinstance(column.type, DateTime) and s_value in ('<now', '>now'):
+                clauses.append(column < datetime.now() if s_value == '<now' else column > datetime.now())
             else:
                 clauses.append(not_(column.like(l_value)) if s_value.startswith("!") else column.like(l_value))
         except AttributeError as e:
             if is_null:
                 clauses.append(and_(MetadataMapping.artifact_id == entity.id, Metadata.key == column,
                                     MetadataMapping.value.is_(None)))
+            elif s_value in ('<now', '>now'):
+                clauses.append(and_(MetadataMapping.artifact_id == entity.id, Metadata.key == column,
+                                    Metadata.type_ == 'date', MetadataMapping.value < datetime.now().isoformat()
+                                    if s_value == '<now' else MetadataMapping.value > datetime.now().isoformat()))
             else:
                 clauses.append(and_(MetadataMapping.artifact_id == entity.id, Metadata.key == column,
                                     not_(MetadataMapping.value.like(l_value))

@@ -20,6 +20,9 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
         shared_tags = request.get_json(silent=True).get("tags", []) if request.is_json else []
     if not isinstance(shared_tags, list):
         abort(400, description="tags must be a list")
+    if request.is_json and request.get_json().get('retire_existing'):
+        from app.indicator_retirement import retire_imported_indicators
+        return retire_imported_indicators(artifacts)
     default_state = "Imported"
     return_artifacts = []
     duplicate_artifacts = []
