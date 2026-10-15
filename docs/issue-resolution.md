@@ -25,3 +25,4 @@ not automatically closed, and unlisted issues remain outstanding.
 | #295 | Significant metadata flags are preserved on creation and exposed as artifact-specific table column definitions; metadata artifact filtering is corrected. Discovery/filter regressions pass. These definitions drive dynamic columns in the replacement UI. |
 | #503 | YARA upgraded to 4.5.4 in the age-gated lock and compiled successfully on Python 3.14. A real negated-hex-byte compilation/matching regression verifies modern syntax. |
 | #306 | Authorized users can restore an inactive rule through a dedicated action without changing its identity, content or revision. Reactivation regression passes; exposed from inactive-record views in the replacement UI. |
+| #288 | Signature saves compare normalized content, workflow values, tags and metadata before writing. No-op saves retain revision/date/history; real changes create a revision in the same transaction. Create/no-op/change regression passes. |
