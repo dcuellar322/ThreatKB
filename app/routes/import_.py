@@ -517,7 +517,7 @@ def import_artifacts_by_filek():
     metadata_field_mapping = request.values.get("metadata_field_mapping", "{}")
     try:
         metadata_field_mapping = json.loads(metadata_field_mapping)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         abort(400, description="Metadata field mapping must be a JSON object.")
 
     if not shared_owner:

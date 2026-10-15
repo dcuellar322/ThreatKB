@@ -26,7 +26,7 @@ def require_artifact(kind, identity, *, write=False):
     try:
         kind = int(kind)
         identity = int(identity)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         abort(400, description="Choose a valid artifact.")
     model = artifact_models().get(kind)
     if model is None:

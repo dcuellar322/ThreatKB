@@ -30,7 +30,7 @@ def confidence_schedule(rule_id):
             due = datetime.fromisoformat(data["due_at"].replace("Z", "+00:00"))
             if due.tzinfo is None or not 0 <= confidence <= 100:
                 raise ValueError()
-        except (ValueError, KeyError, TypeError):
+        except ValueError, KeyError, TypeError:
             abort(
                 400,
                 description="Provide confidence 0–100 and a timestamp with a timezone.",

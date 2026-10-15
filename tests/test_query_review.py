@@ -243,7 +243,6 @@ def test_overview_restores_scoped_ownership_and_category_aggregates(authenticate
     assert scoped["releases"] == []
 
 
-
 def test_empty_text_and_date_only_comparisons(authenticated):
     fixtures()
     for identity, description in [(1, ""), (2, "Present")]:
@@ -256,9 +255,14 @@ def test_empty_text_and_date_only_comparisons(authenticated):
     db.session.add(field)
     db.session.flush()
     for identity, date in [(1, "2000-01-01"), (2, "2999-01-01")]:
-        db.session.add(MetadataMapping(
-            metadata_id=field.id, artifact_id=identity, value=date, created_user_id=1,
-        ))
+        db.session.add(
+            MetadataMapping(
+                metadata_id=field.id,
+                artifact_id=identity,
+                value=date,
+                created_user_id=1,
+            )
+        )
     db.session.commit()
 
     def get(field, operation):

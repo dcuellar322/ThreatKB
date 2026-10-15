@@ -230,8 +230,10 @@ def serialize_page(
     for row in rows:
         if kind == 4:
             value = row.to_dict(
-                include_comments=False, users_cache=users,
-                include_tags=False, include_metadata=False,
+                include_comments=False,
+                users_cache=users,
+                include_tags=False,
+                include_metadata=False,
             )
             if include_metadata:
                 value.update(metadata["TASK"][row.id])
@@ -268,7 +270,7 @@ def filter_page(**options):
         )
         page = int(options["page_number"] or 0)
         size = int(options["page_size"] or 25)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         abort(400, description="Use valid JSON filters and integer pagination.")
     if (
         not isinstance(filters, dict)

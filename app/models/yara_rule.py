@@ -487,8 +487,8 @@ class Yara_rule(db.Model):
         clobber_on_import = cfg_settings.Cfg_settings.get_setting("IMPORT_CLOBBER")
         try:
             clobber_on_import = strtobool(clobber_on_import)
-        except:
-            clobber_on_import = clobber_on_import
+        except ValueError, AttributeError:
+            pass
 
         yara_rule = Yara_rule()
         yara_rule.name = yara_dict["rule_name"]

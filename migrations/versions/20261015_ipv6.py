@@ -1,4 +1,5 @@
 """Allow canonical IPv4 and IPv6 indicators."""
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -13,4 +14,6 @@ def upgrade():
 
 
 def downgrade():
-    raise RuntimeError("IPv6 indicators must be exported or removed before narrowing the IP column.")
+    raise RuntimeError(
+        "IPv6 indicators must be exported or removed before narrowing the IP column."
+    )

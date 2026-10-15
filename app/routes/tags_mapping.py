@@ -9,17 +9,20 @@ import json
 from app.routes.tags import create_tag, get_tags
 
 
-@app.route('/ThreatKB/tags_mapping', methods=['GET'])
+@app.route("/ThreatKB/tags_mapping", methods=["GET"])
 @auto.doc()
 @login_required
 def get_all_tags_mapping():
     """Return all tag mappings
     Return: list of tag mapping dictionaries"""
     entities = tags_mapping.Tags_mapping.query.all()
-    return Response(json.dumps([entity.to_dict() for entity in entities]), mimetype='application/json')
+    return Response(
+        json.dumps([entity.to_dict() for entity in entities]),
+        mimetype="application/json",
+    )
 
 
-@app.route('/ThreatKB/tags_mapping/<int:id>', methods=['GET'])
+@app.route("/ThreatKB/tags_mapping/<int:id>", methods=["GET"])
 @auto.doc()
 @login_required
 def get_tags_mapping(id):
@@ -31,7 +34,9 @@ def get_tags_mapping(id):
     return jsonify(entity.to_dict())
 
 
-@app.route('/ThreatKB/tags_mapping/<string:source_table>/<int:source_id>', methods=['GET'])
+@app.route(
+    "/ThreatKB/tags_mapping/<string:source_table>/<int:source_id>", methods=["GET"]
+)
 @auto.doc()
 @login_required
 def get_tags_for_source_auth(source_table, source_id):
@@ -42,48 +47,61 @@ def get_tags_for_source_auth(source_table, source_id):
 
 def get_tags_for_source(source_table, source_id):
     from app.models.tags import Tags
-    return [row.to_dict() for row in db.session.query(Tags).join(tags_mapping.Tags_mapping,Tags.id==tags_mapping.Tags_mapping.tag_id).filter(tags_mapping.Tags_mapping.source_table==source_table,tags_mapping.Tags_mapping.source_id==source_id).order_by(Tags.text)]
+
+    return [
+        row.to_dict()
+        for row in db.session.query(Tags)
+        .join(tags_mapping.Tags_mapping, Tags.id == tags_mapping.Tags_mapping.tag_id)
+        .filter(
+            tags_mapping.Tags_mapping.source_table == source_table,
+            tags_mapping.Tags_mapping.source_id == source_id,
+        )
+        .order_by(Tags.text)
+    ]
 
 
-@app.route('/ThreatKB/tags_mapping', methods=['POST', 'PUT'])
+@app.route("/ThreatKB/tags_mapping", methods=["POST", "PUT"])
 @auto.doc()
 @login_required
 def create_tags_mapping_rest():
-    create_tags_mapping(request.json['source'], request.json['source_id'], request.json['tags'])
+    create_tags_mapping(
+        request.json["source"], request.json["source_id"], request.json["tags"]
+    )
 
-    return jsonify(''), 201
+    return jsonify(""), 201
 
 
 def batch_create_tags_mapping(table, list_of_source_ids, list_of_tags):
     tags_mapping_to_create = []
     for tag in list_of_tags:
-        if isinstance(tag, dict) and 'id' in tag:
-            t_id = tag['id']
+        if isinstance(tag, dict) and "id" in tag:
+            t_id = tag["id"]
         else:
-            created_tag = create_tag(tag['text']) if type(tag) is dict else create_tag(tag)
+            created_tag = (
+                create_tag(tag["text"]) if type(tag) is dict else create_tag(tag)
+            )
             t_id = created_tag.id
             if isinstance(tag, dict):
-                tag['id'] = t_id
+                tag["id"] = t_id
 
         for s_id in list_of_source_ids:
             entity = tags_mapping.Tags_mapping.query.filter_by(
-                source_table=table,
-                source_id=s_id,
-                tag_id=t_id
+                source_table=table, source_id=s_id, tag_id=t_id
             ).first()
             if not entity:
-                tags_mapping_to_create.append({
-                    "source_table": table,
-                    "source_id": s_id,
-                    "tag_id": t_id
-                })
+                tags_mapping_to_create.append(
+                    {"source_table": table, "source_id": s_id, "tag_id": t_id}
+                )
 
     if tags_mapping_to_create:
-        db.session.execute(tags_mapping.Tags_mapping.__table__.insert().values(
-            source_table=bindparam("source_table"),
-            source_id=bindparam("source_id"),
-            tag_id=bindparam("tag_id")
-        ), tags_mapping_to_create)
+        db.session.execute(
+            tags_mapping.Tags_mapping.__table__.insert().values(
+                source_table=bindparam("source_table"),
+                source_id=bindparam("source_id"),
+                tag_id=bindparam("tag_id"),
+            ),
+            tags_mapping_to_create,
+        )
         db.session.commit()
 
     return list_of_tags
@@ -92,30 +110,31 @@ def batch_create_tags_mapping(table, list_of_source_ids, list_of_tags):
 def create_tags_mapping(table, s_id, list_of_tags):
     tags_mapping_to_create = []
     for tag in list_of_tags:
-        if isinstance(tag, dict) and 'id' in tag:
-            t_id = tag['id']
+        if isinstance(tag, dict) and "id" in tag:
+            t_id = tag["id"]
         else:
-            created_tag = create_tag(tag['text']) if type(tag) is dict else create_tag(tag)
+            created_tag = (
+                create_tag(tag["text"]) if type(tag) is dict else create_tag(tag)
+            )
             t_id = created_tag.id
 
         entity = tags_mapping.Tags_mapping.query.filter_by(
-            source_table=table,
-            source_id=s_id,
-            tag_id=t_id
+            source_table=table, source_id=s_id, tag_id=t_id
         ).first()
         if not entity:
-            tags_mapping_to_create.append({
-                "source_table": table,
-                "source_id": s_id,
-                "tag_id": t_id
-            })
+            tags_mapping_to_create.append(
+                {"source_table": table, "source_id": s_id, "tag_id": t_id}
+            )
 
     if tags_mapping_to_create:
-        db.session.execute(tags_mapping.Tags_mapping.__table__.insert().values(
-            source_table=bindparam("source_table"),
-            source_id=bindparam("source_id"),
-            tag_id=bindparam("tag_id")
-        ), tags_mapping_to_create)
+        db.session.execute(
+            tags_mapping.Tags_mapping.__table__.insert().values(
+                source_table=bindparam("source_table"),
+                source_id=bindparam("source_id"),
+                tag_id=bindparam("tag_id"),
+            ),
+            tags_mapping_to_create,
+        )
         db.session.commit()
 
     return list_of_tags
@@ -124,33 +143,40 @@ def create_tags_mapping(table, s_id, list_of_tags):
 def delete_tags_mapping(table, s_id):
     app.logger.debug(f"delete_tags_mapping {request.url} {table} {s_id}")
     tags_mapping.Tags_mapping.query.filter_by(
-        source_table=table,
-        source_id=s_id
+        source_table=table, source_id=s_id
     ).delete()
     db.session.commit()
     return
 
 
 def batch_delete_tags_mapping(table, list_of_source_ids):
-    app.logger.debug(f"batchdelete_tags_mapping {request.url} {table} {list_of_source_ids}")
-    db.session.execute(tags_mapping.Tags_mapping.__table__
-                       .delete()
-                       .where((tags_mapping.Tags_mapping.source_table == table)
-                              & (tags_mapping.Tags_mapping.source_id.in_(list_of_source_ids))))
+    app.logger.debug(
+        f"batchdelete_tags_mapping {request.url} {table} {list_of_source_ids}"
+    )
+    db.session.execute(
+        tags_mapping.Tags_mapping.__table__.delete().where(
+            (tags_mapping.Tags_mapping.source_table == table)
+            & (tags_mapping.Tags_mapping.source_id.in_(list_of_source_ids))
+        )
+    )
     db.session.commit()
 
 
 def batch_delete_tags_mapping_for_source_id(table, source_id, list_of_tag_ids):
-    app.logger.debug(f"batch_delete_tags_mapping_for_source_id {request.url} {table} {source_id} {list_of_tag_ids}")
-    db.session.execute(tags_mapping.Tags_mapping.__table__
-                       .delete()
-                       .where((tags_mapping.Tags_mapping.source_table == table)
-                              & (tags_mapping.Tags_mapping.source_id == source_id)
-                              & (tags_mapping.Tags_mapping.tag_id.in_(list_of_tag_ids))))
+    app.logger.debug(
+        f"batch_delete_tags_mapping_for_source_id {request.url} {table} {source_id} {list_of_tag_ids}"
+    )
+    db.session.execute(
+        tags_mapping.Tags_mapping.__table__.delete().where(
+            (tags_mapping.Tags_mapping.source_table == table)
+            & (tags_mapping.Tags_mapping.source_id == source_id)
+            & (tags_mapping.Tags_mapping.tag_id.in_(list_of_tag_ids))
+        )
+    )
     db.session.commit()
 
 
-@app.route('/ThreatKB/tags_mapping/<int:id>', methods=['DELETE'])
+@app.route("/ThreatKB/tags_mapping/<int:id>", methods=["DELETE"])
 @login_required
 @admin_only()
 def delete_tags_mapping_by_id(id):
@@ -160,4 +186,4 @@ def delete_tags_mapping_by_id(id):
         abort(404)
     db.session.delete(entity)
     db.session.commit()
-    return jsonify(''), 204
+    return jsonify(""), 204

@@ -1,8 +1,8 @@
 import json
 import requests
 
-class SlackHelper():
 
+class SlackHelper:
     @staticmethod
     def send_slack_message(web_hook, user, channel, message):
         """Send a slack message
@@ -17,5 +17,7 @@ class SlackHelper():
 
         payload = {"text": message, "username": user, "channel": channel}
 
-        req = requests.post(web_hook, json.dumps(payload), headers={'content-type': 'application/json'})
+        req = requests.post(
+            web_hook, json.dumps(payload), headers={"content-type": "application/json"}
+        )
         return True

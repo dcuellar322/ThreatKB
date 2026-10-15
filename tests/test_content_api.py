@@ -66,9 +66,10 @@ def test_feed_export_selects_only_active_released_indicators(authenticated, tmp_
         )
         from flask_login import login_user
         from app.models.users import KBUser
+
         with app.test_request_context():
             with db.session.no_autoflush:
-                login_user(db.session.get(KBUser,1))
+                login_user(db.session.get(KBUser, 1))
             db.session.commit()
         response = authenticated.post("/ThreatKB/content/export-indicators", json={})
         assert response.status_code == 200, response.json

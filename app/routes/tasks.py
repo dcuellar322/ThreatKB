@@ -19,8 +19,7 @@ def persist_task_tags(entity, values):
         abort(400, description="Tags must be a list.")
     texts = [tag.get("text") if isinstance(tag, dict) else tag for tag in values]
     if any(
-        not isinstance(tag, str) or not tag.strip() or len(tag) > 256
-        for tag in texts
+        not isinstance(tag, str) or not tag.strip() or len(tag) > 256 for tag in texts
     ):
         abort(400, description="Tags require 1–256 characters.")
     texts = set(texts)
@@ -39,9 +38,9 @@ def persist_task_tags(entity, values):
         if mapping.tag_id not in wanted:
             db.session.delete(mapping)
     for identity in wanted - existing:
-        db.session.add(Tags_mapping(
-            source_table="tasks", source_id=entity.id, tag_id=identity
-        ))
+        db.session.add(
+            Tags_mapping(source_table="tasks", source_id=entity.id, tag_id=identity)
+        )
 
 
 def persist_task_metadata(entity, values):
@@ -83,15 +82,19 @@ def persist_task_metadata(entity, values):
                     int(value)
                 elif field.type_ == "date":
                     isoparse(value)
-            except (ValueError, TypeError, OverflowError):
+            except ValueError, TypeError, OverflowError:
                 abort(400, description=f"Invalid {field.type_} value for {key}.")
         if mapping:
             mapping.value = value
         elif value is not None:
-            db.session.add(MetadataMapping(
-                metadata_id=field.id, artifact_id=entity.id,
-                created_user_id=current_user.id, value=value,
-            ))
+            db.session.add(
+                MetadataMapping(
+                    metadata_id=field.id,
+                    artifact_id=entity.id,
+                    created_user_id=current_user.id,
+                    value=value,
+                )
+            )
 
 
 def task_owner(data, default=None):

@@ -4,7 +4,7 @@ from app import app, db, auto
 import json
 
 
-@app.route('/ThreatKB/version', methods=['GET'])
+@app.route("/ThreatKB/version", methods=["GET"])
 @auto.doc()
 def get_version():
     """Returns the version of ThreatKB.
@@ -12,9 +12,23 @@ def get_version():
     try:
         version = [v.strip() for v in open("version", "r").readlines()]
         return Response(
-            json.dumps({"version": version[0], "version_email": version[1], "version_date": version[2][:-6]}),
-            mimetype='application/json')
+            json.dumps(
+                {
+                    "version": version[0],
+                    "version_email": version[1],
+                    "version_date": version[2][:-6],
+                }
+            ),
+            mimetype="application/json",
+        )
     except:
         return Response(
-            json.dumps({"version": "unavailable", "version_email": "unavailable", "version_date": "unavailable"}),
-            mimetype='application/json')
+            json.dumps(
+                {
+                    "version": "unavailable",
+                    "version_email": "unavailable",
+                    "version_date": "unavailable",
+                }
+            ),
+            mimetype="application/json",
+        )

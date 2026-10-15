@@ -58,8 +58,11 @@ class Tasks(db.Model):
     )
 
     def to_dict(
-        self, include_comments=True, users_cache=None,
-        include_tags=True, include_metadata=True,
+        self,
+        include_comments=True,
+        users_cache=None,
+        include_tags=True,
+        include_metadata=True,
     ):
         task = dict(
             active=self.active,
@@ -85,15 +88,17 @@ class Tasks(db.Model):
             from app.models.tags import Tags
             from app.models.tags_mapping import Tags_mapping
 
-            task["tags"] = list(db.session.scalars(
-                db.select(Tags.text)
-                .join(Tags_mapping, Tags_mapping.tag_id == Tags.id)
-                .where(
-                    Tags_mapping.source_table == "tasks",
-                    Tags_mapping.source_id == self.id,
+            task["tags"] = list(
+                db.session.scalars(
+                    db.select(Tags.text)
+                    .join(Tags_mapping, Tags_mapping.tag_id == Tags.id)
+                    .where(
+                        Tags_mapping.source_table == "tasks",
+                        Tags_mapping.source_id == self.id,
+                    )
+                    .order_by(Tags.text)
                 )
-                .order_by(Tags.text)
-            ))
+            )
         if include_metadata:
             from app.models.metadata import Metadata, MetadataMapping
 
@@ -103,7 +108,8 @@ class Tasks(db.Model):
                 for mapping, field in db.session.query(MetadataMapping, Metadata)
                 .join(Metadata)
                 .filter(
-                    Metadata.active.is_(True), Metadata.artifact_type == 4,
+                    Metadata.active.is_(True),
+                    Metadata.artifact_type == 4,
                     MetadataMapping.artifact_id == self.id,
                 )
             }

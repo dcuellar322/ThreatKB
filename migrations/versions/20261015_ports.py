@@ -1,4 +1,5 @@
 """Support upstream's externally maintained C2 port specifications."""
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -9,7 +10,9 @@ depends_on = None
 
 
 def upgrade():
-    columns = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("c2ip")}
+    columns = {
+        column["name"] for column in sa.inspect(op.get_bind()).get_columns("c2ip")
+    }
     if "ports" not in columns:
         op.add_column("c2ip", sa.Column("ports", sa.String(255), nullable=True))
 

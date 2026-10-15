@@ -21,7 +21,7 @@ def merge_sources(sources, name):
     for index, rule in enumerate(parsed, 1):
         prefix = f"r{index}_"
 
-        def replace(match):
+        def replace(match, prefix=prefix):
             token = match.group()
             if token == "them":
                 return f"(${prefix}*)"

@@ -1,4 +1,4 @@
-from itsdangerous import (URLSafeTimedSerializer as Serializer, BadSignature)
+from itsdangerous import URLSafeTimedSerializer as Serializer, BadSignature
 
 from app import db
 from app.models import metadata, scripts
@@ -10,7 +10,9 @@ class KBUser(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     email = db.Column(db.String(255), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
-    registered_on = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
+    registered_on = db.Column(
+        db.DateTime(timezone=True), default=db.func.current_timestamp()
+    )
     admin = db.Column(db.Boolean, nullable=False, default=False)
     active = db.Column(db.Boolean, nullable=False, default=True)
     first_name = db.Column(db.String(255), nullable=True)
@@ -36,7 +38,7 @@ class KBUser(db.Model):
         return str(self.id)
 
     def __repr__(self):
-        return '<User {0}>'.format(self.email)
+        return "<User {0}>".format(self.email)
 
     def to_dict(self):
         return dict(
@@ -46,12 +48,12 @@ class KBUser(db.Model):
             active=self.active,
             id=self.id,
             first_name=self.first_name,
-            last_name=self.last_name
+            last_name=self.last_name,
         )
 
     def generate_auth_token(self, s_key):
         s = Serializer(s_key)
-        return s.dumps({'id': self.id})
+        return s.dumps({"id": self.id})
 
     @staticmethod
     def get_user_cache():
@@ -67,5 +69,5 @@ class KBUser(db.Model):
             data = s.loads(token)
         except BadSignature:
             return None  # invalid token
-        user = db.session.get(KBUser, data['id'])
+        user = db.session.get(KBUser, data["id"])
         return user if user and user.active else None

@@ -51,7 +51,7 @@ def batch_update(batch, artifact, session, include_tags=True):
                 if batch["expiration_timestamp"]
                 else None
             )
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             abort(400, description="Use a valid expiration date.")
     if batch.get("state"):
         state = (

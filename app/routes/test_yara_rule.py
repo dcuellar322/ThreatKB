@@ -56,7 +56,7 @@ def get_all_tests():
             or page < 0
         ):
             raise ValueError()
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         abort(400, description="Choose valid test filters and page size 1–200.")
     query = Yara_testing_history.query
     if not current_user.admin:
