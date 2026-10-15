@@ -72,6 +72,7 @@ npm run build
 - [Design acceptance and remaining integration work](docs/design-acceptance.md)
 - [Upstream issue resolutions](docs/issue-resolution.md)
 - [Verification evidence](docs/verification.md)
+- [Content-page execution and performance](docs/content-performance.md)
 - [Browser workflow audit](docs/browser-e2e-2026-10-15.md)
 
 CI has separate application, quality and per-pack jobs. A failing Sigpack job

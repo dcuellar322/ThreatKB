@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import os
 import subprocess
+import stat
 import threading
 import yaml
 from flask import request, jsonify, abort, send_file
@@ -14,6 +15,68 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 _cache = {}
 _guard = threading.Lock()
+_git_cache = {}
+_git_guard = threading.Lock()
+
+
+def file_inventory(root):
+    """Detect external edits without reading every file or spawning Git processes."""
+    files = []
+    root = str(root)
+    for folder, directories, names in os.walk(root):
+        directories[:] = [name for name in directories if name != ".git"]
+        for name in names:
+            path = os.path.join(folder, name)
+            try:
+                info = os.stat(path, follow_symlinks=False)
+                target = os.stat(path) if stat.S_ISLNK(info.st_mode) else None
+            except FileNotFoundError:
+                continue
+            files.append(
+                (
+                    path[len(root) + 1 :],
+                    info.st_mtime_ns,
+                    info.st_ctime_ns,
+                    info.st_size,
+                    info.st_mode,
+                    (target.st_mtime_ns, target.st_ctime_ns, target.st_size)
+                    if target
+                    else None,
+                )
+            )
+    return tuple(sorted(files))
+
+
+def git_metadata(repo, inventory):
+    """Reuse read-only Git/digest results until source or Git metadata changes."""
+    directory = repo.root / ".git"
+    if directory.is_file():
+        directory = (
+            repo.root / directory.read_text().strip().removeprefix("gitdir: ")
+        ).resolve()
+    common = directory
+    if (directory / "commondir").is_file():
+        common = (directory / (directory / "commondir").read_text().strip()).resolve()
+    paths = [directory / name for name in ("HEAD", "index", "commondir")]
+    paths.extend(common / name for name in ("packed-refs", "config", "info/exclude"))
+    paths.extend((common / "refs").rglob("*"))
+    signature = []
+    for path in paths:
+        if path.is_file():
+            info = path.stat()
+            signature.append(
+                (str(path), info.st_mtime_ns, info.st_ctime_ns, info.st_size)
+            )
+    key = (repo.root, inventory, tuple(sorted(signature)))
+    with _git_guard:
+        if _git_cache.get("key") != key:
+            value = {
+                "source_digest": repo.digest(),
+                "git_commit": git("rev-parse", "HEAD"),
+                "git_status": git("--no-optional-locks", "status", "--porcelain"),
+            }
+            _git_cache.update(key=key, value=value)
+        return _git_cache["value"]
 
 
 def content_root():
@@ -38,7 +101,7 @@ def channels():
     return Path(app.instance_path) / "channels"
 
 
-def repository():
+def repository(include_inventory=False):
     root = content_root()
     if not (root / ".git").exists():
         root.mkdir(parents=True, exist_ok=True)
@@ -69,15 +132,18 @@ def repository():
             check=True,
             capture_output=True,
         )
-    files = []
-    for folder in (str(root), str(root / "rules")):
-        if os.path.isdir(folder):
-            with os.scandir(folder) as entries:
-                for entry in entries:
-                    if entry.name.endswith(".yaml") and entry.is_file():
-                        info = entry.stat()
-                        files.append((entry.path, info.st_mtime_ns, info.st_size))
-    signature = tuple(sorted(files))
+    inventory = file_inventory(root)
+    signature = tuple(
+        entry
+        for entry in inventory
+        if entry[0]
+        in ("macros.yaml", "categories.yaml", "policies.yaml", "pairings.yaml")
+        or (
+            entry[0].endswith(".yaml")
+            and entry[0].startswith("rules/")
+            and entry[0].count("/") == 1
+        )
+    )
     with _guard:
         if (
             _cache.get("signature") != signature
@@ -90,7 +156,8 @@ def repository():
                 corpus=corpus(),
                 repo=Repository(root, corpus()),
             )
-        return _cache["repo"]
+        repo = _cache["repo"]
+        return (repo, inventory) if include_inventory else repo
 
 
 def git(*args):
@@ -100,6 +167,11 @@ def git(*args):
         text=True,
         check=True,
     ).stdout.strip()
+
+
+def invalidate_repository():
+    with _guard:
+        _cache.clear()
 
 
 def commit_file(path, text, message):
@@ -147,7 +219,7 @@ def commit_file(path, text, message):
                 capture_output=True,
             )
             raise
-        _cache.clear()
+        invalidate_repository()
 
 
 def authorize_group(group, repo=None):
@@ -181,7 +253,8 @@ JOB_HANDLERS.update(validate_content=run_content_check, build_content=run_conten
 @app.get("/ThreatKB/content")
 @login_required
 def content_overview():
-    repo = repository()
+    # Bootstrap before inventory so an initial GET sees the initialized Git state.
+    repo, inventory = repository(include_inventory=True)
     group = request.args.get("group", "default")
     query = request.args.get("q", "").lower()
     authorize_group(group, repo)
@@ -222,7 +295,6 @@ def content_overview():
         total_count=len(filtered),
         groups=repo.groups,
         categories=repo.categories,
-        source_digest=repo.digest(),
         builds=[
             value
             for path in recent
@@ -237,8 +309,7 @@ def content_overview():
             "testing_releases": sum(r["status"] == "testing" for r in releases),
             "production_releases": sum(r["status"] == "production" for r in releases),
         },
-        git_commit=git("rev-parse", "HEAD"),
-        git_status=git("status", "--porcelain"),
+        **git_metadata(repo, inventory),
     )
 
 
@@ -441,7 +512,7 @@ def export_legacy_content():
             "-m",
             "Export legacy signatures with stable UUIDs",
         )
-    _cache.clear()
+    invalidate_repository()
     return jsonify(added=added)
 
 

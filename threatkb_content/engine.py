@@ -190,12 +190,14 @@ class Repository:
                     if path == os.path.join(root, "review.yaml"):
                         continue
                     info = os.stat(path)
-                    files.append((path, info.st_mtime_ns, info.st_size))
+                    files.append(
+                        (path, info.st_mtime_ns, info.st_ctime_ns, info.st_size)
+                    )
         files.sort()
         signature = tuple(files)
         if getattr(self, "_digest_signature", None) != signature:
             digest = sha256()
-            for path, _, _ in files:
+            for path, *_ in files:
                 digest.update(path[len(root) + 1 :].encode() + b"\0")
                 with open(path, "rb") as handle:
                     digest.update(handle.read())
@@ -204,6 +206,13 @@ class Repository:
         return self._digest_value
 
     def render(self, text):
+        if not any(marker in text for marker in ("{{", "{%", "{#")):
+            # Match Jinja's default newline handling without compiling a template
+            # for every literal YARA string and condition in the repository.
+            rendered = text.replace("\r\n", "\n").replace("\r", "\n").removesuffix("\n")
+            if len(rendered.encode()) > 1024 * 1024:
+                raise ContentError("Materialized rule exceeds 1 MiB")
+            return rendered
         cache = self.__dict__.setdefault("_render_cache", {})
         if text in cache:
             return cache[text]

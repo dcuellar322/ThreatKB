@@ -2,7 +2,7 @@
 
 ## Current repository evidence
 
-- **106 backend/content tests pass locally and in the verification container**, including dependency-age policy,
+- **111 backend/content tests pass locally**, including dependency-age policy,
   staged-index preservation, IOC assessment, reviewed publication, frozen promotion
   policy, alarm visibility and the prior application/query/permission regressions.
 - Frontend type checking/build and Prettier checks pass. Python correctness lint,
@@ -36,6 +36,15 @@ and fixed a shared mobile rule hiding the alarm badge. No page errors or horizon
 page overflow were observed. Four screenshots and a gallery are available locally
 under `output/playwright/maintenance-2026-10-15/`; generated browser evidence is
 intentionally excluded from Git.
+
+## Content-page performance follow-up
+
+The [content execution/performance report](content-performance.md) records the
+current worker/Git boundaries and a measured warm API median reduction from
+276 ms to 68 ms on 2,502 YAML signatures. It includes external-edit invalidation
+regressions, browser search/pagination/history checks and a successful real queued
+validation of 1,250 selected rules, their positive samples, and 25 goodware samples.
+The verification workflow runs the current suite in its Python 3.14 container.
 
 ## Existing application and browser evidence
 

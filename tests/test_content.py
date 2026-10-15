@@ -53,6 +53,15 @@ def test_yaml_uuid_category_macro_and_group_isolation(tmp_path):
         repo.render("{{ unknown_macro }}")
 
 
+def test_literal_render_matches_jinja_and_preserves_output_limit(tmp_path):
+    root, corpus = content(tmp_path)
+    repo = Repository(root, corpus)
+    for value in ("", "true", ' $a = "café"\r\n', "\n\ntext\n\n", "literal }}\rline\r"):
+        assert repo.render(value) == repo.env.from_string(value).render()
+    with pytest.raises(ContentError, match="exceeds 1 MiB"):
+        repo.render("a" * (1024 * 1024 + 1))
+
+
 def test_testing_window_telemetry_alarms_and_independent_review(tmp_path):
     root, corpus = content(tmp_path)
     repo = Repository(root, corpus)

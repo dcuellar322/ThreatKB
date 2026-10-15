@@ -24,33 +24,34 @@ export function Content({ version, notify, refresh }: any) {
     [config, setConfig] = useState<any>(null),
     [data, setData] = useState<any>(null),
     [q, setQ] = useState(""),
+    [query, setQuery] = useState(""),
     [group, setGroup] = useState("default"),
     [index, setIndex] = useState(0),
     [edit, setEdit] = useState<any>(null),
     [text, setText] = useState("");
   useEffect(() => {
-    setIndex(0);
-  }, [q, group]);
+    if (q === query) return;
+    const timer = setTimeout(() => {
+      setQuery(q);
+      setIndex(0);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [q, query]);
   useEffect(() => {
     const controller = new AbortController();
-    const timer = setTimeout(
-      () =>
-        api(
-          "/content?" +
-            new URLSearchParams({ q, group, offset: String(index * 25) }),
-          { signal: controller.signal },
-        )
-          .then(setData)
-          .catch((e: any) => {
-            if (e.name !== "AbortError") notify(e.message, true);
-          }),
-      250,
-    );
+    api(
+      "/content?" +
+        new URLSearchParams({ q: query, group, offset: String(index * 25) }),
+      { signal: controller.signal },
+    )
+      .then(setData)
+      .catch((e: any) => {
+        if (e.name !== "AbortError") notify(e.message, true);
+      });
     return () => {
-      clearTimeout(timer);
       controller.abort();
     };
-  }, [version, q, group, index]);
+  }, [version, query, group, index]);
   async function action(kind: string) {
     try {
       await write("/content/jobs", { kind, payload: { group, kind: pack } });
@@ -290,7 +291,10 @@ export function Content({ version, notify, refresh }: any) {
           <Select
             aria-label="Policy group"
             value={group}
-            onChange={(e) => setGroup(e.target.value)}
+            onChange={(e) => {
+              setGroup(e.target.value);
+              setIndex(0);
+            }}
           >
             {Object.keys(data.groups).map((g) => (
               <option key={g}>{g}</option>

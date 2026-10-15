@@ -106,3 +106,10 @@ persist in channel state; actual telemetry alarms appear in the workbench and in
 notifications for authorized groups. Clearing notifications does not clear the
 underlying alarm. Operational telemetry and external notification routing still
 require their actual integrations.
+
+## Web execution and performance
+
+Page reads create no commits after initial repository bootstrap. Explicit saves
+validate and commit locally before returning; validation/build buttons use Celery
+jobs. See [content-performance.md](content-performance.md) for the execution
+boundaries, cache invalidation, measured improvement and remaining cold/save costs.
