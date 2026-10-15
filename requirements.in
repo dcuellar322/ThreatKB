@@ -1,0 +1,25 @@
+# Resolve stable releases published no later than 2026-10-05 (ten-day age gate).
+Flask
+Flask-Bcrypt
+Flask-Caching
+Flask-Login
+Flask-Migrate
+Flask-SQLAlchemy
+SQLAlchemy
+celery[redis]
+PyMySQL[rsa]
+requests
+geoip2
+plyara
+more-itertools
+python-dateutil
+python-magic
+pycountry
+yara-python
+PyYAML
+jsonschema
+Jinja2
+packaging
+delegator.py
+pytest
+waitress

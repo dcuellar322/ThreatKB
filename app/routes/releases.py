@@ -5,7 +5,7 @@ from app.models import releases, cfg_settings
 import tempfile
 import uuid
 import time
-import distutils
+from app.compat import strtobool
 from app.models import yara_rule, releases
 import datetime
 from sqlalchemy import bindparam
@@ -46,7 +46,7 @@ def get_releases_latest():
     Return: list of release dictionaries"""
 
     count = request.args.get("count", None)
-    short = distutils.util.strtobool(request.args.get("short", "True"))
+    short = strtobool(request.args.get("short", "True"))
 
     try:
         count = int(count)
@@ -89,7 +89,7 @@ def generate_release_notes(release_id):
     tfile = "%s/%s" % (tempfile.gettempdir(), str(uuid.uuid4()).replace("-", ""))
     with open(tfile, "w") as t:
         t.write(content.read())
-    return send_file(tfile, attachment_filename=filename, mimetype="text/plain", as_attachment=True)
+    return send_file(tfile, download_name=filename, mimetype="text/plain", as_attachment=True)
 
 
 @app.route('/ThreatKB/releases/<int:release_id>/artifact_export', methods=['GET'])
@@ -112,7 +112,7 @@ def generate_artifact_export(release_id):
     tfile = "%s/%s" % (tempfile.gettempdir(), str(uuid.uuid4()).replace("-", ""))
     with open(tfile, "wb") as t:
         t.write(content.read())
-    return send_file(tfile, attachment_filename=filename, as_attachment=True)
+    return send_file(tfile, download_name=filename, as_attachment=True)
 
 
 @app.route('/ThreatKB/releases', methods=['POST', 'PUT'])
@@ -123,7 +123,7 @@ def create_release():
     """Create new release
     From Data: name (str), is_test_release (bool)
     Return: release dictionary"""
-    short = distutils.util.strtobool(request.args.get('short', "true"))
+    short = strtobool(request.args.get('short', "true"))
 
     start_time = time.time()
 

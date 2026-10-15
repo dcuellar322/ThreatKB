@@ -1,8 +1,7 @@
 import geoip2.database
 import os
-import pyzipcode
 
-from ipaddr import IPAddress
+from ipaddress import ip_address as IPAddress
 from app import app
 from app.models import cfg_settings
 
@@ -18,9 +17,8 @@ if not app.config.get("GEOIP_CITY_DATABASE_FILE"):
 
 GEOIP_ASN_DATABASE_FILE = app.config["GEOIP_ASN_DATABASE_FILE"]
 GEOIP_CITY_DATABASE_FILE = app.config["GEOIP_CITY_DATABASE_FILE"]
-ASN_READER = geoip2.database.Reader(GEOIP_ASN_DATABASE_FILE)
-CITY_READER = geoip2.database.Reader(GEOIP_CITY_DATABASE_FILE)
-ZIPCODE_DB = pyzipcode.ZipCodeDatabase()
+ASN_READER = geoip2.database.Reader(GEOIP_ASN_DATABASE_FILE) if os.path.isfile(GEOIP_ASN_DATABASE_FILE) else None
+CITY_READER = geoip2.database.Reader(GEOIP_CITY_DATABASE_FILE) if os.path.isfile(GEOIP_CITY_DATABASE_FILE) else None
 
 
 def get_geo_for_ip(ip_address):

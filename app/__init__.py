@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 import datetime
-import distutils
+from app.compat import strtobool
 import functools
 
 from flask import Flask, abort, jsonify, request
@@ -14,27 +14,40 @@ from flask_migrate import Migrate
 from flask import make_response
 from functools import wraps, update_wrapper
 from flask_caching import Cache
-from flask_selfdoc import Autodoc
+from app.documentation import Autodoc
 
 
 app = Flask(__name__, static_url_path='')
 
-if os.path.exists("testing_config.py") and not os.path.exists("config.py"):
-    app.config.from_object("testing_config")
-
+app.config.update(
+    SQLALCHEMY_DATABASE_URI="sqlite:///threatkb.db",
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    LOGGING_LEVEL="INFO",
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    MAX_CONTENT_LENGTH=64 * 1024 * 1024,
+)
 if os.path.exists("config.py"):
     app.config.from_object("config")
-
-if not os.path.exists("config.py") and not os.path.exists("testing_config.py"):
-    print("Missing configuration settings")
-    sys.exit(1)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "THREATKB_DATABASE_URL", app.config["SQLALCHEMY_DATABASE_URI"]
+).replace("mysql://", "mysql+pymysql://").replace("charset=utf8", "charset=utf8mb4")
+app.config["SECRET_KEY"] = os.getenv("THREATKB_SECRET_KEY")
+if not app.config["SECRET_KEY"]:
+    from pathlib import Path
+    Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+    key_file = Path(app.instance_path) / "secret-key"
+    if not key_file.exists():
+        with open(key_file, "x", opener=lambda path, flags: os.open(path, flags, 0o600)) as key:
+            import secrets
+            key.write(secrets.token_hex(32))
+    app.config["SECRET_KEY"] = key_file.read_text().strip()
 
 if app.config.get('REDIS_CACHE_URL', None):
-    cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': app.config.get('REDIS_CACHE_URL')})
+    cache = Cache(app, config={'CACHE_TYPE': 'RedisCache', 'CACHE_REDIS_URL': app.config.get('REDIS_CACHE_URL')})
 else:
-    cache = Cache(app, config={'CACHE_TYPE': 'simple'})
-cache.init_app(app)
-app.secret_key = "a" * 24  # os.urandom(24)
+    cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
+
 
 auto = Autodoc(app)
 
@@ -104,7 +117,7 @@ def set_celery_stuff(flask_app):
 
 set_celery_stuff(app)
 
-print(("app config: %s" % (str(app.config))))
+
 
 from app.celeryapp import make_celery
 
@@ -229,7 +242,7 @@ def load_user_from_request(request):
     token = request.args.get('token')
     s_key = str(request.args.get('secret_key'))
     if token and s_key:
-        valid_token = is_token_active(token)
+        valid_token = access_keys.is_token_active(token)
         if valid_token:
             user = users.KBUser.verify_auth_token(str(token), s_key)
             if user:
@@ -243,113 +256,15 @@ def load_user_from_request(request):
 
 
 def generate_app():
-
-    global celery
-    from app.models import users
-    from app.models import c2ip
-    from app.models import c2dns
-    from app.models import cfg_settings
-    from app.models import yara_rule
-    from app.models import cfg_states
-    from app.models import comments
-    from app.models import tags
-    from app.models import tags_mapping
-    from app.models import files
-    from app.models import scripts
-    from app.models import cfg_category_range_mapping
-    from app.models import releases
-    from app.models import tasks
-    from app.models import access_keys
-    from app.models import users
-    from app.models import whitelist
-    from app.models import bookmarks
-    from app.models import metadata
-    from app.models import errors
-    from app.models import activity_log
-    from app.models import macros
-
-    set_celery_stuff(app)
-
-    from app.celeryapp import make_celery
-    celery = make_celery(app)
-
-    from app.geo_ip_helper import get_geo_for_ip
-
-    from app.routes import index
-    from app.routes import authentication
-    from app.routes import c2ips
-    from app.routes import c2dns
-    from app.routes import cfg_settings
-    from app.routes import yara_rules
-    from app.routes import cfg_states
-    from app.routes import comments
-    from app.routes import tags
-    from app.routes import tags_mapping
-    from app.routes import files
-    from app.routes import import_
-    from app.routes import cfg_category_range_mapping
-    from app.routes import test_yara_rule
-    from app.routes import error_handling
-    from app.routes import releases
-    from app.routes import tasks
-    from app.routes import documentation
-    from app.routes import access_keys
-    from app.routes import whitelist
-    from app.routes import search
-    from app.routes import bookmarks
-    from app.routes import version
-    from app.routes import scripts
-    from app.routes import metadata
-    from app.routes import errors
-    from app.routes import activity_log
-    from app.routes import macros
-    from app.routes import countries
-
-    app.config['PRESERVE_CONTEXT_ON_EXCEPTION'] = False
-
-    @app.teardown_request
-    def teardown_request(exception):
-        if exception:
-            db.session.rollback()
-        db.session.remove()
-
-    def setup_logging():
-        app.logger.addHandler(logging.StreamHandler())
-        app.logger.setLevel(app.config["LOGGING_LEVEL"])
-
-    @login_manager.user_loader
-    @cache.memoize(timeout=60)
-    def load_user(userid):
-        app.logger.debug("load_user called with user_id: '%s'" % (str(userid)))
-        return users.KBUser.query.get(int(userid))
-
-    @login_manager.request_loader
-    @cache.memoize(timeout=60)
-    def load_user_from_request(request):
-        token = request.args.get('token')
-        s_key = str(request.args.get('secret_key'))
-        if token and s_key:
-            valid_token = access_keys.is_token_active(token)
-            if valid_token:
-                user = users.KBUser.verify_auth_token(str(token), s_key)
-                if user:
-                    return user
-                else:
-                    abort(401)
-            else:
-                abort(401)
-
-        return None
-
-    with app.app_context():
-        setup_logging()
+    """Compatibility entry point for existing WSGI and worker launchers."""
+    return app
 
 
 def run(debug=False, port=0, host=''):
     import os
     port = port or int(os.getenv('LISTEN_PORT', 5000))
     host = host or os.getenv('LISTEN_ON', '127.0.0.1')
-    debug = debug or os.getenv("DEBUG", False)
+    debug = debug or strtobool(os.getenv("DEBUG", "false"))
 
     generate_app()
     app.run(debug=debug, port=port, host=host)
@@ -357,3 +272,5 @@ def run(debug=False, port=0, host=''):
 
 with app.app_context():
     setup_logging()
+
+from app import commands

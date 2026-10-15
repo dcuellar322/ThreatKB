@@ -1,10 +1,10 @@
 from app import db, cache
 from app.models.cfg_settings import Cfg_settings
 from app.models.cfg_states import Cfg_states, get_cfg_states
-import distutils
+from app.compat import strtobool
 import re
 import time
-from ipaddr import IPAddress, IPNetwork
+from ipaddress import ip_address as IPAddress, ip_network as IPNetwork
 
 
 class WhitelistException(Exception):
@@ -47,7 +47,7 @@ class Whitelist(db.Model):
         whitelist_enabled = Cfg_settings.get_setting("ENABLE_IP_WHITELIST_CHECK_ON_SAVE")
         whitelist_states = Cfg_settings.get_setting("WHITELIST_STATES")
 
-        if not whitelist_enabled or not distutils.util.strtobool(whitelist_enabled) or not whitelist_states:
+        if not whitelist_enabled or not strtobool(whitelist_enabled) or not whitelist_states:
             return True
 
         states = []

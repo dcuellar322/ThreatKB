@@ -1,7 +1,7 @@
-import distutils
+from app.compat import strtobool
 import re
 
-from ipaddr import IPAddress, IPNetwork
+from ipaddress import ip_address as IPAddress, ip_network as IPNetwork
 from sqlalchemy.event import listens_for
 from sqlalchemy.orm import Session
 

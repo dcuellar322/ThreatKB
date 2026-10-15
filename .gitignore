@@ -72,3 +72,9 @@ dump.rdb
 .vagrant
 
 version
+
+.venv/
+.pytest_cache/
+instance/
+coverage.xml
+playwright-report/

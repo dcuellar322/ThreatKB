@@ -9,7 +9,7 @@ from app.models.whitelist import Whitelist, WhitelistException
 from app.routes import tags_mapping
 from app.models.metadata import Metadata, MetadataMapping
 from app.models import cfg_states, activity_log
-from ipaddr import IPAddress, IPNetwork
+from ipaddress import ip_address as IPAddress, ip_network as IPNetwork
 from app.models import cfg_states, cfg_settings, activity_log
 from app.routes.countries import get_country
 from flask import abort

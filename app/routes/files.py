@@ -260,7 +260,7 @@ def get_file_for_entity(entity_type, entity_id, file_id):
         abort(404)
 
     return send_file(full_path,
-                     attachment_filename="{}".format(file_entity.filename),
+                     download_name="{}".format(file_entity.filename),
                      as_attachment=True)
 
 

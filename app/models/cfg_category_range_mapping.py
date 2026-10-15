@@ -1,6 +1,6 @@
 from app import db
 from . import yara_rule
-from sqlalchemy import bindparam
+from sqlalchemy import bindparam, text
 
 
 class CfgCategoryRangeMapping(db.Model):
@@ -81,7 +81,8 @@ class CfgCategoryRangeMapping(db.Model):
             category.current = eventid
 
         db.session.execute(
-            "update `cfg_category_range_mapping` set current=%s where id=%s" % (category.current, category.id))
+            text("UPDATE cfg_category_range_mapping SET current=:current WHERE id=:id"),
+            {"current": category.current, "id": category.id})
         return eventid
 
     def __repr__(self):
