@@ -43,7 +43,7 @@ def seed_database(user_id, rules=2500, ips=10000, domains=5000, tasks=400, conte
         state = states[index % len(states)]
         timestamp = now - timedelta(hours=index % 1000)
         if name not in rule_names:
-            values = dict(name=name, eventid=700000000 + index, category="Development",
+            values = dict(name=name, uuid=str(uuid5(NAMESPACE_URL, f"threatkb:dev:{index}")), eventid=700000000 + index, category="Development",
                           strings=f'$marker = "{marker}" ascii', condition="$marker",
                           description=f"Synthetic fixture {index}: workflow and scale verification — no real threat data.",
                           references="https://example.test/development", state=state, revision=1,

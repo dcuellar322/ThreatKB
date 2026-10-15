@@ -15,6 +15,7 @@ import json
 import re
 from app.compat import strtobool
 import zlib
+from uuid import uuid4
 
 from flask import abort
 
@@ -23,6 +24,7 @@ class Yara_rule(db.Model):
     __tablename__ = "yara_rules"
 
     id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(36), nullable=False, unique=True, default=lambda: str(uuid4()))
     creation_date = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
     last_revision_date = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp(),
                                    onupdate=db.func.current_timestamp())
@@ -127,6 +129,7 @@ class Yara_rule(db.Model):
                 include_tags=True, include_comments=True, metadata_cache=None, users_cache=None, tags_mapping_cache=None,
                 comments_cache=None, include_revisions=True):
         yara_dict = dict(
+            uuid=self.uuid,
             creation_date=self.creation_date.isoformat() if self.creation_date else None,
             last_revision_date=self.last_revision_date.isoformat() if self.last_revision_date else None,
             state=self.state,

@@ -1,0 +1,41 @@
+from datetime import datetime,timezone,timedelta
+from hashlib import sha256
+from uuid import uuid4
+import yaml
+import pytest
+from threatkb_content.engine import Repository,ContentError,regex_chunks
+
+
+def content(tmp_path):
+    root=tmp_path/'content';(root/'rules').mkdir(parents=True)
+    corpus=tmp_path/'corpus';corpus.mkdir()
+    sample=b'SYNTHETIC_CONTENT_FIXTURE';digest=sha256(sample).hexdigest();(corpus/digest).write_bytes(sample)
+    rule={'id':str(uuid4()),'name':'Fixture','category':'SC','status':'released','strings':'$a = "SYNTHETIC_CONTENT_FIXTURE"',
+          'condition':'$a','groups':['default'],'references':{'public':{'samples':[digest]}},'testing_strategy':['match_all_referenced_samples']}
+    (root/'rules'/'fixture.yaml').write_text(yaml.safe_dump(rule))
+    (root/'policies.yaml').write_text(yaml.safe_dump({'groups':{'default':{'categories':['SC']},'other':{'categories':['MC']}},'promotion_wait_minutes':30,'required_consumers':['local']}))
+    return root,corpus
+
+
+def test_yaml_uuid_category_macro_and_group_isolation(tmp_path):
+    root,corpus=content(tmp_path);repo=Repository(root,corpus)
+    assert repo.check()['positive_samples']==1
+    assert 'rule SC_Fixture' in repo.materialize(repo.selected())
+    assert repo.selected('other')==[]
+    chunks=regex_chunks(['value'+str(i) for i in range(300)])
+    assert len(chunks)>1 and all(len(chunk.encode())<=512 for chunk in chunks)
+    with pytest.raises(ContentError): repo.render('{{ unknown_macro }}')
+
+
+def test_testing_window_telemetry_alarms_and_independent_review(tmp_path):
+    root,corpus=content(tmp_path);repo=Repository(root,corpus)
+    manifest=repo.build(tmp_path/'builds');channels=tmp_path/'channels'
+    with pytest.raises(ContentError): repo.publish_testing(manifest,channels)
+    (root/'review.yaml').write_text(yaml.safe_dump({'author':'analyst-a','reviewer':'analyst-b','source_digest':repo.digest()}))
+    start=datetime.now(timezone.utc);repo.publish_testing(manifest,channels,start)
+    with pytest.raises(ContentError): repo.promote(channels,'sigpack','default',start+timedelta(minutes=10))
+    report={'window_start':start.isoformat(),'window_end':(start+timedelta(minutes=31)).isoformat(),'detections':0,'errors':1}
+    repo.telemetry(channels,'sigpack','default',manifest['id'],'local',report)
+    with pytest.raises(ContentError): repo.promote(channels,'sigpack','default',start+timedelta(minutes=31))
+    report['errors']=0;repo.telemetry(channels,'sigpack','default',manifest['id'],'local',report)
+    assert repo.promote(channels,'sigpack','default',start+timedelta(minutes=31))['status']=='production'

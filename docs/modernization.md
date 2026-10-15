@@ -48,3 +48,22 @@ merged into this modernization branch. The personal fork's master was fast-forwa
 by 113 commits and its rc branch now matches upstream rc. No force pushes were used.
 An idempotent migration adds the upstream ports column only when absent and never
 drops externally maintained values on downgrade.
+
+## Detection-as-code engine
+
+The standalone threatkb_content package validates YAML/UUIDs, unique names and
+pairings; renders bounded Jinja macro lists; derives category prefixes and rich
+metadata; compiles dependencies; and verifies referenced SHA-256 samples/goodware.
+Policy groups filter content before build. Sigpack, Feedpack and Codepack builds
+are independent and carry manifests with file hashes and Git provenance. Optional
+external collections require a pinned local Git checkout and remain separate
+namespaces. Collection fetching is an explicit Git operation, never implicit code
+execution. Testing-channel publication requires a review for the exact source
+digest by someone other than its author. Production promotion requires an elapsed
+observation window and recent complete telemetry without errors, alarms or an
+excessive detection rate. Tests exercise both blocked and successful transitions.
+
+These are local tooling and integration contracts. Deployment to TAC/customer
+systems, production telemetry ingestion and the organization's release-frequency
+outcome cannot be verified without those external systems. The code does not
+fabricate those signals or automatically approve its own content.
