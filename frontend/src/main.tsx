@@ -1469,13 +1469,20 @@ function ArtifactEditor({ page, initial, onClose, onSaved, notify }: any) {
                     body.append("entity_type", "1");
                     body.append("entity_id", initial.id);
                     try {
-                      await api("/file_upload", { method: "POST", body });
+                      const upload = await api("/file_upload", {
+                        method: "POST",
+                        body,
+                      });
                       setFiles(
                         await api(
                           "/files?entity_type=1&entity_id=" + initial.id,
                         ),
                       );
-                      notify("Sample uploaded.");
+                      notify(
+                        Object.keys(upload.postprocessing_skipped || {}).length
+                          ? "Sample uploaded. Optional DFI preprocessing was skipped."
+                          : "Sample uploaded.",
+                      );
                     } catch (err: any) {
                       notify(err.message, true);
                     }

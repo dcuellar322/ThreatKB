@@ -137,7 +137,11 @@ def upload_file():
         ## POSTPROCESSOR FUNCTIONALITY ##
         app.logger.debug("POSTPROCESSOR STARTING")
         postprocessors = cfg_settings.Cfg_settings.get_settings("POSTPROCESSOR%") or []
-        postprocessors = [item for item in postprocessors if not item.key.startswith(("POSTPROCESSOR_TIMEOUT", "POSTPROCESSOR_DFI_IMAGE"))]
+        from app.compat import strtobool
+        from app.postprocessing import select_postprocessors, is_dfi_processor
+        dfi_enabled = strtobool(os.getenv('POSTPROCESSOR_DFI_ENABLED') or
+            cfg_settings.Cfg_settings.get_setting('POSTPROCESSOR_DFI_ENABLED') or False)
+        postprocessors, postprocessing_skipped = select_postprocessors(postprocessors, dfi_enabled)
         postprocessing_exclude_files_regex = cfg_settings.Cfg_settings.get_setting("POSTPROCESSING_EXCLUDE_FILES_REGEX")
         for postprocessor in postprocessors:
             app.logger.debug("POSTPROCESSOR STARTING '%s'" % (postprocessor.key))
@@ -156,7 +160,7 @@ def upload_file():
             app.logger.debug("POSTPROCESSOR DIRLIST is:\n\n%s" % (os.listdir(tempdir)))
             try:
                 from app.postprocessing import run_postprocessor
-                image = cfg_settings.Cfg_settings.get_setting('POSTPROCESSOR_DFI_IMAGE') if 'DFI' in postprocessor.key else None
+                image = cfg_settings.Cfg_settings.get_setting('POSTPROCESSOR_DFI_IMAGE') if is_dfi_processor(postprocessor) else None
                 timeout = cfg_settings.Cfg_settings.get_setting('POSTPROCESSOR_TIMEOUT') or 120
                 stdout, stderr, return_code = run_postprocessor(postprocessor.value, filename, tempdir, timeout, image)
                 app.logger.debug("POSTPROCESSOR STDOUT is:\n\n%s" % (stdout))
@@ -247,7 +251,8 @@ def upload_file():
             shutil.rmtree(tempdir)
 
         db.session.commit()
-        return jsonify({"files_added": files_added, "files_skipped": files_skipped})
+        return jsonify({"files_added": files_added, "files_skipped": files_skipped,
+                        "postprocessing_skipped": postprocessing_skipped})
 
     return jsonify({})
 

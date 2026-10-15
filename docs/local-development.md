@@ -57,12 +57,18 @@ not intelligence or production-quality detections.
 
 Existing POSTPROCESSOR command settings remain supported, with `{FILENAME}` and
 `{WORKDIR}` argument placeholders and a bounded POSTPROCESSOR_TIMEOUT (seconds).
-For DFI entries, set POSTPROCESSOR_DFI_IMAGE to an explicit image tag or digest to
+DFI is optional and disabled by default, as authorized by the user. Uploads report
+`postprocessing_skipped` when a configured DFI step is disabled; other processors
+continue to run. To opt in later, set `POSTPROCESSOR_DFI_ENABLED=true` in the
+environment or workspace settings. For DFI entries, set POSTPROCESSOR_DFI_IMAGE
+to an explicit image tag or digest to
 use a container adapter instead of a machine-specific pp-dev wrapper. It runs with
 network disabled, receives the sample path under `/work`, and writes extracted
 files into the mounted work directory. The external image must support that
 entrypoint contract. No DFI image was available in this local installation, so
-only the command adapter and error paths have been verified so far.
+the vendor-specific integration is intentionally skipped. Explicitly enabling it
+retains failure reporting; missing/broken tooling is never reported as a successful
+DFI analysis. Command adapters and skip/error behavior are verified locally.
 
 ## Workbench, worker and scheduler
 

@@ -47,8 +47,10 @@ are in `detection-as-code.md`.
 ## External acceptance
 
 The DFI container image/registry was not supplied and the old pp-dev wrapper is
-absent. Command adapters are tested; compatibility with that vendor image remains
-unverified (#470). No unavailable production TAC/customer endpoint, collection
+absent. The user authorized skipping DFI on 2026-10-15. It is disabled by default
+and uploads report configured DFI steps as skipped. Command adapters and explicit
+enable/failure behavior are tested; vendor image compatibility is outside the
+accepted local scope (#470). No unavailable production TAC/customer endpoint, collection
 checkout or private corpus is treated as tested. Receiving-system UUID support,
 channel polling, telemetry reporting and alert delivery require integration there.
 Production promotion blocks without independent review and complete elapsed
