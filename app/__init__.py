@@ -121,9 +121,7 @@ set_celery_stuff(app)
 
 
 
-from app.celeryapp import make_celery
-
-celery = make_celery(app)
+from app.celeryapp import celery
 
 
 from app.routes.version import *
@@ -277,3 +275,5 @@ with app.app_context():
 
 from app import commands
 from app.routes import scanner
+
+from app.routes import scheduled_confidence

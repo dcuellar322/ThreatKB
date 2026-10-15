@@ -1,24 +1,20 @@
-from celery import Celery
-
+import os
+from celery import Celery, Task
 from app import app
-from app.models import cfg_settings
+
 
 def make_celery(flask_app):
-    celery_app = Celery(flask_app.import_name,
-                        backend=flask_app.config['BROKER_URL'],
-                        broker=flask_app.config['BROKER_URL'])
-    celery_app.conf.update(flask_app.config)
-    # task_base = celery_app.Task
-    #
-    # class ContextTask(task_base):
-    #     abstract = True
-    #
-    #     def __call__(self, *args, **kwargs):
-    #         with flask_app.app_context():
-    #             return task_base.__call__(self, *args, **kwargs)
-    #
-    # celery_app.Task = ContextTask
+    class FlaskTask(Task):
+        def __call__(self, *args, **kwargs):
+            with flask_app.app_context():
+                return self.run(*args, **kwargs)
 
+    broker = os.getenv("REDIS_BROKER_URL") or flask_app.config.get("BROKER_URL") or "redis://127.0.0.1:6379/0"
+    celery_app = Celery(flask_app.import_name, task_cls=FlaskTask, broker=broker, backend=broker)
+    celery_app.conf.update(task_serializer="json", result_serializer="json", accept_content=["json"],
+                           timezone="UTC", broker_connection_retry_on_startup=True,
+                           beat_schedule={"scheduled-confidence": {
+                               "task": "threatkb.apply_scheduled_confidence", "schedule": 60.0}})
     return celery_app
 
 
