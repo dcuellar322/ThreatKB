@@ -14,6 +14,23 @@ import tempfile
 from flask_login import current_user
 
 
+def summarize_release_ranges(release_ids, metadata):
+    """Compress contiguous positions in the real release timeline, preserving gaps."""
+    timeline = sorted(metadata, key=lambda key: (metadata[key].get('date_created') or datetime.datetime.min, key))
+    selected = set(release_ids)
+    groups, current = [], []
+    for release_id in timeline:
+        if release_id in selected:
+            current.append(release_id)
+        elif current:
+            groups.append(current)
+            current = []
+    if current:
+        groups.append(current)
+    return [{'first': metadata[group[0]]['name'], 'last': metadata[group[-1]]['name'],
+             'count': len(group), 'first_id': group[0], 'last_id': group[-1]} for group in groups]
+
+
 @cache.memoize(timeout=300)
 def get_release_metadata():
     r = {}

@@ -471,15 +471,19 @@ class Yara_rule_history(db.Model):
     def to_dict(self, include_json=True):
         release_mapping = get_release_yara_rule_history_mapping()
         release_metadata = get_release_metadata()
-        releases = ",".join([release_metadata[release]["name"] for release in
-                             release_mapping[self.id]]) if self.id in release_mapping else None
+        from app.models.releases import summarize_release_ranges
+        release_ranges = summarize_release_ranges(release_mapping.get(self.id, []), release_metadata)
+        releases = ', '.join(item['first'] if item['count'] == 1 else
+                             f"{item['first']} → {item['last']} ({item['count']} releases)"
+                             for item in release_ranges) or None
         yara_history_dict = dict(
             date_created=self.date_created.isoformat() if self.date_created else None,
             revision=self.revision,
             yara_rule_id=self.yara_rule_id,
             user=self.user.to_dict(),
             state=self.state,
-            releases=releases
+            releases=releases,
+            release_ranges=release_ranges
         )
 
         if include_json:
