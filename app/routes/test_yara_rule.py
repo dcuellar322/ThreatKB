@@ -124,8 +124,9 @@ def test_yara_rule_rest(rule_id):
         if not is_neg_test:
             return jsonify(test_yara_rule(yara_rule_entity, files_to_test, current_user.id, False, is_neg_test)), 200
         else:
-            test_yara_rule_task.delay(yara_rule_entity.id, current_user.id, is_neg_test)
-            return jsonify({"status": "ok", "message": "Background job created"}), 200
+            from app.routes.jobs import enqueue_job
+            job = enqueue_job("test_rule", {"rule_id": yara_rule_entity.id, "negative": True}, current_user.id)
+            return jsonify(job.to_dict()), 202
     except Exception as e:
         return str(e), 422
 
@@ -204,7 +205,7 @@ def test_yara_rule(yara_rule_entity, files_to_test, user, is_async=False, is_neg
     db.session.commit()
     return dict(history_id=history.id, duration=duration, files_tested=len(files_to_test),
                 files_matched=matched, tests_terminated=0, errors_encountered=len(errors), error_msgs=errors,
-                passed=not errors and (matched == 0 if is_neg_test else matched == len(files_to_test)))
+                passed=bool(files_to_test) and not errors and (matched == 0 if is_neg_test else matched == len(files_to_test)))
 
 
 def does_rule_compile(yara_dict):
