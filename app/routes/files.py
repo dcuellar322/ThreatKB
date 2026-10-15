@@ -291,10 +291,7 @@ def delete_file(file_id):
         return '', 204
 
     else:
-        full_path = os.path.join(app.config['FILE_STORE_PATH'],
-                                 str(entity.entity_type) if entity.entity_type else "",
-                                 str(entity.entity_id) if entity.entity_id else "",
-                                 secure_filename(entity.filename))
+        full_path = os.path.join(entity.full_path, secure_filename(entity.filename))
         if os.path.exists(full_path):
             os.remove(full_path)
 
