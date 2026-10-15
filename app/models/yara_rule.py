@@ -369,6 +369,8 @@ class Yara_rule(db.Model):
         yara_rule = Yara_rule()
         yara_rule.name = yara_dict["rule_name"]
 
+        if "metadata" not in yara_dict:
+            yara_dict["metadata"] = {}
         if type(yara_dict["metadata"]) is list:
             yara_dict["metadata"] = {list(m.keys())[0]: list(m.values())[0] for m in yara_dict["metadata"]}
 

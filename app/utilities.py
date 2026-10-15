@@ -49,27 +49,20 @@ def extract_dns_text(text):
 #####################################################################
 
 def extract_yara_rules_text(text):
-    text = text.strip()
+    if isinstance(text, bytes):
+        text = text.decode("utf-8")
+    if not re.search(r"\brule\s+[A-Za-z_]", text):
+        return []
+    from flask import abort
+    try:
+        parsed = Plyara().parse_string(text)
+    except Exception as error:
+        abort(422, description=f"Could not parse YARA input: {error}")
     imports = Yara_rule.get_imports_from_string(text)
-    split_regex = cfg_settings.Cfg_settings.get_setting(key="IMPORT_SIG_SPLIT_REGEX")
-    split_regex = split_regex if split_regex else "\n[\t\s]*\}[\s\t]*(rule[\t\s][^\r\n]+(?:\{|[\r\n][\r\n\s\t]*\{))"
-    parse_regex = cfg_settings.Cfg_settings.get_setting(key="IMPORT_SIG_PARSE_REGEX")
-    parse_regex = parse_regex if parse_regex else r"^[\t\s]*rule[\t\s][^\r\n]+(?:\{|[\r\n][\r\n\s\t]*\{).*?condition:.*?\r?\n?[\t\s]*\}[\s\t]*(?:$|\r?\n)"
-
-    yara_rules = re.sub(split_regex, "\n}\n\\1", text, re.MULTILINE | re.DOTALL)
-    yara_rules = re.compile(parse_regex, re.MULTILINE | re.DOTALL).findall(yara_rules)
-    extracted = []
-    for yara_rule_original in yara_rules:
-        try:
-            parsed_rule = parse_yara_rules_text(yara_rule_original.strip())[0]
-
-            strings, condition = get_strings_and_conditions(yara_rule_original)
-            extracted.append(
-                {"parsed_rule": parsed_rule, "strings": strings, "condition": condition, "imports": imports})
-        except Exception as e:
-            pass
-
-    return extracted
+    return [{"parsed_rule": rule,
+             "strings": re.sub(r"^\s*strings:\s*", "", rule.get("raw_strings", "")),
+             "condition": re.sub(r"^\s*condition:\s*", "", rule["raw_condition"]),
+             "imports": imports} for rule in parsed]
 
 
 #####################################################################

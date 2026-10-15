@@ -164,7 +164,7 @@ def save_artifacts(extract_ip, extract_dns, extract_signature, artifacts, shared
 
             elif artifact["type"].lower() == "yara_rule" and extract_signature:
                 yr = yara_rules.get(artifact["rule"]["rule_name"], None)
-                if unique_rule_name_enforcement and yr:
+                if unique_rule_name_enforcement and strtobool(unique_rule_name_enforcement) and yr:
                     duplicate_artifacts.append(artifact)
                     continue
 
