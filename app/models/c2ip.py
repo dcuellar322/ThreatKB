@@ -241,6 +241,8 @@ def run_against_whitelist(mapper, connect, target):
         target.ip = str(IPAddress(target.ip))
     except ValueError:
         abort(412, description=f"Invalid IP address: {target.ip}")
+    from app.dynamic_whitelist import validate_dynamic_whitelist
+    validate_dynamic_whitelist([target.ip], "IP", target.state)
     if Whitelist.hits_whitelist(target.ip, target.state):
         abort(412, f"Failed whitelist validation {target.ip}")
 
@@ -257,6 +259,8 @@ def c2ip_before_update(mapper, connect, target):
     except:
         abort(412, f"Not a welformed IP address {target.ip}")
 
+    from app.dynamic_whitelist import validate_dynamic_whitelist
+    validate_dynamic_whitelist([target.ip], "IP", target.state)
     if Whitelist.hits_whitelist(target.ip, target.state):
         abort(412, f"Failed whitelist validation {target.ip}")
 

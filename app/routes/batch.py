@@ -80,6 +80,15 @@ def batch_update(batch, artifact, session, include_tags=True):
                 'artifact_id': batch_id
             })
 
+    if fields_to_update.get('state') and artifact.__tablename__ in ('c2ip', 'c2dns'):
+        from app.dynamic_whitelist import validate_dynamic_whitelist
+        from app.models.whitelist import Whitelist
+        kind, column = ('IP', 'ip') if artifact.__tablename__ == 'c2ip' else ('DNS', 'domain_name')
+        indicators = [getattr(row, column) for row in artifact.query.filter(artifact.id.in_(batch['ids']))]
+        if any(Whitelist.hits_whitelist(value, fields_to_update['state']) for value in indicators):
+            abort(412, description='Batch includes a whitelisted indicator.')
+        validate_dynamic_whitelist(indicators, kind, fields_to_update['state'])
+
     if fields_to_update and 'ids' in batch and batch['ids']:
         session.execute(artifact.__table__.update().values(
             fields_to_update

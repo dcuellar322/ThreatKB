@@ -226,6 +226,8 @@ class C2dns(db.Model):
 
 @listens_for(C2dns, "before_insert")
 def run_against_whitelist(mapper, connect, target):
+    from app.dynamic_whitelist import validate_dynamic_whitelist
+    validate_dynamic_whitelist([target.domain_name], "DNS", target.state)
     if Whitelist.hits_whitelist(target.domain_name, target.state):
         abort(412, f"Failed whitelist validation {target.domain_name}")
 
@@ -237,6 +239,8 @@ def run_against_whitelist(mapper, connect, target):
 
 @listens_for(C2dns, "before_update")
 def c2dns_before_update(mapper, connect, target):
+    from app.dynamic_whitelist import validate_dynamic_whitelist
+    validate_dynamic_whitelist([target.domain_name], "DNS", target.state)
     if Whitelist.hits_whitelist(target.domain_name, target.state):
         abort(412, f"Failed whitelist validation {target.domain_name}")
 
