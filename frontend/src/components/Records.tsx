@@ -123,12 +123,13 @@ export function Records({ page, version, notify, refresh, user }: any) {
   }, [showColumns]);
   const editable = !!kinds[page];
   useEffect(() => {
+    if (query === debounced) return;
     const timer = setTimeout(() => {
       setDebounced(query);
       setIndex(0);
     }, 250);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, debounced]);
   useEffect(() => {
     sessionStorage.setItem(
       key,
