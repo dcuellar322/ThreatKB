@@ -1,15 +1,24 @@
 from flask import request, Response, json, abort
-from flask_login import login_required
+from flask_login import login_required, current_user
 from sqlalchemy import or_, and_
 from app import app, db, auto, ENTITY_MAPPING
-from app.models import comments, yara_rule, c2dns, c2ip, tasks, tags, tags_mapping, metadata
+from app.models import (
+    comments,
+    yara_rule,
+    c2dns,
+    c2ip,
+    tasks,
+    tags,
+    tags_mapping,
+    metadata,
+)
 import json
 from app.models import users
 from app.models import tags_mapping
 from app import cache
 
 
-@cache.cached(timeout=60*5)
+@cache.cached(timeout=60 * 5)
 def get_caches():
     metadata_cache = metadata.Metadata.get_metadata_cache()
     tags_mapping_cache = tags_mapping.Tags_mapping.get_tags_mapping_cache()
@@ -18,17 +27,22 @@ def get_caches():
     return metadata_cache, tags_mapping_cache, user_cache, comments_cache
 
 
-@app.route('/ThreatKB/search', methods=['GET'])
+@app.route("/ThreatKB/search", methods=["GET"])
 @auto.doc()
+@login_required
 def do_search():
-    """Returns list of artifacts based on the search criteria.
-    From Data: tag (str), state (str), category (str), description (str), artifact_type (comma-separated list of dns, ip, signature, task)
-    Return: dictionary of lists of artifact dictionaries"""
     tag = request.args.get("tag", None)
-    state = request.args.get('state', None)
+    state = request.args.get("state", None)
     all = request.args.get("all", None)
-    artifact_type = request.args.get('artifact_type', None)
-    category = request.args.get('category', None)
+    artifact_type = request.args.get("artifact_type", None)
+    category = request.args.get("category", None)
+
+    # Pagination parameters with defaults
+    limit = request.args.get("limit", default=100, type=int)
+    offset = request.args.get("offset", default=0, type=int)
+
+    if not 1 <= limit <= 200 or offset < 0:
+        abort(400, description="Use limit 1–200 and a nonnegative offset.")
 
     if not tag and not state and not category and not artifact_type and not all:
         abort(400)
@@ -38,28 +52,57 @@ def do_search():
 
     results = {"tasks": [], "ips": [], "dns": [], "signatures": []}
 
-    signatures = yara_rule.Yara_rule.query
-    ips = c2ip.C2ip.query
-    dns = c2dns.C2dns.query
-    task = tasks.Tasks.query
+    # Default sorted queries
+    signatures = yara_rule.Yara_rule.query.order_by(yara_rule.Yara_rule.id.desc())
+    ips = c2ip.C2ip.query.order_by(c2ip.C2ip.id.desc())
+    dns = c2dns.C2dns.query.order_by(c2dns.C2dns.id.desc())
+    task = tasks.Tasks.query.order_by(tasks.Tasks.id.desc())
 
     if tag:
-        signatures = db.session.query(yara_rule.Yara_rule).join(tags_mapping.Tags_mapping,
-                                                                tags_mapping.Tags_mapping.source_id == yara_rule.Yara_rule.id).join(
-            tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "yara_rules")
-        ips = db.session.query(c2ip.C2ip).join(tags_mapping.Tags_mapping,
-                                               tags_mapping.Tags_mapping.source_id == c2ip.C2ip.id).join(
-            tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "c2ip")
-        dns = db.session.query(c2dns.C2dns).join(tags_mapping.Tags_mapping,
-                                                 tags_mapping.Tags_mapping.source_id == c2dns.C2dns.id).join(
-            tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "c2dns")
-        task = db.session.query(tasks.Tasks).join(tags_mapping.Tags_mapping,
-                                                  tags_mapping.Tags_mapping.source_id == tasks.Tasks.id).join(
-            tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id).filter_by(text=tag).filter(
-            tags_mapping.Tags_mapping.source_table == "tasks")
+        signatures = (
+            db.session.query(yara_rule.Yara_rule)
+            .join(
+                tags_mapping.Tags_mapping,
+                tags_mapping.Tags_mapping.source_id == yara_rule.Yara_rule.id,
+            )
+            .join(tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id)
+            .filter_by(text=tag)
+            .filter(tags_mapping.Tags_mapping.source_table == "yara_rules")
+            .order_by(yara_rule.Yara_rule.id.desc())
+        )
+        ips = (
+            db.session.query(c2ip.C2ip)
+            .join(
+                tags_mapping.Tags_mapping,
+                tags_mapping.Tags_mapping.source_id == c2ip.C2ip.id,
+            )
+            .join(tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id)
+            .filter_by(text=tag)
+            .filter(tags_mapping.Tags_mapping.source_table == "c2ip")
+            .order_by(c2ip.C2ip.id.desc())
+        )
+        dns = (
+            db.session.query(c2dns.C2dns)
+            .join(
+                tags_mapping.Tags_mapping,
+                tags_mapping.Tags_mapping.source_id == c2dns.C2dns.id,
+            )
+            .join(tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id)
+            .filter_by(text=tag)
+            .filter(tags_mapping.Tags_mapping.source_table == "c2dns")
+            .order_by(c2dns.C2dns.id.desc())
+        )
+        task = (
+            db.session.query(tasks.Tasks)
+            .join(
+                tags_mapping.Tags_mapping,
+                tags_mapping.Tags_mapping.source_id == tasks.Tasks.id,
+            )
+            .join(tags.Tags, tags.Tags.id == tags_mapping.Tags_mapping.tag_id)
+            .filter_by(text=tag)
+            .filter(tags_mapping.Tags_mapping.source_table == "tasks")
+            .order_by(tasks.Tasks.id.desc())
+        )
 
     if state:
         signatures = signatures.filter(yara_rule.Yara_rule.state == state)
@@ -72,40 +115,88 @@ def do_search():
 
     if all:
         signatures = signatures.filter(
-            or_(yara_rule.Yara_rule.name.like("%" + all + "%"), yara_rule.Yara_rule.category.like("%" + all + "%"),
-                yara_rule.Yara_rule.state.like("%" + all + "%"), yara_rule.Yara_rule.strings.like("%" + all + "%"),
+            or_(
+                yara_rule.Yara_rule.name.like("%" + all + "%"),
+                yara_rule.Yara_rule.category.like("%" + all + "%"),
+                yara_rule.Yara_rule.state.like("%" + all + "%"),
+                yara_rule.Yara_rule.strings.like("%" + all + "%"),
                 yara_rule.Yara_rule.condition.like("%" + all + "%"),
                 yara_rule.Yara_rule.description.like("%" + all + "%"),
                 yara_rule.Yara_rule.references.like("%" + all + "%"),
-                (yara_rule.Yara_rule.eventid == int(all) if all.isdigit() else False)))
+                (yara_rule.Yara_rule.eventid == int(all) if all.isdigit() else False),
+            )
+        )
 
-        ips = ips.filter(or_(c2ip.C2ip.state.like("%" + all + "%"),
-                             c2ip.C2ip.ip.like("%" + all + "%"),
-                             c2ip.C2ip.asn.like("%" + all + "%"),
-                             c2ip.C2ip.country.like("%" + all + "%"),
-                             c2ip.C2ip.description.like("%" + all + "%"),
-                             c2ip.C2ip.references.like("%" + all + "%"),
-                             c2ip.C2ip.state.like("%" + all + "%"), ))
-        dns = dns.filter(or_(c2dns.C2dns.state.like("%" + all + "%"),
-                             c2dns.C2dns.domain_name.like("%" + all + "%"),
-                             c2dns.C2dns.description.like("%" + all + "%"),
-                             c2dns.C2dns.references.like("%" + all + "%"),
-                             ))
-        task = task.filter(or_(tasks.Tasks.state.like("%" + all + "%"), tasks.Tasks.title.like("%" + all + "%"),
-                               tasks.Tasks.final_artifact.like("%" + all + "%")))
+        ips = ips.filter(
+            or_(
+                c2ip.C2ip.state.like("%" + all + "%"),
+                c2ip.C2ip.ip.like("%" + all + "%"),
+                c2ip.C2ip.asn.like("%" + all + "%"),
+                c2ip.C2ip.country.like("%" + all + "%"),
+                c2ip.C2ip.description.like("%" + all + "%"),
+                c2ip.C2ip.references.like("%" + all + "%"),
+                c2ip.C2ip.state.like("%" + all + "%"),
+            )
+        )
+        dns = dns.filter(
+            or_(
+                c2dns.C2dns.state.like("%" + all + "%"),
+                c2dns.C2dns.domain_name.like("%" + all + "%"),
+                c2dns.C2dns.description.like("%" + all + "%"),
+                c2dns.C2dns.references.like("%" + all + "%"),
+            )
+        )
+        task = task.filter(
+            or_(
+                tasks.Tasks.state.like("%" + all + "%"),
+                tasks.Tasks.title.like("%" + all + "%"),
+                tasks.Tasks.final_artifact.like("%" + all + "%"),
+            )
+        )
 
-    metadata_cache, tags_mapping_cache, user_cache, comments_cache = get_caches()
+    from app.querying import visible_query, eager_people, serialize_page
+    from app.models.cfg_settings import Cfg_settings
 
-    if not artifact_type or "signature" in artifact_type:
-        results["signatures"] = [signature.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache) for signature in signatures.all()]
+    pairs = [
+        ("signatures", yara_rule.Yara_rule, 1, signatures, "signature"),
+        ("ips", c2ip.C2ip, 3, ips, "ip"),
+        ("dns", c2dns.C2dns, 2, dns, "dns"),
+        ("tasks", tasks.Tasks, 4, task, "task"),
+    ]
+    totals = {}
+    for key, model, kind, query, selector in pairs:
+        if artifact_type and selector not in artifact_type:
+            totals[key] = 0
+            continue
+        if not current_user.admin:
+            if kind == 4:
+                from app.compat import strtobool
 
-    if not artifact_type or "ip" in artifact_type:
-        results["ips"] = [ip.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache) for ip in ips.all()]
+                public = Cfg_settings.get_setting("ENABLE_NON_ADMIN_TASK_VISIBILITY")
+                if not (public and strtobool(public)):
+                    query = query.filter(
+                        or_(
+                            model.owner_user_id == current_user.id,
+                            model.owner_user_id.is_(None),
+                        )
+                    )
+            else:
+                query = query.filter(model.owner_user_id == current_user.id)
+        totals[key] = query.order_by(None).count()
+        rows = eager_people(query, model).offset(offset).limit(limit).all()
+        results[key] = serialize_page(rows, model, kind, short=True)
+    sig_total, ip_total, dns_total, task_total = (
+        totals[key] for key in ("signatures", "ips", "dns", "tasks")
+    )
 
-    if not artifact_type or "dns" in artifact_type:
-        results["dns"] = [d.to_dict(comments_cache=comments_cache, metadata_cache=metadata_cache, users_cache=user_cache, tags_mapping_cache=tags_mapping_cache) for d in dns.all()]
+    response_data = {
+        **results,
+        "pagination": {
+            "signatures": {"limit": limit, "offset": offset, "total": sig_total},
+            "ips": {"limit": limit, "offset": offset, "total": ip_total},
+            "dns": {"limit": limit, "offset": offset, "total": dns_total},
+            "tasks": {"limit": limit, "offset": offset, "total": task_total},
+        },
+    }
 
-    if not artifact_type or "task" in artifact_type:
-        results["tasks"] = [t.to_dict() for t in task.all()]
-
-    return Response(json.dumps(results), mimetype='application/json')
+    return Response(json.dumps(response_data), mimetype="application/json")

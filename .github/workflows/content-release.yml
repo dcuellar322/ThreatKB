@@ -1,0 +1,65 @@
+name: Publish reviewed testing content
+on:
+  push:
+    branches: [master]
+    paths:
+      - detections/**
+      - threatkb_content/**
+      - scripts/publish_content.py
+      - .github/workflows/content-release.yml
+  workflow_dispatch:
+    inputs:
+      group:
+        description: Configured policy group
+        default: default
+        required: true
+permissions:
+  contents: read
+jobs:
+  testing:
+    # Activation is explicit; a draft modernization PR cannot publish content.
+    if: vars.CONTENT_RELEASES_ENABLED == 'true' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [sigpack, feedpack, codepack]
+    concurrency:
+      group: testing-${{ matrix.kind }}-${{ inputs.group || 'default' }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, 2026-07-20
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: docker build --target content -t threatkb:content .
+      - name: Build and publish only after independent review
+        env:
+          PACK_KIND: ${{ matrix.kind }}
+          CONTENT_GROUP: ${{ inputs.group || 'default' }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/source:ro" -v "$RUNNER_TEMP/release:/artifacts" \
+            threatkb:content --root /source/detections build \
+            --kind "$PACK_KIND" --group "$CONTENT_GROUP" \
+            --corpus /source/detections/samples --goodware /source/detections/goodware \
+            --output /artifacts/builds
+          manifest=$(find "$RUNNER_TEMP/release/builds" -name manifest.json -type f)
+          manifest="/artifacts/${manifest#"$RUNNER_TEMP/release/"}"
+          docker run --rm --user "$(id -u):$(id -g)" --entrypoint python \
+            -e GITHUB_TOKEN -e GITHUB_REPOSITORY -e GITHUB_SHA \
+            -v "$PWD:/source:ro" -v "$RUNNER_TEMP/release:/artifacts" \
+            threatkb:content -m scripts.publish_content --root /source/detections \
+            --manifest "$manifest" --output /artifacts/publication
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, 2026-04-10
+        if: always()
+        with:
+          name: testing-${{ matrix.kind }}-${{ github.sha }}
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: warn
+          retention-days: 30

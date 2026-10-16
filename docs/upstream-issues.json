@@ -1,0 +1,242 @@
+[
+  {
+    "body": "When deploying the project using Docker Compose, I'm encountering the following error:\n```\nERROR 1146 (42S02) at line 1: Table 'threatkb.kb_users' doesn't exist\n```\n**Questions**\nIs there a database migration step I'm missing?\nAre there any specific configuration settings required for proper database initialization?\nAny help would be greatly appreciated as I'm trying to get the application running in my environment.\n\n\n**Command execution log for debugging Docker Compose deployment error**\n```\nubuntu@VM-140-17-ubuntu:~/ThreatKB$ sudo docker compose up\nWARN[0000] /home/ubuntu/ThreatKB/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion \n[+] Running 12/12\n \u2714 db Pulled                                                                                                                                                                               6.8s \n   \u2714 e54b73e95ef3 Pull complete                                                                                                                                                            2.1s \n   \u2714 327840d38cb2 Pull complete                                                                                                                                                            2.1s \n   \u2714 642077275f5f Pull complete                                                                                                                                                            2.2s \n   \u2714 e077469d560d Pull complete                                                                                                                                                            2.3s \n   \u2714 cbf214d981a6 Pull complete                                                                                                                                                            2.3s \n   \u2714 7d1cc1ea1b3d Pull complete                                                                                                                                                            2.3s \n   \u2714 d48f3c15cb80 Pull complete                                                                                                                                                            3.0s \n   \u2714 94c3d7b2c9ae Pull complete                                                                                                                                                            3.0s \n   \u2714 f6cfbf240ed7 Pull complete                                                                                                                                                            5.8s \n   \u2714 e12b159b2a12 Pull complete                                                                                                                                                            5.8s \n   \u2714 4e93c6fd777f Pull complete                                                                                                                                                            5.8s \n[+] Running 6/6\n \u2714 Network threatkb_default             Created                                                                                                                                            0.0s \n \u2714 Volume \"threatkb_db_data\"            Created                                                                                                                                            0.0s \n \u2714 Container threatkb-db-1              Created                                                                                                                                            0.8s \n \u2714 Container threatkb-redis-1           Created                                                                                                                                            0.0s \n \u2714 Container threatkb-threatkb-1        Created                                                                                                                                            0.0s \n \u2714 Container threatkb-threatkb_agent-1  Created                                                                                                                                            0.0s \nAttaching to db-1, redis-1, threatkb-1, threatkb_agent-1\ndb-1              | 2025-05-09 07:22:17+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.29-1.el8 started.\ndb-1              | 2025-05-09 07:22:17+00:00 [Note] [Entrypoint]: Switching to dedicated user 'mysql'\ndb-1              | 2025-05-09 07:22:17+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.29-1.el8 started.\ndb-1              | 2025-05-09 07:22:18+00:00 [Note] [Entrypoint]: Initializing database files\nthreatkb_agent-1  | + env\nthreatkb_agent-1  | REDIS_TASK_SERIALIZER=json\nthreatkb_agent-1  | HOSTNAME=7290daa8ef6b\nthreatkb_agent-1  | REDIS_ACCEPT_CONTENT=[\"json\"]\nthreatkb_agent-1  | C_FORCE_ROOT=true\nthreatkb_agent-1  | PWD=/opt/threatkb\nthreatkb_agent-1  | HOME=/root\nthreatkb_agent-1  | RUN_AGENT=1\nthreatkb_agent-1  | REDIS_RESULT_SERIALIZER=json\nthreatkb_agent-1  | SHLVL=1\nthreatkb_agent-1  | REDIS_BROKER_URL=redis://redis:6379/0\nthreatkb_agent-1  | PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\ndb-1              | 2025-05-09T07:22:18.073259Z 0 [Warning] [MY-010918] [Server] 'default_authentication_plugin' is deprecated and will be removed in a future release. Please use authentication_policy instead.\nthreatkb_agent-1  | _=/usr/bin/env\ndb-1              | 2025-05-09T07:22:18.073274Z 0 [System] [MY-013169] [Server] /usr/sbin/mysqld (mysqld 8.0.29) initializing of server in progress as process 42\nthreatkb_agent-1  | + cd /opt/threatkb\ndb-1              | 2025-05-09T07:22:18.081108Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.\nthreatkb_agent-1  | + ./wait-for-it.sh db:3306 -- echo 'db is up'\nthreatkb_agent-1  | wait-for-it.sh: waiting 15 seconds for db:3306\nredis-1           | 1:C 09 May 2025 07:22:18.113 # WARNING Memory overcommit must be enabled! Without it, a background save or replication may fail under low memory condition. Being disabled, it can also cause failures without low memory condition, see https://github.com/jemalloc/jemalloc/issues/1328. To fix this issue add 'vm.overcommit_memory = 1' to /etc/sysctl.conf and then reboot or run the command 'sysctl vm.overcommit_memory=1' for this to take effect.\nredis-1           | 1:C 09 May 2025 07:22:18.113 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo\nredis-1           | 1:C 09 May 2025 07:22:18.113 * Redis version=7.4.3, bits=64, commit=00000000, modified=0, pid=1, just started\nredis-1           | 1:C 09 May 2025 07:22:18.113 # Warning: no config file specified, using the default config. In order to specify a config file use redis-server /path/to/redis.conf\nredis-1           | 1:M 09 May 2025 07:22:18.114 * monotonic clock: POSIX clock_gettime\nredis-1           | 1:M 09 May 2025 07:22:18.115 * Running mode=standalone, port=6379.\nredis-1           | 1:M 09 May 2025 07:22:18.115 * Server initialized\nredis-1           | 1:M 09 May 2025 07:22:18.115 * Ready to accept connections tcp\nthreatkb-1        | + env\nthreatkb-1        | HOSTNAME=f70d439f8aa4\nthreatkb-1        | PWD=/opt/threatkb\nthreatkb-1        | SQL_HOST=db\nthreatkb-1        | MYSQL_ROOT_PASSWORD=b5vXcqzUtn4suyS\nthreatkb-1        | HOME=/root\nthreatkb-1        | SQL_PROTOCOL=mysql\nthreatkb-1        | LISTEN_PORT=5000\nthreatkb-1        | THREATKB_USER=admin@inquest.net\nthreatkb-1        | SQL_PASSWORD=b5vXcqzUtn4suyS\nthreatkb-1        | SHLVL=1\nthreatkb-1        | SQL_USERNAME=threatkb\nthreatkb-1        | SQL_DATABASE=threatkb\nthreatkb-1        | REDIS_CACHE_URL=redis://localhost:6379/0\nthreatkb-1        | LISTEN_ON=0.0.0.0\nthreatkb-1        | THREATKB_PASS=b5vXcqzUtn4suyS\nthreatkb-1        | PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nthreatkb-1        | SQL_PORT=3306\nthreatkb-1        | _=/usr/bin/env\nthreatkb-1        | + cd /opt/threatkb\nthreatkb-1        | + ./wait-for-it.sh db:3306 -- echo 'db is up'\nthreatkb-1        | wait-for-it.sh: waiting 15 seconds for db:3306\ndb-1              | 2025-05-09T07:22:18.460136Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.\ndb-1              | 2025-05-09T07:22:19.445349Z 6 [Warning] [MY-010453] [Server] root@localhost is created with an empty password ! Please consider switching off the --initialize-insecure option.\ndb-1              | 2025-05-09 07:22:21+00:00 [Note] [Entrypoint]: Database files initialized\ndb-1              | 2025-05-09 07:22:21+00:00 [Note] [Entrypoint]: Starting temporary server\ndb-1              | 2025-05-09T07:22:22.101863Z 0 [Warning] [MY-010918] [Server] 'default_authentication_plugin' is deprecated and will be removed in a future release. Please use authentication_policy instead.\ndb-1              | 2025-05-09T07:22:22.101877Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.0.29) starting as process 91\ndb-1              | 2025-05-09T07:22:22.117095Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.\ndb-1              | 2025-05-09T07:22:22.228819Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.\ndb-1              | 2025-05-09T07:22:22.422143Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.\ndb-1              | 2025-05-09T07:22:22.422172Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.\ndb-1              | 2025-05-09T07:22:22.426061Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/run/mysqld' in the path is accessible to all OS users. Consider choosing a different directory.\ndb-1              | 2025-05-09T07:22:22.438296Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.0.29'  socket: '/var/run/mysqld/mysqld.sock'  port: 0  MySQL Community Server - GPL.\ndb-1              | 2025-05-09 07:22:22+00:00 [Note] [Entrypoint]: Temporary server started.\ndb-1              | '/var/lib/mysql/mysql.sock' -> '/var/run/mysqld/mysqld.sock'\ndb-1              | Warning: Unable to load '/usr/share/zoneinfo/iso3166.tab' as time zone. Skipping it.\ndb-1              | Warning: Unable to load '/usr/share/zoneinfo/leapseconds' as time zone. Skipping it.\ndb-1              | Warning: Unable to load '/usr/share/zoneinfo/tzdata.zi' as time zone. Skipping it.\ndb-1              | Warning: Unable to load '/usr/share/zoneinfo/zone.tab' as time zone. Skipping it.\ndb-1              | Warning: Unable to load '/usr/share/zoneinfo/zone1970.tab' as time zone. Skipping it.\ndb-1              | 2025-05-09 07:22:23+00:00 [Note] [Entrypoint]: Creating database threatkb\ndb-1              | 2025-05-09 07:22:23+00:00 [Note] [Entrypoint]: Creating user threatkb\ndb-1              | 2025-05-09 07:22:23+00:00 [Note] [Entrypoint]: Giving user threatkb access to schema threatkb\ndb-1              | \ndb-1              | 2025-05-09 07:22:24+00:00 [Note] [Entrypoint]: Stopping temporary server\ndb-1              | 2025-05-09T07:22:24.011873Z 13 [System] [MY-013172] [Server] Received SHUTDOWN from user root. Shutting down mysqld (Version: 8.0.29).\ndb-1              | 2025-05-09T07:22:25.124489Z 0 [System] [MY-010910] [Server] /usr/sbin/mysqld: Shutdown complete (mysqld 8.0.29)  MySQL Community Server - GPL.\ndb-1              | 2025-05-09 07:22:26+00:00 [Note] [Entrypoint]: Temporary server stopped\ndb-1              | \ndb-1              | 2025-05-09 07:22:26+00:00 [Note] [Entrypoint]: MySQL init process done. Ready for start up.\ndb-1              | \ndb-1              | 2025-05-09T07:22:26.272290Z 0 [Warning] [MY-010918] [Server] 'default_authentication_plugin' is deprecated and will be removed in a future release. Please use authentication_policy instead.\ndb-1              | 2025-05-09T07:22:26.272304Z 0 [System] [MY-010116] [Server] /usr/sbin/mysqld (mysqld 8.0.29) starting as process 1\ndb-1              | 2025-05-09T07:22:26.278160Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.\ndb-1              | 2025-05-09T07:22:26.392124Z 1 [System] [MY-013577] [InnoDB] InnoDB initialization has ended.\ndb-1              | 2025-05-09T07:22:26.559152Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.\ndb-1              | 2025-05-09T07:22:26.559179Z 0 [System] [MY-013602] [Server] Channel mysql_main configured to support TLS. Encrypted connections are now supported for this channel.\ndb-1              | 2025-05-09T07:22:26.560952Z 0 [Warning] [MY-011810] [Server] Insecure configuration for --pid-file: Location '/var/run/mysqld' in the path is accessible to all OS users. Consider choosing a different directory.\ndb-1              | 2025-05-09T07:22:26.573657Z 0 [System] [MY-010931] [Server] /usr/sbin/mysqld: ready for connections. Version: '8.0.29'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server - GPL.\nthreatkb_agent-1  | wait-for-it.sh: db:3306 is available after 9 seconds\nthreatkb_agent-1  | db is up\nthreatkb_agent-1  | + [[ ! -z 1 ]]\nthreatkb_agent-1  | + env/bin/celery -A app.celery worker --uid uwsgi --loglevel=info\nthreatkb-1        | wait-for-it.sh: db:3306 is available after 9 seconds\nthreatkb-1        | db is up\nthreatkb-1        | + [[ ! -z '' ]]\nthreatkb-1        | + find . -name '*.pyc' -exec rm -f '{}' ';'\nthreatkb-1        | + env/bin/flask db upgrade\nthreatkb_agent-1  | app config: <Config {'DEBUG': False, 'TESTING': False, 'PROPAGATE_EXCEPTIONS': None, 'SECRET_KEY': 'aaaaaaaaaaaaaaaaaaaaaaaa', 'PERMANENT_SESSION_LIFETIME': datetime.timedelta(days=31), 'USE_X_SENDFILE': False, 'SERVER_NAME': None, 'APPLICATION_ROOT': '/', 'SESSION_COOKIE_NAME': 'session', 'SESSION_COOKIE_DOMAIN': None, 'SESSION_COOKIE_PATH': None, 'SESSION_COOKIE_HTTPONLY': True, 'SESSION_COOKIE_SECURE': False, 'SESSION_COOKIE_SAMESITE': None, 'SESSION_REFRESH_EACH_REQUEST': True, 'MAX_CONTENT_LENGTH': None, 'SEND_FILE_MAX_AGE_DEFAULT': None, 'TRAP_BAD_REQUEST_ERRORS': None, 'TRAP_HTTP_EXCEPTIONS': False, 'EXPLAIN_TEMPLATE_LOADING': False, 'PREFERRED_URL_SCHEME': 'http', 'TEMPLATES_AUTO_RELOAD': None, 'MAX_COOKIE_SIZE': 4093, 'LOGGING_LEVEL': 10, 'SQLALCHEMY_DATABASE_URI': 'mysql://root:yourpassword@127.0.0.1:3306/threatkb_test?use_unicode=1&charset=utf8', 'SQLALCHEMY_TRACK_MODIFICATIONS': False, 'SQL_DATABASE': 'threatkb_test', 'SQL_HOST': '127.0.0.1', 'SQL_PASSWORD': 'yourpassword', 'SQL_PORT': '3306', 'SQL_PROTOCOL': 'mysql', 'SQL_USERNAME': 'root', 'TEST_PASSWORD': 'password', 'TEST_PASSWORD_HASHED': b'$2b$12$Rx9.vQCk489tO0bg50/Sfem9VOggC.L/WNhO1XMPlArsRXsxPkKZG', 'TEST_USER': 'admin', 'SQLALCHEMY_ENGINE_OPTIONS': {}, 'SQLALCHEMY_ECHO': False, 'SQLALCHEMY_BINDS': {}, 'SQLALCHEMY_RECORD_QUERIES': False, 'BROKER_URL': 'redis://redis:6379/0', 'TASK_SERIALIZER': 'json', 'RESULT_SERIALIZER': 'json', 'ACCEPT_CONTENT': '[\"json\"]', 'FILE_STORE_PATH': None, 'MAX_MILLIS_PER_FILE_THRESHOLD': None}>\nthreatkb_agent-1  |  \nthreatkb_agent-1  |  -------------- celery@7290daa8ef6b v5.2.6 (dawn-chorus)\nthreatkb_agent-1  | --- ***** ----- \nthreatkb_agent-1  | -- ******* ---- Linux-6.8.0-57-generic-x86_64-with-glibc2.29 2025-05-09 07:22:30\nthreatkb_agent-1  | - *** --- * --- \nthreatkb_agent-1  | - ** ---------- [config]\nthreatkb_agent-1  | - ** ---------- .> app:         app:0x7568caa29b20\nthreatkb_agent-1  | - ** ---------- .> transport:   redis://redis:6379/0\nthreatkb_agent-1  | - ** ---------- .> results:     redis://redis:6379/0\nthreatkb_agent-1  | - *** --- * --- .> concurrency: 8 (prefork)\nthreatkb_agent-1  | -- ******* ---- .> task events: OFF (enable -E to monitor tasks in this worker)\nthreatkb_agent-1  | --- ***** ----- \nthreatkb_agent-1  |  -------------- [queues]\nthreatkb_agent-1  |                 .> celery           exchange=celery(direct) key=celery\nthreatkb_agent-1  |                 \nthreatkb_agent-1  | \nthreatkb_agent-1  | [tasks]\nthreatkb_agent-1  |   . app.routes.test_yara_rule.test_yara_rule_task\nthreatkb_agent-1  | \nthreatkb_agent-1  | [2025-05-09 07:22:30,634: WARNING/MainProcess] /opt/threatkb/env/lib/python3.8/site-packages/celery/app/utils.py:204: CDeprecationWarning: \nthreatkb_agent-1  |     The 'BROKER_URL' setting is deprecated and scheduled for removal in\nthreatkb_agent-1  |     version 6.0.0. Use the broker_url instead\nthreatkb_agent-1  | \nthreatkb_agent-1  |   deprecated.warn(description=f'The {setting!r} setting',\nthreatkb_agent-1  | \nthreatkb_agent-1  | [2025-05-09 07:22:30,634: WARNING/MainProcess] Please run `celery upgrade settings path/to/settings.py` to avoid these warnings and to allow a smoother upgrade to Celery 6.0.\nthreatkb_agent-1  | [2025-05-09 07:22:31,051: INFO/MainProcess] Connected to redis://redis:6379/0\nthreatkb_agent-1  | [2025-05-09 07:22:31,053: INFO/MainProcess] mingle: searching for neighbors\nthreatkb_agent-1  | [2025-05-09 07:22:32,061: INFO/MainProcess] mingle: all alone\nthreatkb_agent-1  | [2025-05-09 07:22:32,069: INFO/MainProcess] celery@7290daa8ef6b ready.\nthreatkb-1        | app config: <Config {'DEBUG': False, 'TESTING': False, 'PROPAGATE_EXCEPTIONS': None, 'SECRET_KEY': 'aaaaaaaaaaaaaaaaaaaaaaaa', 'PERMANENT_SESSION_LIFETIME': datetime.timedelta(days=31), 'USE_X_SENDFILE': False, 'SERVER_NAME': None, 'APPLICATION_ROOT': '/', 'SESSION_COOKIE_NAME': 'session', 'SESSION_COOKIE_DOMAIN': None, 'SESSION_COOKIE_PATH': None, 'SESSION_COOKIE_HTTPONLY': True, 'SESSION_COOKIE_SECURE': False, 'SESSION_COOKIE_SAMESITE': None, 'SESSION_REFRESH_EACH_REQUEST': True, 'MAX_CONTENT_LENGTH': None, 'SEND_FILE_MAX_AGE_DEFAULT': None, 'TRAP_BAD_REQUEST_ERRORS': None, 'TRAP_HTTP_EXCEPTIONS': False, 'EXPLAIN_TEMPLATE_LOADING': False, 'PREFERRED_URL_SCHEME': 'http', 'TEMPLATES_AUTO_RELOAD': None, 'MAX_COOKIE_SIZE': 4093, 'LOGGING_LEVEL': 10, 'SQLALCHEMY_DATABASE_URI': 'mysql://threatkb:b5vXcqzUtn4suyS@db:3306/threatkb?use_unicode=1&charset=utf8', 'SQLALCHEMY_TRACK_MODIFICATIONS': False, 'SQL_DATABASE': 'threatkb', 'SQL_HOST': 'db', 'SQL_PASSWORD': 'b5vXcqzUtn4suyS', 'SQL_PORT': '3306', 'SQL_PROTOCOL': 'mysql', 'SQL_USERNAME': 'threatkb', 'TEST_PASSWORD': 'password', 'TEST_PASSWORD_HASHED': b'$2b$12$VK75mMiKzJijwzSNNx8NdOPOnvmQMOfTyeJqRV.38EvGjSqygtHw2', 'TEST_USER': 'admin', 'SQLALCHEMY_ENGINE_OPTIONS': {}, 'SQLALCHEMY_ECHO': False, 'SQLALCHEMY_BINDS': {}, 'SQLALCHEMY_RECORD_QUERIES': False, 'BROKER_URL': None, 'TASK_SERIALIZER': None, 'RESULT_SERIALIZER': None, 'ACCEPT_CONTENT': None, 'FILE_STORE_PATH': None, 'MAX_MILLIS_PER_FILE_THRESHOLD': None}>\nthreatkb-1        | Traceback (most recent call last):\nthreatkb-1        |   File \"env/bin/flask\", line 8, in <module>\nthreatkb-1        |     sys.exit(main())\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/flask/cli.py\", line 1063, in main\nthreatkb-1        |     cli.main()\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/click/core.py\", line 1055, in main\nthreatkb-1        |     rv = self.invoke(ctx)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/click/core.py\", line 1657, in invoke\nthreatkb-1        |     return _process_result(sub_ctx.command.invoke(sub_ctx))\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/click/core.py\", line 1657, in invoke\nthreatkb-1        |     return _process_result(sub_ctx.command.invoke(sub_ctx))\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/click/core.py\", line 1404, in invoke\nthreatkb-1        |     return ctx.invoke(self.callback, **ctx.params)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/click/core.py\", line 760, in invoke\nthreatkb-1        |     return __callback(*args, **kwargs)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/click/decorators.py\", line 26, in new_func\nthreatkb-1        |     return f(get_current_context(), *args, **kwargs)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/flask/cli.py\", line 357, in decorator\nthreatkb-1        |     return __ctx.invoke(f, *args, **kwargs)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/click/core.py\", line 760, in invoke\nthreatkb-1        |     return __callback(*args, **kwargs)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/flask_migrate/cli.py\", line 150, in upgrade\nthreatkb-1        |     _upgrade(directory, revision, sql, tag, x_arg)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/flask_migrate/__init__.py\", line 111, in wrapped\nthreatkb-1        |     f(*args, **kwargs)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/flask_migrate/__init__.py\", line 200, in upgrade\nthreatkb-1        |     command.upgrade(config, revision, sql=sql, tag=tag)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/alembic/command.py\", line 378, in upgrade\nthreatkb-1        |     script.run_env()\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/alembic/script/base.py\", line 569, in run_env\nthreatkb-1        |     util.load_python_file(self.dir, \"env.py\")\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/alembic/util/pyfiles.py\", line 94, in load_python_file\nthreatkb-1        |     module = load_module_py(module_id, path)\nthreatkb-1        |   File \"/opt/threatkb/env/lib/python3.8/site-packages/alembic/util/pyfiles.py\", line 110, in load_module_py\nthreatkb-1        |     spec.loader.exec_module(module)  # type: ignore\nthreatkb-1        |   File \"<frozen importlib._bootstrap_external>\", line 848, in exec_module\nthreatkb-1        |   File \"<frozen importlib._bootstrap>\", line 219, in _call_with_frames_removed\nthreatkb-1        |   File \"/opt/threatkb/migrations/env.py\", line 88, in <module>\nthreatkb-1        |     run_migrations_online()\nthreatkb-1        |   File \"/opt/threatkb/migrations/env.py\", line 73, in run_migrations_online\nthreatkb-1        |     context.configure(connection=connection,\nthreatkb-1        | TypeError: configure() got multiple values for keyword argument 'compare_type'\nthreatkb-1        | ++ echo 'select count(*) from kb_users;'\nthreatkb-1        | ++ mysql -u threatkb -pb5vXcqzUtn4suyS -h db threatkb\nthreatkb-1        | ++ sed 's/[^0-9]//g'\nthreatkb-1        | mysql: [Warning] Using a password on the command line interface can be insecure.\nthreatkb-1        | ERROR 1146 (42S02) at line 1: Table 'threatkb.kb_users' doesn't exist\nthreatkb-1        | + num_users=\nthreatkb-1        | + '[' -lt 1 ']'\nthreatkb-1        | /opt/threatkb/docker-entrypoint.sh: line 17: [: -lt: unary operator expected\nthreatkb-1        | + env/bin/python3.8 run.py --listen-on 0.0.0.0 --listen-port 5000\nthreatkb-1        | app config: <Config {'DEBUG': False, 'TESTING': False, 'PROPAGATE_EXCEPTIONS': None, 'SECRET_KEY': 'aaaaaaaaaaaaaaaaaaaaaaaa', 'PERMANENT_SESSION_LIFETIME': datetime.timedelta(days=31), 'USE_X_SENDFILE': False, 'SERVER_NAME': None, 'APPLICATION_ROOT': '/', 'SESSION_COOKIE_NAME': 'session', 'SESSION_COOKIE_DOMAIN': None, 'SESSION_COOKIE_PATH': None, 'SESSION_COOKIE_HTTPONLY': True, 'SESSION_COOKIE_SECURE': False, 'SESSION_COOKIE_SAMESITE': None, 'SESSION_REFRESH_EACH_REQUEST': True, 'MAX_CONTENT_LENGTH': None, 'SEND_FILE_MAX_AGE_DEFAULT': None, 'TRAP_BAD_REQUEST_ERRORS': None, 'TRAP_HTTP_EXCEPTIONS': False, 'EXPLAIN_TEMPLATE_LOADING': False, 'PREFERRED_URL_SCHEME': 'http', 'TEMPLATES_AUTO_RELOAD': None, 'MAX_COOKIE_SIZE': 4093, 'LOGGING_LEVEL': 10, 'SQLALCHEMY_DATABASE_URI': 'mysql://threatkb:b5vXcqzUtn4suyS@db:3306/threatkb?use_unicode=1&charset=utf8', 'SQLALCHEMY_TRACK_MODIFICATIONS': False, 'SQL_DATABASE': 'threatkb', 'SQL_HOST': 'db', 'SQL_PASSWORD': 'b5vXcqzUtn4suyS', 'SQL_PORT': '3306', 'SQL_PROTOCOL': 'mysql', 'SQL_USERNAME': 'threatkb', 'TEST_PASSWORD': 'password', 'TEST_PASSWORD_HASHED': b'$2b$12$HJYk9wcgjFtc8TzKgWK2pOQCJ4ujAqwFTDZQTl8.3Vo2TV9FwwLbq', 'TEST_USER': 'admin', 'SQLALCHEMY_ENGINE_OPTIONS': {}, 'SQLALCHEMY_ECHO': False, 'SQLALCHEMY_BINDS': {}, 'SQLALCHEMY_RECORD_QUERIES': False, 'BROKER_URL': None, 'TASK_SERIALIZER': None, 'RESULT_SERIALIZER': None, 'ACCEPT_CONTENT': None, 'FILE_STORE_PATH': None, 'MAX_MILLIS_PER_FILE_THRESHOLD': None}>\nthreatkb-1        |  * Serving Flask app 'app'\nthreatkb-1        |  * Debug mode: on\nthreatkb-1        | WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\nthreatkb-1        |  * Running on all addresses (0.0.0.0)\nthreatkb-1        |  * Running on http://127.0.0.1:5000\nthreatkb-1        |  * Running on http://172.19.0.5:5000\nthreatkb-1        | Press CTRL+C to quit\nthreatkb-1        |  * Restarting with stat\nthreatkb-1        |  * Debugger is active!\nthreatkb-1        |  * Debugger PIN: 637-419-994\n```",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/508",
+    "number": 508,
+    "title": "Database initialization fails: Table 'threatkb.kb_users' doesn't exist during Docker Compose deployment"
+  },
+  {
+    "body": "Root cause presently unknown, but occasionally a few signatures will somehow be assigned the same EventID. This is not validated until attempting to push signatures on the deployment box. \n\nThe current solution is to change the signature category then change it back so the next available EventID for the category is assigned.\n\nExample:\n<img width=\"428\" src=\"https://api.zenhub.com/attachedFiles/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaHBBNTlpQ0E9PSIsImV4cCI6bnVsbCwicHVyIjoiYmxvYl9pZCJ9fQ==--f74494cb37e3aed169574f21e4b93126bfb2b609/Screenshot%202025-01-10%20at%201.08.19%E2%80%AFPM.png\" alt=\"Screenshot 2025-01-10 at 1.08.19\u202fPM.png\" />\nChanging the newest of each rule to EC then back to MC assigns them EventIDs 5002064 and 5002065 respectively.\n\n ",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/505",
+    "number": 505,
+    "title": "Duplicate EventIDs"
+  },
+  {
+    "body": "Add an alert notification when automated indicator ingestion is stale or delayed.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/504",
+    "number": 504,
+    "title": "Indicator ingestion stagnant"
+  },
+  {
+    "body": "YARA on ThreatKB is currently running version 4.1.3. TI team has signatures on deck that require features in newer versions. As it is likely we have customers on versions of YARA < latest, we should aim for version 4.2.0+ across the board if that needs to be done.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/503",
+    "number": 503,
+    "title": "Upgrade YARA version"
+  },
+  {
+    "body": "Example of the issue - in the list view, users cannot see the full rule name due to column size. Columns are not resizable. Would be useful to either make columns resizable, or to allow mousing over to reveal the full content.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/501",
+    "number": 501,
+    "title": "Columns are truncated and full content cannot be accessed"
+  },
+  {
+    "body": "Artifact extraction picks up certain number inputs (such as version numbers or timestamps that use periods) as IPs. ex: 0.22.04.2",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/492",
+    "number": 492,
+    "title": "Bulk import allows invalid IPs"
+  },
+  {
+    "body": "Feature request: support applying tags to rules on ingestion",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/487",
+    "number": 487,
+    "title": "Tag rules on ingestion"
+  },
+  {
+    "body": "Currently, we're calling `/usr/local/bin/pp-dev` locally which is configured from the UI:\r\n\r\n![image](https://github.com/InQuest/ThreatKB/assets/56496067/5f835fa9-769b-41c3-be54-5a0b92083329)",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/470",
+    "number": 470,
+    "title": "Update DFI containers under ThreatKB"
+  },
+  {
+    "body": "We can currently resurrect existing retired IOCs imported via https://threatkb.inquest.net/#!/import. This is a feature request to add an option to retire imported IOCs if they exist in ThreatKB and are in \"Released\" state.\n\n- Ability to quick filter for key timestamp fields on indicators (evaluate as \"if (date_now) > the timestamp field\"):\n    - Expiration timestamps\n    - Next review on timestamp\n\nThis applies to indicators (C2 IP, C2 domains).\n\n",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/460",
+    "number": 460,
+    "title": "Add option in mass import to mass retire IOCs"
+  },
+  {
+    "body": "Related to timeouts when generating new packs.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/453",
+    "number": 453,
+    "title": "Make release data path configurable in settings"
+  },
+  {
+    "body": "This signature runs on an automation that adds phishing URLs and keeps the rule in Vetting status. We took a look at this before with Danny and found that the revision history had become bloated from the automated changes and imposed a limit to the number of visible revisions. This rule continues to sit at \"Loading ...\" until eventually producing an nginx error and appearing in released status after a while.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/445",
+    "number": 445,
+    "title": "SC_Email_Body_with_Known_Phishing_URL takes a long time to populate."
+  },
+  {
+    "body": "https://github.com/fxb-cocacoding/yara-signator",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/442",
+    "number": 442,
+    "title": "Add YARA signature generation capability"
+  },
+  {
+    "body": "Extracting YARA rules via https://threatkb.inquest.net/#!/import fails to commit. \r\nRule this was occurring on:\r\n`rule SUSP_certificate_payload {\r\n   meta:\r\n      description = \"Detects payloads that pretend to be certificates\"\r\n      date = \"2018/08/02\"\r\n      author = \"Didier Stevens, Florian Roth\"\r\n      reference = \"https://blog.nviso.be/2018/08/02/powershell-inside-a-certificate-part-3/\"\r\n      score = 50\r\n   strings:\r\n      $re1 = \"-----BEGIN CERTIFICATE-----\"\r\n\r\n      $fp1 = \"replace it with the PEM-encoded root certificate\"\r\n   condition:\r\n      uint32(0) == 0x2D2D2D2D\r\n      and $re1 at 0\r\n      /* not 'M' at position 29, which is after the BEGIN CERTIFICATE header plus line break */\r\n      /* \\r\\n */\r\n      and not uint8(29) == 0x4D\r\n      /* \\n */\r\n      and not uint8(28) == 0x4D\r\n      and not 1 of ($fp*)\r\n}`",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/440",
+    "number": 440,
+    "title": "Mass import not committing YARA rules"
+  },
+  {
+    "body": "It's possible to reference rules from other ones:\r\n\r\nhttps://yara.readthedocs.io/en/stable/writingrules.html#referencing-other-rules\r\n\r\nExample:\r\n\r\n![image](https://user-images.githubusercontent.com/1253573/195707751-83844acc-0558-4f91-b081-0a92a874a444.png)\r\n\r\n\r\nThis results in a failure on save due to failed rule validation:\r\n\r\n![image](https://user-images.githubusercontent.com/1253573/195707783-36f11dbe-a671-40ed-96f8-564015647301.png)\r\n\r\nWhich of course is due to the fact that the referenced rule is not available. Thinking the best way to handle this is to test rules along with all other released-state rules.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/439",
+    "number": 439,
+    "title": "Add support for cross-rule references."
+  },
+  {
+    "body": "Attach everything. You know which files have signature hits from whenever a test was last run.\r\n\r\nOnly show the files that have a hit by default. Have a button to expand the rest.\r\n\r\nIf we want to really do this right. We should show existing DFI file hits as well as previous, but ghosted out.\r\n\r\nIf someone runs a test and sees a file they expect to fire, go grey (ghosted), they will see it and can adjust accordingly.\r\n\r\nIn a nut shell:\r\nSave all files\r\nHide files which never had a signature hit\r\nGhost/grey files that used to have a signature hit but don't now\r\nShow files that have active signatures\r\nI think you worry about API only for this, if the UI is easy enough. Implement that too.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/432",
+    "number": 432,
+    "title": "files testing degradation tracking"
+  },
+  {
+    "body": "Where range is determined by timestamp and then shows the label of first and the label of last.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/430",
+    "number": 430,
+    "title": "for release history, if a sig is included in a lot of releases then do a range not every name"
+  },
+  {
+    "body": null,
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/429",
+    "number": 429,
+    "title": "Add a background task table, similar to activity log but to generically track background tasking"
+  },
+  {
+    "body": null,
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/422",
+    "number": 422,
+    "title": "How will we separate groups/policies when merging this into our platform?"
+  },
+  {
+    "body": "Individual files can't be selected. Currently, the only way to delete uploaded files is to select all and delete all uploaded files\r\n<img width=\"888\" alt=\"Screen Shot 2022-02-01 at 3 41 35 PM\" src=\"https://user-images.githubusercontent.com/48770062/152056137-4392797f-f8aa-4656-b829-baef4a5ca926.png\">\r\n.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/405",
+    "number": 405,
+    "title": "Can't select individual uploaded files."
+  },
+  {
+    "body": "",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/381",
+    "number": 381,
+    "title": "Add the ability to revert to a previous version of a yara rule in the UI"
+  },
+  {
+    "body": "On change to the Released state, c2 ip and c2 dns should be checked against a dynamic set of scripts that will perform some dynamic whitelisting checks and return whether or not the c2 ip or dns should be allowed to be changed to the released state. \r\n\r\n====\r\n\r\nWhen an IP or IPs (bulk) are changed to the released state, iterate through all settings and find those prefixed with WHITELIST_SCRIPT_IP_* and call it, passing a json list of the IPs to the script. The script will return a json list with one code entry for each IP that it received. A return of 0 means that the IP can be changed to the released state and a non-zero for disallowing the release state change.\r\n\r\nEX:\r\nWHITELIST_SCRIPT_IP_FOO : /usr/bin/ip_checker.py \r\n\r\nThe generated command would be\r\n/usr/bin/ip_checker.py [ \"123.123.123.123\", \"1.1.1.1\"]\r\n\r\nit would return\r\n[0, 1]\r\n\r\nSo the first IP would be allowed and the second wouldn't.\r\n\r\n===\r\n\r\nWhen a domain name or domain names (bulk) are changed to the released state, iterate through all settings and find those prefixed with WHITELIST_SCRIPT_DNS_* and call it, passing a json list of the domain names to the script. The script will return a json list with one code entry for each domain that it received. A return of 0 means that the domain can be changed to the released state and a non-zero for disallowing the release state change.\r\n\r\nEX:\r\nWHITELIST_SCRIPT_DNS_FOO : /usr/bin/domain_checker.py \r\n\r\nThe generated command would be\r\n/usr/bin/domain_checker.py [ \"foo.com\", \"google.com\"]\r\n\r\nit would return\r\n[0, 1]\r\n\r\n==",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/358",
+    "number": 358,
+    "title": "Dynamic Whitelisting, make sure its configurable"
+  },
+  {
+    "body": "Would be nice to see a distribution of usage at the top of the activity log, similar to the Github distribution for language atop of each repository:\r\n\r\n![image](https://user-images.githubusercontent.com/1253573/65792623-c403c180-e129-11e9-9b35-0a1d7037e198.png)\r\n",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/356",
+    "number": 356,
+    "title": "Activity Distribution Graph by User"
+  },
+  {
+    "body": "http://kb.inquest.net/#!/c2ips/228962\r\n\r\n![image](https://user-images.githubusercontent.com/1253573/54835213-b576b200-4c8f-11e9-8062-ae336e39766f.png)\r\n\r\nNote that the ellipsis highlighted above is not three dots, but an actual ellipsis. Which I believe is the source of this issue:\r\n\r\n![image](https://user-images.githubusercontent.com/1253573/54835292-d0492680-4c8f-11e9-8983-2c50bd35d01f.png)\r\n\r\nEditing the artifact and removing the special chars still doesn't address the issue.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/316",
+    "number": 316,
+    "title": "Unicode woes."
+  },
+  {
+    "body": "Include an option to delete uploaded artifacts from the list.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/307",
+    "number": 307,
+    "title": "Delete uploaded artifacts from sig"
+  },
+  {
+    "body": "Once a sig is deleted/deactivated, it is not deleted from records, just set to inactive. However, there is currently no way to reactivate it within the ui.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/306",
+    "number": 306,
+    "title": "Restore deactivated sigs"
+  },
+  {
+    "body": "Hi,\r\n\r\nI just created a fresh Docker build, it seems everything went OK (except for a npm command where I add to disable certificate check).\r\n\r\nWhen the containers are running and I access the website I find a broken webpage.\r\n\r\n![image](https://user-images.githubusercontent.com/8524905/52072720-f7d01c80-2585-11e9-9a89-fa84774e5f14.png)\r\n\r\nNone of the features are working properly. As you can see, all the ressources are properly retrieved.\r\nThere some javascript errors : \r\n\r\n![image](https://user-images.githubusercontent.com/8524905/52072939-7d53cc80-2586-11e9-9e8d-8816c830851d.png)\r\n\r\nI cannot find any specific error in the logs (docker-compose logs) and I do not know were to look for errors in the containers.\r\n\r\nAny help would be greatly appreciated.\r\n\r\nThanks for your work.\r\n\r\n",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/300",
+    "number": 300,
+    "title": "Fresh docker build not working properly"
+  },
+  {
+    "body": "If column customization is complex, as a stopgap, we could render columns in the list view of signatures for all metadata fields that are marked significant. See #294 ",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/295",
+    "number": 295,
+    "title": "Show \"significant\" fields as list view columns."
+  },
+  {
+    "body": "Note - this issue likely requires more detail to scope/specify more context about the change.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/288",
+    "number": 288,
+    "title": "Dont bump revision if no changes are made"
+  },
+  {
+    "body": "Right now it's just assigned to the user who posted it. One solution could be to create an undefined user, then point any task assignments to that placeholder user by default. Have it available in the ui to change the assignment to an actual user.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/287",
+    "number": 287,
+    "title": "allow for assignment of task during creation"
+  },
+  {
+    "body": "state must be set to actually be required to avoid this bug\r\n\r\n http://kb.inquest.net/#!/tasks --> create task --> create without state --> goes through but item isn't created",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/286",
+    "number": 286,
+    "title": "Create task doesn't create task when state is required"
+  },
+  {
+    "body": "When filling out the comment field, often times, we forget to hit the plus (+) action to save the comment:\r\n\r\n![image](https://user-images.githubusercontent.com/1253573/58835495-c04cac00-861b-11e9-9ff1-aa5c43b80508.png)\r\n\r\nIf the user hits 'save' on the artifact on the bottom, the comment is lost. Can we either, detect an unsaved comment and block hitting save -or- auto submit any draft comments on artifact save?\r\n\r\n---\r\n\r\n**Branch**: `issue/278-save-comment-on-modal-close` (PR #345)",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/278",
+    "number": 278,
+    "title": "If the comment field is filled out, submit the save action for that field prior to saving the underlying artifact."
+  },
+  {
+    "body": "missing space in first if statement of install.sh, just pushing out an issue so I can get a number and create a branch to resolve it.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/273",
+    "number": 273,
+    "title": "syntax error in line 5 of install.sh"
+  },
+  {
+    "body": "Login redirect is \"wonky\", here's 4 successful logins with 0 successful redirects:\r\n\r\n![image](https://user-images.githubusercontent.com/1253573/48008666-b98aa480-e0df-11e8-9849-6f3e5dcfbf1b.png)\r\n\r\nSurfing to an authenticated section manually confirms that the session is indeed valid.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/249",
+    "number": 249,
+    "title": "Sometimes, when you login, you're not automatically redirected."
+  },
+  {
+    "body": "This is not a trivial feature to build. Save it for later.\r\n\r\nalso add last updated column to bookmarked stuff on the dashboard. for yara rules, revision count and last revision date.\r\n\r\nAdd marker (!) for things that have changed since your last login. Add a button to set last login to now (call it Clear).\r\n\r\nAdd column to user for last notification time, update this when the user clicks a button. This way we dont have to keep track of logins/etc.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/248",
+    "number": 248,
+    "title": "Receive notifications for comments made on artifacts for which you are the owner or you have bookmarked."
+  },
+  {
+    "body": "",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/244",
+    "number": 244,
+    "title": "Allow for user deletion."
+  },
+  {
+    "body": "On staging server, on failed login the API returns a 500 HTTP error:\r\n\r\n```\r\nPOST /ThreatKB/login\r\n{\"email\":\"jgemic@inquest.net\",\"password\":\"*******\"}\r\n```\r\n---\r\n```\r\nAttributeError\r\nAttributeError: 'AnonymousUserMixin' object has no attribute 'id'\r\n\r\nTraceback (most recent call last)\r\nFile \"/opt/threatkb/env/lib/python2.7/site-packages/flask/app.py\", line 1701, in __call__\r\n                                'Flask.blueprints instead'), stacklevel=2)\r\n        return self.blueprints\r\n \r\n    def __call__(self, environ, start_response):\r\n        \"\"\"Shortcut for :attr:`wsgi_app`.\"\"\"\r\n        return self.wsgi_app(environ, start_response)\r\nFile \"/opt/threatkb/env/lib/python2.7/site-packages/flask/app.py\", line 1689, in wsgi_app\r\n        \"\"\"\r\n        with self.request_context(environ):\r\n            try:\r\n                response = self.full_dispatch_request()\r\n            except Exception, e:\r\n                response = self.make_response(self.handle_exception(e))\r\n            return response(environ, start_response)\r\n \r\n    @property\r\n    def modules(self):\r\n        from warnings import warn\r\nFile \"/opt/threatkb/env/lib/python2.7/site-packages/flask/app.py\", line 1687, in wsgi_app\r\n                               a list of headers and an optional\r\n                               exception context to start the response\r\n        \"\"\"\r\n        with self.request_context(environ):\r\n            try:\r\n                response = self.full_dispatch_request()\r\n            except Exception, e:\r\n                response = self.make_response(self.handle_exception(e))\r\n            return response(environ, start_response)\r\n \r\n    @property\r\nFile \"/opt/threatkb/env/lib/python2.7/site-packages/flask/app.py\", line 1360, in full_dispatch_request\r\n            request_started.send(self)\r\n            rv = self.preprocess_request()\r\n            if rv is None:\r\n                rv = self.dispatch_request()\r\n        except Exception, e:\r\n            rv = self.handle_user_exception(e)\r\n        response = self.make_response(rv)\r\n        response = self.process_response(response)\r\n        request_finished.send(self, response=response)\r\n        return response\r\n \r\nFile \"/opt/threatkb/env/lib/python2.7/site-packages/flask/app.py\", line 1262, in handle_user_exception\r\n        if handlers is not None:\r\n            blueprint_handlers = handlers.get(None, ())\r\n        app_handlers = self.error_handler_spec[None].get(None, ())\r\n        for typecheck, handler in chain(blueprint_handlers, app_handlers):\r\n            if isinstance(e, typecheck):\r\n                return handler(e)\r\n \r\n        raise exc_type, exc_value, tb\r\n \r\n    def handle_exception(self, e):\r\n        \"\"\"Default exception handling that kicks in when an exception\r\nFile \"/opt/threatkb/app/routes/error_handling.py\", line 24, in handle_exception\r\n \r\n    stacktrace = \"%s\" % (\r\n        re.sub(r'\\\"[^\\\"]+\\/([^\\\"]+)', r\"\\1\", traceback.format_exc().replace(\"\\n\", \"<BR>\").replace(\" \", \"&nbsp;\")))\r\n    err = Error(\r\n        stacktrace=traceback.format_exc(),\r\n        user_id=current_user.id,\r\n        remote_addr=request.remote_addr,\r\n        args=str(request.args.to_dict(flat=False)),\r\n        method=request.method,\r\n        route=request.url_rule\r\n    )\r\nFile \"/opt/threatkb/env/lib/python2.7/site-packages/werkzeug/local.py\", line 347, in __getattr__\r\n            return []\r\n \r\n    def __getattr__(self, name):\r\n        if name == '__members__':\r\n            return dir(self._get_current_object())\r\n        return getattr(self._get_current_object(), name)\r\n \r\n    def __setitem__(self, key, value):\r\n        self._get_current_object()[key] = value\r\n \r\n    def __delitem__(self, key):\r\nAttributeError: 'AnonymousUserMixin' object has no attribute 'id'\r\n```",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/235",
+    "number": 235,
+    "title": "500 HTTP error on login"
+  },
+  {
+    "body": "",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/214",
+    "number": 214,
+    "title": "Edit enum field types"
+  },
+  {
+    "body": "https://github.com/MISP/misp-warninglists\r\n\r\n<!---\r\n@huboard:{\"order\":86.0,\"milestone_order\":197,\"custom_state\":\"\"}\n-->\r\n",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/197",
+    "number": 197,
+    "title": "Source MISP warning list for ingestion whitelisting"
+  },
+  {
+    "body": "Take a date and a new confidence. On that day, the confidence is automatically bumped up. If we find an issue with the signature, we'll manually go in and disable or alter the confidence jump value / date.",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/113",
+    "number": 113,
+    "title": "Add a future confidence input."
+  },
+  {
+    "body": "Accept a file upload that will be scanned with all yara sigs and show the resulting hits (-s option). Discard the file after scan is complete.\r\n\r\n<!---\r\n@huboard:{\"order\":58.994100589941006,\"milestone_order\":41,\"custom_state\":\"\"}\n-->\r\n",
+    "html_url": "https://github.com/InQuest/ThreatKB/issues/41",
+    "number": 41,
+    "title": "Add a file scanner."
+  }
+]

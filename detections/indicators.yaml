@@ -1,0 +1,5 @@
+- groups:
+    - default
+  status: released
+  type: ip
+  value: 192.0.2.24

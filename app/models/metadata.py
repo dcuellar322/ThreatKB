@@ -2,6 +2,7 @@ from app import db, ENTITY_MAPPING
 from dateutil import parser
 import datetime
 
+
 class Metadata(db.Model):
     __tablename__ = "metadata"
 
@@ -19,21 +20,41 @@ class Metadata(db.Model):
     show_in_table = db.Column(db.Integer, default=0, nullable=False)
     required = db.Column(db.Integer, default=0, nullable=False)
     export_with_release = db.Column(db.Integer, default=1, nullable=False)
-    date_created = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
-    date_modified = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp(),
-                              onupdate=db.func.current_timestamp())
-    created_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
-    created_user = db.relationship('KBUser', foreign_keys=created_user_id,
-                                   primaryjoin="KBUser.id==Metadata.created_user_id")
-    choices = db.relationship('MetadataChoices', primaryjoin="MetadataChoices.metadata_id==Metadata.id")
+    date_created = db.Column(
+        db.DateTime(timezone=True), default=db.func.current_timestamp()
+    )
+    date_modified = db.Column(
+        db.DateTime(timezone=True),
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
+    created_user_id = db.Column(
+        db.Integer, db.ForeignKey("kb_users.id"), nullable=False
+    )
+    created_user = db.relationship(
+        "KBUser",
+        foreign_keys=created_user_id,
+        primaryjoin="KBUser.id==Metadata.created_user_id",
+    )
+    choices = db.relationship(
+        "MetadataChoices",
+        primaryjoin="MetadataChoices.metadata_id==Metadata.id",
+        back_populates="metadata_object",
+    )
 
     @staticmethod
     def get_metadata_dict(entity_type):
         metadata_dict = {}
 
-        for metadata in [entity.to_dict() for entity in db.session.query(Metadata).filter(
-                Metadata.artifact_type == ENTITY_MAPPING[entity_type]).filter(Metadata.active > 0).order_by(
-            Metadata.type_).order_by(Metadata.key).all()]:
+        for metadata in [
+            entity.to_dict()
+            for entity in db.session.query(Metadata)
+            .filter(Metadata.artifact_type == ENTITY_MAPPING[entity_type])
+            .filter(Metadata.active > 0)
+            .order_by(Metadata.type_)
+            .order_by(Metadata.key)
+            .all()
+        ]:
             if metadata["type"] not in list(metadata_dict.keys()):
                 metadata_dict[metadata["type"]] = []
             metadata_dict[metadata["type"]].append(metadata)
@@ -42,56 +63,104 @@ class Metadata(db.Model):
 
     @staticmethod
     def get_metadata_keys(entity_type):
-        return [entity.key for entity in db.session.query(Metadata).filter(
-            Metadata.artifact_type == ENTITY_MAPPING[entity_type]).filter(Metadata.active > 0).all()]
+        return [
+            entity.key
+            for entity in db.session.query(Metadata)
+            .filter(Metadata.artifact_type == ENTITY_MAPPING[entity_type])
+            .filter(Metadata.active > 0)
+            .all()
+        ]
 
     @staticmethod
     def get_metadata_cache():
         ENTITY_CACHE = {"IP": {}, "DNS": {}, "SIGNATURE": {}}
-        metadatas = db.session.query(MetadataMapping, Metadata) \
-            .join(Metadata, Metadata.id == MetadataMapping.metadata_id) \
-            .filter(Metadata.active > 0) \
+        from sqlalchemy.orm import joinedload
+
+        metadatas = (
+            db.session.query(MetadataMapping, Metadata)
+            .options(joinedload(Metadata.created_user))
+            .join(Metadata, Metadata.id == MetadataMapping.metadata_id)
+            .filter(Metadata.active > 0)
             .all()
+        )
 
         for metadata_mapping, metadata in metadatas:
             if metadata.artifact_type == ENTITY_MAPPING["IP"]:
                 if not ENTITY_CACHE["IP"].get(metadata_mapping.artifact_id, {}):
-                    ENTITY_CACHE["IP"][metadata_mapping.artifact_id] = {"metadata": {}, "metadata_values": {}}
+                    ENTITY_CACHE["IP"][metadata_mapping.artifact_id] = {
+                        "metadata": {},
+                        "metadata_values": {},
+                    }
 
-                ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata_values"][metadata.key] = {}
-                ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata_values"][metadata.key][
-                    "value"] = metadata_mapping.value
+                ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata_values"][
+                    metadata.key
+                ] = {}
+                ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata_values"][
+                    metadata.key
+                ]["value"] = metadata_mapping.value
 
-                if not metadata.type_ in ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata"]:
-                    ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata"][metadata.type_] = []
-                ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata"][metadata.type_].append(
-                    metadata.to_dict(include_choices=False))
+                if (
+                    not metadata.type_
+                    in ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata"]
+                ):
+                    ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata"][
+                        metadata.type_
+                    ] = []
+                ENTITY_CACHE["IP"][metadata_mapping.artifact_id]["metadata"][
+                    metadata.type_
+                ].append(metadata.to_dict(include_choices=False))
 
             elif metadata.artifact_type == ENTITY_MAPPING["DNS"]:
                 if not ENTITY_CACHE["DNS"].get(metadata_mapping.artifact_id, {}):
-                    ENTITY_CACHE["DNS"][metadata_mapping.artifact_id] = {"metadata": {}, "metadata_values": {}}
+                    ENTITY_CACHE["DNS"][metadata_mapping.artifact_id] = {
+                        "metadata": {},
+                        "metadata_values": {},
+                    }
 
-                ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata_values"][metadata.key] = {}
-                ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata_values"][metadata.key][
-                    "value"] = metadata_mapping.value
+                ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata_values"][
+                    metadata.key
+                ] = {}
+                ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata_values"][
+                    metadata.key
+                ]["value"] = metadata_mapping.value
 
-                if not metadata.type_ in ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata"]:
-                    ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata"][metadata.type_] = []
-                ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata"][metadata.type_].append(
-                    metadata.to_dict(include_choices=False))
+                if (
+                    not metadata.type_
+                    in ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata"]
+                ):
+                    ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata"][
+                        metadata.type_
+                    ] = []
+                ENTITY_CACHE["DNS"][metadata_mapping.artifact_id]["metadata"][
+                    metadata.type_
+                ].append(metadata.to_dict(include_choices=False))
 
             elif metadata.artifact_type == ENTITY_MAPPING["SIGNATURE"]:
                 if not ENTITY_CACHE["SIGNATURE"].get(metadata_mapping.artifact_id, {}):
-                    ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id] = {"metadata": {}, "metadata_values": {}}
+                    ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id] = {
+                        "metadata": {},
+                        "metadata_values": {},
+                    }
 
-                ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id]["metadata_values"][metadata.key] = {}
-                ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id]["metadata_values"][metadata.key][
-                    "value"] = metadata_mapping.value
+                ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id][
+                    "metadata_values"
+                ][metadata.key] = {}
+                ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id][
+                    "metadata_values"
+                ][metadata.key]["value"] = metadata_mapping.value
 
-                if not metadata.type_ in ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id]["metadata"]:
-                    ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id]["metadata"][metadata.type_] = []
-                ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id]["metadata"][metadata.type_].append(
-                    metadata.to_dict(include_choices=False))
+                if (
+                    not metadata.type_
+                    in ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id][
+                        "metadata"
+                    ]
+                ):
+                    ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id]["metadata"][
+                        metadata.type_
+                    ] = []
+                ENTITY_CACHE["SIGNATURE"][metadata_mapping.artifact_id]["metadata"][
+                    metadata.type_
+                ].append(metadata.to_dict(include_choices=False))
 
         return ENTITY_CACHE
 
@@ -117,17 +186,23 @@ class Metadata(db.Model):
             active=self.active,
             required=self.required,
             export_with_release=self.export_with_release,
-            choices=[choice.to_dict() for choice in self.choices] if include_choices else []
+            choices=[choice.to_dict() for choice in self.choices]
+            if include_choices
+            else [],
         )
 
         if include_mappings and self.active:
-            results["mappings"] = [entity.to_dict() for entity in db.session.query(MetadataMapping).filter(
-                MetadataMapping.metadata_id == self.id).all()]
+            results["mappings"] = [
+                entity.to_dict()
+                for entity in db.session.query(MetadataMapping)
+                .filter(MetadataMapping.metadata_id == self.id)
+                .all()
+            ]
 
         return results
 
     def __repr__(self):
-        return '<Metadata %r>' % self.id
+        return "<Metadata %r>" % self.id
 
 
 class MetadataMapping(db.Model):
@@ -136,20 +211,35 @@ class MetadataMapping(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     value = db.Column(db.TEXT(), nullable=True)
 
-    date_created = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
-    date_modified = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp(),
-                              onupdate=db.func.current_timestamp())
-    metadata_id = db.Column(db.Integer, db.ForeignKey('metadata.id'), nullable=False)
-    metadata_object = db.relationship('Metadata', foreign_keys=metadata_id,
-                                      primaryjoin="Metadata.id==MetadataMapping.metadata_id")
+    date_created = db.Column(
+        db.DateTime(timezone=True), default=db.func.current_timestamp()
+    )
+    date_modified = db.Column(
+        db.DateTime(timezone=True),
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
+    metadata_id = db.Column(db.Integer, db.ForeignKey("metadata.id"), nullable=False)
+    metadata_object = db.relationship(
+        "Metadata",
+        foreign_keys=metadata_id,
+        primaryjoin="Metadata.id==MetadataMapping.metadata_id",
+    )
     artifact_id = db.Column(db.Integer, nullable=False)
-    created_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
-    created_user = db.relationship('KBUser', foreign_keys=created_user_id,
-                                   primaryjoin="KBUser.id==MetadataMapping.created_user_id")
+    created_user_id = db.Column(
+        db.Integer, db.ForeignKey("kb_users.id"), nullable=False
+    )
+    created_user = db.relationship(
+        "KBUser",
+        foreign_keys=created_user_id,
+        primaryjoin="KBUser.id==MetadataMapping.created_user_id",
+    )
 
     def to_dict(self):
         if self.metadata_object.type_ == "date" and self.value:
-            value = datetime.datetime.strftime(parser.parse(self.value), "%Y-%m-%dT%H:%M:%S")
+            value = datetime.datetime.strftime(
+                parser.parse(self.value), "%Y-%m-%dT%H:%M:%S"
+            )
         elif self.metadata_object.type_ == "integer" and self.value:
             value = int(self.value)
         else:
@@ -165,7 +255,7 @@ class MetadataMapping(db.Model):
         )
 
     def __repr__(self):
-        return '<MetadataMapping %r>' % self.id
+        return "<MetadataMapping %r>" % self.id
 
 
 class MetadataChoices(db.Model):
@@ -174,15 +264,29 @@ class MetadataChoices(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     choice = db.Column(db.String(512), nullable=False)
 
-    date_created = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
-    date_modified = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp(),
-                              onupdate=db.func.current_timestamp())
-    metadata_id = db.Column(db.Integer, db.ForeignKey('metadata.id'), nullable=False)
-    metadata_object = db.relationship('Metadata', foreign_keys=metadata_id,
-                                      primaryjoin="Metadata.id==MetadataChoices.metadata_id")
-    created_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
-    created_user = db.relationship('KBUser', foreign_keys=created_user_id,
-                                   primaryjoin="KBUser.id==MetadataChoices.created_user_id")
+    date_created = db.Column(
+        db.DateTime(timezone=True), default=db.func.current_timestamp()
+    )
+    date_modified = db.Column(
+        db.DateTime(timezone=True),
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
+    metadata_id = db.Column(db.Integer, db.ForeignKey("metadata.id"), nullable=False)
+    metadata_object = db.relationship(
+        "Metadata",
+        foreign_keys=metadata_id,
+        primaryjoin="Metadata.id==MetadataChoices.metadata_id",
+        back_populates="choices",
+    )
+    created_user_id = db.Column(
+        db.Integer, db.ForeignKey("kb_users.id"), nullable=False
+    )
+    created_user = db.relationship(
+        "KBUser",
+        foreign_keys=created_user_id,
+        primaryjoin="KBUser.id==MetadataChoices.created_user_id",
+    )
 
     def to_dict(self):
         return dict(
@@ -190,8 +294,8 @@ class MetadataChoices(db.Model):
             choice=self.choice,
             date_created=self.date_created.isoformat(),
             date_modified=self.date_modified.isoformat(),
-            created_user=self.created_user.to_dict()
+            created_user=self.created_user.to_dict(),
         )
 
     def __repr__(self):
-        return '<MetadataChoices %r>' % self.id
+        return "<MetadataChoices %r>" % self.id

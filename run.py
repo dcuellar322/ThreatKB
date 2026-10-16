@@ -24,4 +24,4 @@ args = parser.parse_args()
 #app.run(debug=True)
 import app
 
-app.run(debug=True, host=args.listen_on, port=args.listen_port)
+app.run(host=args.listen_on, port=args.listen_port)

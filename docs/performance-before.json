@@ -1,0 +1,93 @@
+[
+  {
+    "path": "/dashboard",
+    "cold_ms": 59.5,
+    "warm_ms": 37.69,
+    "queries": 9,
+    "bytes": 3202
+  },
+  {
+    "path": "/yara_rules?page_size=25&short=true",
+    "cold_ms": 941.19,
+    "warm_ms": 915.03,
+    "queries": 203,
+    "bytes": 65415
+  },
+  {
+    "path": "/c2ips?page_size=25",
+    "cold_ms": 488.76,
+    "warm_ms": 444.11,
+    "queries": 128,
+    "bytes": 21862
+  },
+  {
+    "path": "/c2dns?page_size=25",
+    "cold_ms": 463.05,
+    "warm_ms": 379.37,
+    "queries": 128,
+    "bytes": 22268
+  },
+  {
+    "path": "/tasks?page_size=25",
+    "cold_ms": 91.96,
+    "warm_ms": 86.48,
+    "queries": 28,
+    "bytes": 19426
+  },
+  {
+    "path": "/activity_log?page_size=25",
+    "cold_ms": 19.79,
+    "warm_ms": 15.75,
+    "queries": 3,
+    "bytes": 9146
+  },
+  {
+    "path": "/cfg_states",
+    "cold_ms": 120.44,
+    "warm_ms": 129.66,
+    "queries": 26,
+    "bytes": 1032
+  },
+  {
+    "path": "/metadata",
+    "cold_ms": 20.03,
+    "warm_ms": 19.1,
+    "queries": 5,
+    "bytes": 1297
+  },
+  {
+    "path": "/tags",
+    "cold_ms": 12.01,
+    "warm_ms": 10.03,
+    "queries": 2,
+    "bytes": 193
+  },
+  {
+    "path": "/notifications",
+    "cold_ms": 29.53,
+    "warm_ms": 28.63,
+    "queries": 4,
+    "bytes": 42
+  },
+  {
+    "path": "/bookmarks",
+    "cold_ms": 34.33,
+    "warm_ms": 24.12,
+    "queries": 7,
+    "bytes": 726
+  },
+  {
+    "path": "/content",
+    "cold_ms": 4789.91,
+    "warm_ms": 875.78,
+    "queries": 1,
+    "bytes": 12519
+  },
+  {
+    "path": "/search?all=Synthetic&limit=25",
+    "cold_ms": 769.78,
+    "warm_ms": 638.43,
+    "queries": 184,
+    "bytes": 102483
+  }
+]

@@ -1,100 +1,160 @@
 from flask import abort, jsonify
-from flask_login import current_user
-
-from app.routes.cfg_category_range_mapping import update_cfg_category_range_mapping_current
+from flask_login import current_user, login_required
+from app import app, db
 from app.models.cfg_category_range_mapping import CfgCategoryRangeMapping
-from app.models.cfg_states import verify_state
-from app.routes.bookmarks import batch_delete_bookmarks
-from app.routes.tags_mapping import batch_create_tags_mapping, batch_delete_tags_mapping
+from app.models.cfg_states import Cfg_states
+from app.models.users import KBUser
+from app.models.tags import Tags
+from app.models.tags_mapping import Tags_mapping
+
+
+def selected_rows(batch, artifact, session):
+    identities = batch.get("ids")
+    if (
+        not isinstance(identities, list)
+        or not 1 <= len(identities) <= 200
+        or any(type(value) != int or value < 1 for value in identities)
+    ):
+        abort(400, description="Select 1–200 records.")
+    identities = list(dict.fromkeys(identities))
+    rows = artifact.query.filter(artifact.id.in_(identities)).all()
+    if len(rows) != len(identities):
+        abort(404)
+    if not current_user.admin and any(
+        row.owner_user_id != current_user.id for row in rows
+    ):
+        abort(403)
+    return rows
 
 
 def batch_delete(batch, artifact, session, entity_mapping, is_yara=False):
-    if 'ids' in batch and batch['ids']:
-        for b in batch['ids']:
-            entity = artifact.query.get(b)
-            if not entity:
-                abort(404)
-            if not current_user.admin and entity.owner_user_id != current_user.id:
-                abort(403)
-
-        if is_yara:
-            session.execute(artifact.__table__.update().values(
-                {'active': False}
-            ).where(artifact.id.in_(batch['ids'])))
-        else:
-            session.execute(artifact.__table__.delete().where(artifact.id.in_(batch['ids'])))
-        session.commit()
-
-        if not is_yara:
-            batch_delete_tags_mapping(artifact.__tablename__, batch['ids'])
-        batch_delete_bookmarks(entity_mapping, batch['ids'], current_user.id)
-
-    return jsonify(''), 200
+    for row in selected_rows(batch, artifact, session):
+        row.active = False
+        row.modified_user_id = current_user.id
+    session.commit()
+    return jsonify(""), 200
 
 
 def batch_update(batch, artifact, session, include_tags=True):
-    category = dict()
-    fields_to_update = dict()
-    if 'description' in batch and batch['description']:
-        fields_to_update['description'] = batch['description']
-    if 'match_type' in batch and batch['match_type']:
-        fields_to_update['match_type'] = batch['match_type']
-    if 'expiration_timestamp' in batch and batch['expiration_timestamp'] and hasattr(artifact, 'expiration_timestamp'):
-        fields_to_update['expiration_timestamp'] = batch['expiration_timestamp']
-    if 'category' in batch and batch['category'] and hasattr(artifact, 'category'):
-        fields_to_update['category'] = batch['category']['category'] \
-            if batch['category'] and 'category' in batch['category'] \
-            else None
-        category_entity = CfgCategoryRangeMapping.query \
-            .filter(CfgCategoryRangeMapping.category == fields_to_update['category']) \
-            .first()
-        category['id'] = category_entity.id
-        if category_entity and not category_entity.current:
-            category['current'] = category_entity.range_min
-        else:
-            category['current'] = category_entity.current
+    rows = selected_rows(batch, artifact, session)
+    fields = {
+        key: batch[key]
+        for key in ("description", "match_type", "references")
+        if key in batch and hasattr(artifact, key)
+    }
+    if "expiration_timestamp" in batch and hasattr(artifact, "expiration_timestamp"):
+        from dateutil.parser import parse
 
-        if category_entity.current + 1 > category_entity.range_max:
-            abort(400)
-    if 'state' in batch and batch['state']:
-        fields_to_update['state'] = verify_state(batch['state']['state']) \
-            if batch['state'] and 'state' in batch['state'] \
-            else verify_state(batch['state'])
-    if 'owner_user' in batch and batch['owner_user']:
-        fields_to_update['owner_user_id'] = batch['owner_user']['id'] \
-            if batch.get("owner_user", None) and batch["owner_user"].get("id", None) \
-            else None
-
-    artifact_events_to_update = []
-    for batch_id in batch['ids']:
-        entity = artifact.query.get(batch_id)
-        if not entity:
-            abort(404)
-        if not current_user.admin and entity.owner_user_id != current_user.id:
+        try:
+            fields["expiration_timestamp"] = (
+                parse(batch["expiration_timestamp"])
+                if batch["expiration_timestamp"]
+                else None
+            )
+        except ValueError, TypeError:
+            abort(400, description="Use a valid expiration date.")
+    if batch.get("state"):
+        state = (
+            batch["state"].get("state")
+            if isinstance(batch["state"], dict)
+            else batch["state"]
+        )
+        definition = Cfg_states.query.filter_by(state=state).first()
+        if not definition:
+            abort(400, description="Choose a configured state.")
+        if definition.is_release_state and not current_user.admin:
             abort(403)
-        if 'category' in fields_to_update and fields_to_update['category'] and hasattr(artifact, 'eventid') and \
-                entity.category != fields_to_update['category']:
-            category['current'] = category['current'] + 1
-            artifact_events_to_update.append({
-                'event_id': category['current'],
-                'artifact_id': batch_id
-            })
+        fields["state"] = state
+    if batch.get("category") and hasattr(artifact, "category"):
+        category = (
+            batch["category"].get("category")
+            if isinstance(batch["category"], dict)
+            else batch["category"]
+        )
+        if not CfgCategoryRangeMapping.query.filter_by(category=category).first():
+            abort(400, description="Choose a configured category.")
+        fields["category"] = category
+    if "owner_user" in batch:
+        owner = (
+            batch["owner_user"].get("id")
+            if isinstance(batch["owner_user"], dict)
+            else batch["owner_user"]
+        )
+        if owner is not None:
+            user = session.get(KBUser, owner)
+            if not user or not user.active:
+                abort(400, description="Choose an active owner.")
+        fields["owner_user_id"] = owner
+    tag_values = batch.get("tags", [])
+    if not isinstance(tag_values, list):
+        abort(400, description="Tags must be a list.")
+    texts = [tag.get("text") if isinstance(tag, dict) else tag for tag in tag_values]
+    if any(
+        not isinstance(text, str) or not text.strip() or len(text) > 256
+        for text in texts
+    ):
+        abort(400, description="Tags require 1–256 characters.")
+    if artifact.__tablename__ == "yara_rules":
+        from app.signature_service import save_signature
 
-    if fields_to_update and 'ids' in batch and batch['ids']:
-        session.execute(artifact.__table__.update().values(
-            fields_to_update
-        ).where(artifact.id.in_(batch['ids'])))
+        previous = {row.id: [] for row in rows}
+        if texts:
+            for identity, text in (
+                session.query(Tags_mapping.source_id, Tags.text)
+                .join(Tags, Tags.id == Tags_mapping.tag_id)
+                .filter(
+                    Tags_mapping.source_table == "yara_rules",
+                    Tags_mapping.source_id.in_(previous),
+                )
+            ):
+                previous[identity].append(text)
+        for row in rows:
+            value = dict(fields)
+            if texts:
+                value["tags"] = sorted(set(previous[row.id] + texts))
+            save_signature(value, row, commit=False)
+    else:
+        # ORM writes retain validators and audit events, including release whitelists.
+        for row in rows:
+            for key, value in fields.items():
+                setattr(row, key, value)
+            if session.is_modified(row):
+                row.modified_user_id = current_user.id
+        if include_tags and texts:
+            tags = {tag.text: tag for tag in Tags.query.filter(Tags.text.in_(texts))}
+            for text in set(texts) - tags.keys():
+                tag = Tags(text=text)
+                session.add(tag)
+                tags[text] = tag
+            session.flush()
+            existing = {
+                (mapping.source_id, mapping.tag_id)
+                for mapping in Tags_mapping.query.filter(
+                    Tags_mapping.source_table == artifact.__tablename__,
+                    Tags_mapping.source_id.in_([row.id for row in rows]),
+                )
+            }
+            for row in rows:
+                for tag in tags.values():
+                    if (row.id, tag.id) not in existing:
+                        session.add(
+                            Tags_mapping(
+                                source_table=artifact.__tablename__,
+                                source_id=row.id,
+                                tag_id=tag.id,
+                            )
+                        )
+    session.commit()
+    return jsonify(""), 200
 
-        for artifact_events_to_update in artifact_events_to_update:
-            session.execute(artifact.__table__.update().values(
-                {'eventid': artifact_events_to_update['event_id']}
-            ).where(artifact.id == artifact_events_to_update['artifact_id']))
 
-        if category:
-            update_cfg_category_range_mapping_current(category['id'], category['current'])
-        session.commit()
+@app.post("/ThreatKB/artifacts/<int:kind>/<int:identity>/restore")
+@login_required
+def restore_artifact(kind, identity):
+    from app.authorization import require_artifact
 
-    if include_tags and 'tags' in batch and batch['tags']:
-        batch_create_tags_mapping(artifact.__tablename__, batch['ids'], batch['tags'])
-
-    return jsonify(''), 200
+    entity = require_artifact(kind, identity, write=True)
+    entity.active = True
+    entity.modified_user_id = current_user.id
+    db.session.commit()
+    return jsonify(id=entity.id, active=True)

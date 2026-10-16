@@ -1,0 +1,61 @@
+name: Verify application and detection content
+on: [push, pull_request]
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    name: Formatting, lint and dependency ages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, 2026-07-20
+      - run: docker build --target quality -t threatkb:quality .
+  application:
+    name: Python 3.14 application regressions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, 2026-07-20
+      - run: docker build --target verification -t threatkb:verify .
+      - run: docker run --rm --entrypoint python threatkb:verify -m pytest -q
+  packs:
+    name: ${{ matrix.kind }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [sigpack, feedpack, codepack]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, 2026-07-20
+        with:
+          fetch-depth: 0
+      - run: docker build --target content -t threatkb:content .
+      - name: Build independent content artifact
+        env:
+          PACK_KIND: ${{ matrix.kind }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/source:ro" -v "$RUNNER_TEMP/pack:/artifacts" \
+            threatkb:content --root /source/detections build \
+            --kind "$PACK_KIND" --corpus /source/detections/samples \
+            --goodware /source/detections/goodware --output /artifacts
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1, 2026-04-10
+        with:
+          name: ${{ matrix.kind }}-${{ github.sha }}
+          path: ${{ runner.temp }}/pack/
+          if-no-files-found: error
+          retention-days: 30
+  # Keep the existing protected-branch required check, including when a job fails.
+  verify:
+    name: verify
+    if: always()
+    needs: [quality, application, packs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every independent job
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 -c 'import json,os; results=json.loads(os.environ["RESULTS"]); assert all(job["result"] == "success" for job in results.values()), results'

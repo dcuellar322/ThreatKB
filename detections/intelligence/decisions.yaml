@@ -1,0 +1,11 @@
+# Synthetic example decisions; operational approvals belong in reviewed Git changes.
+a64e991c-6b2e-5cf6-bc2f-4e206fe2245e:
+  author: fixture-author
+  decision: approved
+  record_digest: 5ad047a25aa7e0dad93ca476a3fa732a2ef2b127ea35dc648682aea1be7c6dea
+  reviewer: fixture-reviewer
+c2a8774f-798d-5be0-a615-138896c83b13:
+  author: fixture-author
+  decision: approved
+  record_digest: b4733fcdb25d23d5a4776da7d079eb3c907a751fa009641fddc65a1bc50303aa
+  reviewer: fixture-reviewer

@@ -1,2 +1,3 @@
-recursive-include app/static *
-include config.py
+recursive-include app/static/workbench *
+recursive-include app/static/images *
+include requirements.txt

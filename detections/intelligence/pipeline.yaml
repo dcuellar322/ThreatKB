@@ -1,0 +1,6 @@
+input: intelligence/observations.csv
+source: synthetic
+sources: intelligence/sources.yaml
+policy: intelligence/policy.yaml
+enrichment: intelligence/enrichment.yaml
+decisions: intelligence/decisions.yaml
