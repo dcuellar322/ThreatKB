@@ -304,7 +304,10 @@ def load_user_from_request(request):
 
 
 def generate_app():
-    """Compatibility entry point for existing WSGI and worker launchers."""
+    """Application factory for WSGI and compatibility launchers."""
+    from app.catalog_startup import start_catalog_prewarm
+
+    start_catalog_prewarm(app)
     return app
 
 

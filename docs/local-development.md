@@ -148,13 +148,21 @@ manifests or bypass testing/promotion gates. Three invalid preexisting drafts
 (IDs 8–10) were retained but deactivated in the upgraded copy; repair them before
 reactivation.
 
-## Prewarm a large detection catalog
+## Automatic catalog prewarming
 
-After configuring `CONTENT_REPOSITORY`, run
-`.venv/bin/flask --app app warm-content-catalog` (or
-`docker compose exec web flask --app app warm-content-catalog`) before first use.
-The disposable read cache lives under the shared instance workspace and survives
-web-process restarts. External edits invalidate affected entries automatically.
-It does not replace worker validation or publication gates. The first cache build
-still parses all source files; subsequent cold-process reads reuse unchanged
-rules. See [content-performance.md](content-performance.md).
+`run_web.sh` and the Docker web entrypoint automatically start a separate process
+to prepare the catalog cache while the web server starts serving. No manual step,
+Redis availability, or worker is required. The shared instance cache survives
+web-process restarts; external edits invalidate affected entries. Startup failures
+are logged and normal source loading remains available. The first-ever build
+still parses source files, so an immediate catalog request can take the cold path
+until the background work finishes.
+
+Set `THREATKB_CATALOG_PREWARM=0` to disable automatic warming. Custom WSGI serving
+should use `app.web:app`; Flask development serving can use
+`.venv/bin/flask --app app.web run`. Migrations and administrative commands retain
+`--app app` and do not launch warmers. The manual
+`.venv/bin/flask --app app warm-content-catalog` command remains available for
+diagnostics; it is no longer required for normal startup. The cache does not
+replace worker validation or publication gates. See
+[content-performance.md](content-performance.md).

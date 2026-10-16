@@ -19,7 +19,7 @@ case "$role" in
         if [ -n "${THREATKB_ADMIN_EMAIL:-}" ] && [ -n "${THREATKB_ADMIN_PASSWORD:-}" ]; then
             flask --app app admin-user --email "$THREATKB_ADMIN_EMAIL"
         fi
-        exec waitress-serve --host="${LISTEN_ON:-0.0.0.0}" --port="${LISTEN_PORT:-5000}" app:app
+        exec waitress-serve --host="${LISTEN_ON:-0.0.0.0}" --port="${LISTEN_PORT:-5000}" app.web:app
         ;;
     *)
         echo "Unknown THREATKB_ROLE: $role (choose web, worker, or scheduler)" >&2

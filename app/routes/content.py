@@ -9,6 +9,7 @@ import hashlib
 import shutil
 import tempfile
 import yaml
+import click
 from flask import request, jsonify, abort, send_file
 from flask_login import login_required, current_user
 from app import app, db, admin_only
@@ -384,10 +385,17 @@ def invalidate_repository():
 
 
 @app.cli.command("warm-content-catalog")
-def warm_content_catalog():
+@click.option("--startup", is_flag=True, hidden=True)
+def warm_content_catalog(startup):
     """Prepare the disposable read cache before serving a large repository."""
-    import click
+    if startup:
+        from app.catalog_startup import warm_startup_catalog
 
+        try:
+            click.echo(warm_startup_catalog())
+        except Exception as error:
+            raise click.ClickException(f"Catalog prewarm failed: {error}") from error
+        return
     repo = repository(catalog=True)
     click.echo(f"Catalog ready: {len(repo.rules)} signatures.")
 

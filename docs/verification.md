@@ -151,3 +151,33 @@ The restarted Celery worker also completed a fresh source-validation job with
 1,250 selected rules, 1,250 positive samples, and 25 goodware samples. Catalog
 reads continue to work independently of worker availability; the cache does not
 replace these validation checks.
+
+## Automatic startup prewarming — 2026-10-16
+
+The native and Docker web launchers now use `app.web:app`, which starts catalog
+prewarming in a separate process without waiting. Concurrent warmers sharing a
+cache skip duplicate work through a nonblocking lock. CLI/migration imports,
+workers, schedulers, test mode, and explicit opt-out do not start web warmers.
+Failures are logged and the serving process keeps its normal source-loading path.
+
+All **141 backend/content tests** pass locally. New regressions cover serving
+requests while a child is still running, once-per-process spawning, cache-lock
+contention, role/opt-out handling, spawn failure, malformed-source failure/retry,
+unchanged Git state, and skipped uninitialized/overlapping repositories. Frontend
+build/type checking, format/lint, dependency ages, shell syntax, and Compose
+configuration validation also pass.
+
+The local test removed only the derived cache and started the normal web launcher.
+All 2,503 rules were cached automatically. In the final loaded run, health was
+ready at 5.66 seconds while warmup finished at 19.11 seconds. Chromium displayed
+a populated Overview at 9.75 seconds (before warmup finished) and its health
+request returned in 30 ms. A catalog check after automatic warmup returned 200
+in 749 ms and passed pagination, search/reset, source/history dialogs, and
+unchanged content-Git checks. No JavaScript exceptions were observed.
+
+Evidence is stored under ignored
+`output/playwright/maintenance-2026-10-16/auto-prewarm-results.json`,
+`auto-prewarm-startup.log`, `overview-startup-prewarm.png`, and
+`catalog-auto-prewarm.png`. These are local observations under varying CPU/I/O
+load, not startup latency guarantees. An immediate catalog request can still
+perform a normal cold load if background warming has not finished.

@@ -134,8 +134,30 @@ configured location would fall inside the content repository, so derived files
 cannot affect source digests or Git commits. Cache files are disposable and may
 be removed when the app is stopped; the next read recreates usable storage.
 
-The first-ever cache build still reads and validates all source files. Large
-repositories can prepare it before opening the UI:
+The web application automatically prewarms existing content repositories at
+startup. Native and Docker web launchers use `app.web:app`; the compatibility
+application factory/`run.py` launcher also start it. A separate Python process
+prepares the persisted cache, so its catalog lock, parsing work, and failures do
+not block the serving process. No Redis connection or Celery worker is required
+for startup prewarming. The server does not wait for completion before accepting
+requests or reporting database health.
+
+Concurrent startup warmers sharing an instance/repository use a nonblocking file
+lock; duplicate work is skipped rather than queued. Child processes are reaped
+in a daemon thread, with completion/failure recorded in server logs. Worker,
+scheduler, migration, ordinary CLI imports, and test runs do not start web warmers.
+An uninitialized repository is left for normal first-use bootstrap; startup
+warming creates no content commits. Overlapping cache/source storage is skipped.
+
+The first-ever cache build still reads and validates all source files. Requests
+do not wait for this background task, although an immediate catalog request can
+still take the normal cold-load path before the cache is ready. Warmup failures
+are logged and normal source loading remains available. Set
+`THREATKB_CATALOG_PREWARM=0` to opt out; native launchers and Compose both support
+this flag. A custom WSGI server should target `app.web:app` (or the application
+factory), and Flask development serving can use `flask --app app.web run`.
+
+The manual command remains available for diagnostics or an explicit refresh:
 
 ```sh
 .venv/bin/flask --app app warm-content-catalog
@@ -143,9 +165,8 @@ repositories can prepare it before opening the UI:
 docker compose exec web flask --app app warm-content-catalog
 ```
 
-This command prepares the read cache, without committing content after the normal
-initial repository bootstrap. It does not require a worker or Redis to serve
-cached reads. Cache warmup is an optimization, not release approval.
+Manual administrative/migration commands should keep `--app app`, which does not
+start background work. Cache warmup is an optimization, not release approval.
 
 ## Cold-load measurements
 
@@ -172,7 +193,9 @@ screenshots and measurements are stored under ignored
 
 ## Verification
 
-All **133 backend/content tests** pass locally. Persistent-cache coverage includes
+All **141 backend/content tests** pass locally. Startup regressions cover
+nonblocking process launch, duplicate suppression, role/opt-out handling,
+spawn failure, malformed-source failure/retry, and read-only initialization. Persistent-cache coverage includes
 cold reuse, invalidation, corruption/fallback, concurrent writes, value types,
 prewarming, and independent source validation. Queued-save regressions cover
 deferred work, stale/missing revisions, competing saves, unchanged live source

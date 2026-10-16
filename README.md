@@ -35,7 +35,8 @@ sh run_scheduler.sh
 ```
 
 The installer selects Python 3.14.7, syncs pinned build/development dependencies,
-builds the frontend and applies migrations. The local worker uses the solo pool
+builds the frontend and applies migrations. Web startup automatically prewarms the detection catalog in a separate process
+without waiting for it to finish. The local worker uses the solo pool
 on macOS and prefork on Linux. Native Windows uses WSL2; `install.bat` delegates
 to WSL. See the [local guide](docs/local-development.md) for prerequisites,
 CLI-only installation, configuration, synthetic data, backups and rollback.
