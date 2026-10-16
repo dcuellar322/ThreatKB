@@ -58,6 +58,12 @@ def load(path, default=None):
     return yaml.load(path.read_text(), Loader=UniqueLoader)
 
 
+def load_rule(path):
+    rule = load(path)
+    RULE_VALIDATOR.validate(rule)
+    return rule
+
+
 def utcnow():
     return datetime.now(timezone.utc)
 
@@ -116,7 +122,7 @@ def environment():
 
 
 class Repository:
-    def __init__(self, root, corpus=None, load_rules=True):
+    def __init__(self, root, corpus=None, load_rules=True, rule_loader=None):
         self.root = Path(root).resolve()
         self.corpus = Path(corpus).resolve() if corpus else None
         self.categories = load(
@@ -137,8 +143,7 @@ class Repository:
         self.rules = []
         self.env = environment()
         for path in sorted((self.root / "rules").glob("*.yaml")) if load_rules else []:
-            rule = load(path)
-            RULE_VALIDATOR.validate(rule)
+            rule = (rule_loader or load_rule)(path)
             if rule["category"] not in self.categories:
                 raise ContentError(f"Unknown category in {path.name}")
             if any(

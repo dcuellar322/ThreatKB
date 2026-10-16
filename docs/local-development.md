@@ -147,3 +147,14 @@ Git revert creates a new content revision/build; it does not edit historical
 manifests or bypass testing/promotion gates. Three invalid preexisting drafts
 (IDs 8–10) were retained but deactivated in the upgraded copy; repair them before
 reactivation.
+
+## Prewarm a large detection catalog
+
+After configuring `CONTENT_REPOSITORY`, run
+`.venv/bin/flask --app app warm-content-catalog` (or
+`docker compose exec web flask --app app warm-content-catalog`) before first use.
+The disposable read cache lives under the shared instance workspace and survives
+web-process restarts. External edits invalidate affected entries automatically.
+It does not replace worker validation or publication gates. The first cache build
+still parses all source files; subsequent cold-process reads reuse unchanged
+rules. See [content-performance.md](content-performance.md).

@@ -15,9 +15,11 @@ from app import app, db, admin_only
 from app.models.yara_rule import Yara_rule
 from app.routes.jobs import JOB_HANDLERS, enqueue_job
 from threatkb_content.engine import Repository, ContentError, RULE_SCHEMA, load, lock
+from threatkb_content.catalog import CatalogCache
 from jsonschema import Draft202012Validator, FormatChecker
 
 _cache = {}
+_catalog_cache = {}
 _guard = threading.Lock()
 _git_cache = {}
 _git_guard = threading.Lock()
@@ -249,8 +251,13 @@ def git_metadata(repo, inventory):
     key = (repo.root, inventory, tuple(sorted(signature)))
     with _git_guard:
         if _git_cache.get("key") != key:
+            display_inventory, display_digest = getattr(
+                repo, "_catalog_digest", (None, None)
+            )
             value = {
-                "source_digest": repo.digest(),
+                "source_digest": display_digest
+                if display_inventory == inventory
+                else repo.digest(),
                 "git_commit": git("rev-parse", "HEAD"),
                 "git_status": git("--no-optional-locks", "status", "--porcelain"),
             }
@@ -280,7 +287,7 @@ def channels():
     return Path(app.instance_path) / "channels"
 
 
-def repository(include_inventory=False):
+def repository(include_inventory=False, catalog=False):
     root = content_root()
     if not (root / ".git").exists():
         root.mkdir(parents=True, exist_ok=True)
@@ -324,18 +331,40 @@ def repository(include_inventory=False):
         )
     )
     with _guard:
+        cached = _catalog_cache if catalog else _cache
         if (
-            _cache.get("signature") != signature
-            or _cache.get("root") != root
-            or _cache.get("corpus") != corpus()
+            cached.get("signature") != signature
+            or cached.get("root") != root
+            or cached.get("corpus") != corpus()
         ):
-            _cache.update(
+            if catalog:
+                path = (
+                    Path(app.instance_path)
+                    / "content-catalogs"
+                    / (hashlib.sha256(str(root).encode()).hexdigest() + ".sqlite3")
+                )
+                store = CatalogCache(path, root, inventory)
+                try:
+                    repo = Repository(root, corpus(), rule_loader=store.load)
+                    repo._catalog_digest = (inventory, store.digest(repo, inventory))
+                    # Don't publish a catalog assembled across concurrent writes.
+                    if file_inventory(root) != inventory:
+                        abort(
+                            409,
+                            description="Content changed while loading the catalog. Please refresh.",
+                        )
+                    store.finish()
+                finally:
+                    store.close()
+            else:
+                repo = Repository(root, corpus())
+            cached.update(
                 signature=signature,
                 root=root,
                 corpus=corpus(),
-                repo=Repository(root, corpus()),
+                repo=repo,
             )
-        repo = _cache["repo"]
+        repo = cached["repo"]
         return (repo, inventory) if include_inventory else repo
 
 
@@ -351,6 +380,16 @@ def git(*args):
 def invalidate_repository():
     with _guard:
         _cache.clear()
+        _catalog_cache.clear()
+
+
+@app.cli.command("warm-content-catalog")
+def warm_content_catalog():
+    """Prepare the disposable read cache before serving a large repository."""
+    import click
+
+    repo = repository(catalog=True)
+    click.echo(f"Catalog ready: {len(repo.rules)} signatures.")
 
 
 def commit_file(path, text, message, actor=None, locked=False, validated=False):
@@ -402,7 +441,9 @@ def commit_file(path, text, message, actor=None, locked=False, validated=False):
 
 
 def authorize_group(group, repo=None):
-    policy = (repo or repository()).groups.get(group)
+    policy = (
+        repo or Repository(content_root(), corpus(), load_rules=False)
+    ).groups.get(group)
     if policy is None:
         abort(400, description="Unknown policy group.")
     members = list(map(str, policy.get("members", [])))
@@ -437,7 +478,7 @@ JOB_HANDLERS.update(
 @login_required
 def content_overview():
     # Bootstrap before inventory so an initial GET sees the initialized Git state.
-    repo, inventory = repository(include_inventory=True)
+    repo, inventory = repository(include_inventory=True, catalog=True)
     group = request.args.get("group", "default")
     query = request.args.get("q", "").lower()
     authorize_group(group, repo)
@@ -536,7 +577,7 @@ def content_rule(identity):
                 "message": f"Update signature {identity}",
             }
         )
-    repo = repository()
+    repo = repository(catalog=True)
     rule = next((r for r in repo.rules if r["id"] == identity), None)
     if not rule:
         abort(404)

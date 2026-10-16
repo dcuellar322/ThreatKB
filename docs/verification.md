@@ -121,3 +121,33 @@ concurrent commit produced a 409 with the settings draft retained. Desktop and
 HTTP save responses were 129–299 ms on this development catalog; they measure
 queue acceptance, not validation/commit completion time. No remote content push
 or release publication occurred during these checks.
+
+## Cold catalog loading
+
+All **133 backend/content tests** pass. Catalog regressions cover reuse after a
+process-cache reset, parsing only changed rules, removal of deleted entries,
+external source/digest changes, current policy/category checks, loader/schema
+invalidation, corrupt rows and databases, busy/unavailable cache storage,
+YAML-only value types, private cache permissions, concurrent source edits, and
+source validation that bypasses the display cache. The prewarm CLI preserves
+content Git history and keeps derived files outside the repository.
+
+Chromium exercised a cold web-process load of the 2,503-signature catalog,
+pagination, search/reset, signature source/history, and a real queued worker save.
+The updated catalog header and reopened YAML reflected the new commit; reads
+created no commits. Desktop and 390px mobile screenshots were reviewed without
+horizontal overflow. The worker save took 30 seconds during the loaded local run;
+this cache optimizes catalog reads and does not bypass source validation.
+
+Cold-process comparisons on 2,503 signatures improved median authenticated
+responses from 4,229 to 563 ms, and from 5,708 to 1,097 ms during concurrent full
+worker validation (three requests per column). These reuse an existing index and
+OS filesystem cache; initial index construction remains source work. A separate
+Chromium request after an idle web-process restart completed in 702 ms, with rows
+and controls rendered in 768 ms. Measurements and limitations are recorded in
+[content-performance.md](content-performance.md).
+
+The restarted Celery worker also completed a fresh source-validation job with
+1,250 selected rules, 1,250 positive samples, and 25 goodware samples. Catalog
+reads continue to work independently of worker availability; the cache does not
+replace these validation checks.

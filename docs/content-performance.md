@@ -42,8 +42,9 @@ signatures**, the same machine/browser, and authenticated endpoint requests.
 
 This is local evidence, not a production latency guarantee. Browser search still
 has a 250 ms debounce; other view changes request data immediately. A first load
-or changed signature still needs full catalog parsing; observed cold profiles
-were around two seconds after the changes. It is not a constant-time cold path.
+or changed signature previously needed full catalog parsing; the persistent
+catalog cache below replaces that behavior. Initial cache creation still parses
+the complete repository. It is not a constant-time cold path.
 
 Previously every filter/page request performed two Git subprocesses, walked the
 source tree for a digest check, and separately scanned rule metadata. The read
@@ -51,8 +52,9 @@ path now takes one file inventory and reuses Git/digest results when unchanged.
 It still checks file metadata on every request. External edits, additions,
 deletions, mode changes, staging and commits invalidate the relevant cache.
 Change times also detect same-size edits whose modification times were restored;
-linked-file targets and Git worktree refs are accounted for. Caches are bounded
-to the current repository and local to each web process.
+linked-file targets and Git worktree refs are accounted for. In-memory caches are
+bounded to the current repository in each web process; the catalog cache below
+is shared through the persistent instance workspace.
 
 Read-only Git status uses `--no-optional-locks` to avoid refreshing the Git index.
 Build, review and promotion checks retain their own current source/digest checks;
@@ -96,13 +98,83 @@ an extra commit. Reads still create no commits after repository bootstrap.
 
 Full catalog parsing, snapshot copying, compilation, and the Git commit still take
 worker time; queueing removes them from the save request, not from total elapsed
-time. Cold catalog reads remain synchronous and can still take seconds. Review
+time. Catalog reads remain synchronous; unchanged rules and their source digest
+are reused across restarts. An empty cache still needs its initial build. Review
 recording and explicit legacy exports remain synchronous. No action pushes local
 content commits to a remote.
 
+## Persistent cold catalog cache
+
+Catalog listing and signature-editor reads use a disposable SQLite cache under
+`instance/content-catalogs/`, separated by the resolved content-repository path.
+It stores parsed/schema-validated rules individually and the display source
+digest. After a process restart, unchanged rules are loaded in one database read;
+a changed rule is reparsed without reparsing the other signatures. Deleted rules
+are removed from the cache. The catalog still checks duplicate identities/names,
+category/group references, and pairings against current definitions.
+
+Each entry is tied to file modification/change times, size, mode, and linked-file
+target metadata. Parser/schema versions invalidate old entries; payload checksums
+detect corrupted rows. Source inventory is checked again before publishing a new
+catalog, so a concurrent edit returns an explicit conflict instead of presenting
+a catalog assembled across revisions. Non-rule content inputs also invalidate
+the persisted digest. External edits and Git status/revisions remain visible.
+
+This cache is for web reads only. Worker saves, full validation, pack builds,
+independent review, and release operations retain source validation. Publication gates do not consume cached validation results. Group membership
+definitions come from current policy source, with file changes invalidating the
+in-memory catalog. Group-only authorization no longer parses the full
+signature catalog just to queue a job.
+
+The cache directory is private (0700) and its databases are 0600. Missing,
+corrupted, unavailable, read-only, or busy cache storage falls back to source
+loading. YAML values that cannot round-trip through JSON, including dates, retain
+their source types and bypass per-rule caching. Cache storage is disabled if its
+configured location would fall inside the content repository, so derived files
+cannot affect source digests or Git commits. Cache files are disposable and may
+be removed when the app is stopped; the next read recreates usable storage.
+
+The first-ever cache build still reads and validates all source files. Large
+repositories can prepare it before opening the UI:
+
+```sh
+.venv/bin/flask --app app warm-content-catalog
+# Or, against the shared container workspace:
+docker compose exec web flask --app app warm-content-catalog
+```
+
+This command prepares the read cache, without committing content after the normal
+initial repository bootstrap. It does not require a worker or Redis to serve
+cached reads. Cache warmup is an optimization, not release approval.
+
+## Cold-load measurements
+
+On the local 2,503-signature catalog, authenticated requests with process caches
+cleared before each request improved as follows (three requests per column):
+
+| Run | Full source parsing median | Persistent catalog median |
+|---|---:|---:|
+| Development comparison | 4,229 ms | 563 ms |
+| Concurrent full worker validation | 5,708 ms | 1,097 ms |
+
+These runs show roughly **5–7.5× faster** cold-process reads. They retain the OS
+filesystem cache and persisted catalog index; they do not measure an empty index.
+Local CPU/I/O load varies, so these are development observations, not production
+latency guarantees. The first cache build still parses source as described above.
+
+In Chromium, the first catalog request after a fresh idle web-process restart
+returned HTTP 200 in **702 ms**, with controls and rows rendered in **768 ms**.
+Search, pagination, source/history, and a real worker save were exercised; the
+new commit and edited YAML appeared without stale catalog data. Desktop/mobile
+screenshots and measurements are stored under ignored
+`output/playwright/maintenance-2026-10-15/cold-catalog-results.json`,
+`content-cold-catalog.png`, and `content-catalog-mobile.png`.
+
 ## Verification
 
-All **122 backend/content tests** pass locally. Queued-save regressions cover
+All **133 backend/content tests** pass locally. Persistent-cache coverage includes
+cold reuse, invalidation, corruption/fallback, concurrent writes, value types,
+prewarming, and independent source validation. Queued-save regressions cover
 deferred work, stale/missing revisions, competing saves, unchanged live source
 during failed compilation, external edits during validation, revoked account and
 administrator access, queue outages, no-op commits, rollback, and duplicate task
