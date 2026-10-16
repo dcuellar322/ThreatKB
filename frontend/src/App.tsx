@@ -283,7 +283,12 @@ export function App() {
             {page === "dashboard" ? (
               <Dashboard version={version} go={go} />
             ) : page === "content" ? (
-              <Content version={version} notify={notify} refresh={refresh} />
+              <Content
+                user={user}
+                version={version}
+                notify={notify}
+                refresh={refresh}
+              />
             ) : page === "scanner" ? (
               <SampleLab notify={notify} />
             ) : page === "settings" ? (

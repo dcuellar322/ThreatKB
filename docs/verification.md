@@ -95,3 +95,29 @@ signals or release-frequency improvement are fabricated. Authoritative migration
 away from legacy signature management and the target doubling of release frequency
 require real team cutover and usage. [design-acceptance.md](design-acceptance.md)
 records the implemented-versus-remaining matrix.
+
+## Queued content saves
+
+Signature creation, signature edits, and repository-settings saves now return a
+revision-bound HTTP 202 job instead of compiling the catalog in the web request.
+The Celery worker validates a private snapshot and rechecks source revision and
+current analyst permissions before making the local Git commit. The editor shows
+queued/running, failed, and committed states; failed drafts remain editable.
+Pending saves can continue in Background jobs and recover after a tab reload.
+
+All **122 backend/content tests** pass, including new cases for competing saves,
+missing/stale revisions, unchanged live source during failed validation, external
+edits during compilation, account/administrator revocation, queue outages, no-op
+saves, commit rollback, and duplicate task delivery. Frontend type checking/build,
+formatting/lint, and the dependency-age gate pass. See
+[content-performance.md](content-performance.md) for the API contract, worker
+boundaries, and remaining cold-read cost.
+
+Chromium confirmed real worker commits for new signatures, edits and settings,
+queued state while the worker was stopped, reload recovery, and continuing to
+Background jobs. Invalid YARA preserved both draft and committed source; a real
+concurrent commit produced a 409 with the settings draft retained. Desktop and
+390px mobile screenshots were reviewed without horizontal overflow. Observed
+HTTP save responses were 129–299 ms on this development catalog; they measure
+queue acceptance, not validation/commit completion time. No remote content push
+or release publication occurred during these checks.

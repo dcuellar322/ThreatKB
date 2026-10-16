@@ -1,6 +1,6 @@
 import { CodeEditor } from "./CodeEditor";
 import { Select } from "./Select";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FileCode2,
   Package,
@@ -12,12 +12,14 @@ import {
   GitBranch,
   Download,
   CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { api, base, write } from "../lib/api";
 import { fmt } from "../lib/format";
 
 import { Badge, IconButton, Empty, Dialog, Loading } from "./ui";
-export function Content({ version, notify, refresh }: any) {
+export function Content({ user, version, notify, refresh }: any) {
   const [pack, setPack] = useState("sigpack"),
     [newName, setNewName] = useState<any>(null),
     [busy, setBusy] = useState(false),
@@ -28,7 +30,161 @@ export function Content({ version, notify, refresh }: any) {
     [group, setGroup] = useState("default"),
     [index, setIndex] = useState(0),
     [edit, setEdit] = useState<any>(null),
-    [text, setText] = useState("");
+    [text, setText] = useState(""),
+    [save, setSave] = useState<any>(null);
+  const submitting = useRef(false);
+  const storageKey = "threatkb:pending-content-save:" + user.id;
+  const persist = (value: any) => {
+    try {
+      if (value) sessionStorage.setItem(storageKey, JSON.stringify(value));
+      else sessionStorage.removeItem(storageKey);
+    } catch {
+      /* The job remains available in Background jobs if storage is full. */
+    }
+  };
+  useEffect(() => {
+    try {
+      const pending = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+      if (pending?.job?.id) {
+        setEdit(pending.edit);
+        setConfig(pending.config);
+        setNewName(pending.newName);
+        setText(pending.text);
+        setBusy(true);
+        setSave(pending);
+      }
+    } catch {
+      sessionStorage.removeItem(storageKey);
+    }
+  }, []);
+  useEffect(() => {
+    if (!save?.job || !["queued", "running"].includes(save.job.status)) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const job = await api("/jobs/" + save.job.id);
+        if (cancelled) return;
+        if (job.status === "succeeded") {
+          persist(null);
+          setBusy(false);
+          setSave({
+            job,
+            message: "Committed · " + job.result.git_commit.slice(0, 8),
+          });
+          if (save.config)
+            setConfig({
+              ...save.config,
+              ...job.result,
+              original: job.result.yaml,
+            });
+          else {
+            setNewName(null);
+            setEdit(job.result);
+            setText(job.result.yaml);
+          }
+          refresh();
+        } else if (job.status === "failed") {
+          persist(null);
+          setBusy(false);
+          setSave({
+            job,
+            error: job.error || "Save failed. Your draft is unchanged.",
+          });
+        } else {
+          const pending = { ...save, job, error: null };
+          persist(pending);
+          setSave(pending);
+        }
+      } catch (error: any) {
+        if (!cancelled)
+          setSave({ ...save, error: "Unable to check save status. Retrying…" });
+      }
+      if (!cancelled) timer = setTimeout(poll, 1000);
+    };
+    timer = setTimeout(poll, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [save?.job?.id, save?.job?.status]);
+  async function queueSave(path: string, payload: any, method = "PUT") {
+    if (submitting.current || busy) return;
+    submitting.current = true;
+    setBusy(true);
+    setSave(null);
+    try {
+      const job = await write(path, payload, method);
+      const pending = { job, edit, config, newName, text };
+      persist(pending);
+      setSave(pending);
+    } catch (error: any) {
+      setSave({ error: error.message });
+      setBusy(false);
+    } finally {
+      submitting.current = false;
+    }
+  }
+  async function reloadSource() {
+    if (busy || !confirm("Discard this draft and load the latest source?"))
+      return;
+    setBusy(true);
+    try {
+      const value = await api(
+        config ? "/content/config/" + config.name : "/content/rules/" + edit.id,
+      );
+      if (config) setConfig({ ...config, ...value, original: value.yaml });
+      else {
+        setEdit(value);
+        setText(value.yaml);
+      }
+      setSave(null);
+    } catch (error: any) {
+      setSave({ error: error.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  const saveStatus = save && (
+    <div
+      className={"content-save-status" + (save.error ? " error" : "")}
+      role={save.error ? "alert" : "status"}
+    >
+      {busy ? (
+        <Loader2 size={16} className="spin" />
+      ) : save.error ? (
+        <AlertCircle size={16} />
+      ) : (
+        <Check size={16} />
+      )}
+      <span>
+        {save.error ||
+          save.message ||
+          (save.job?.status === "running"
+            ? "Validating in background…"
+            : "Save queued…")}
+      </span>
+      {busy && save.job && (
+        <button
+          type="button"
+          onClick={() => {
+            setBusy(false);
+            setSave(null);
+            setEdit(null);
+            setConfig(null);
+            setNewName(null);
+          }}
+        >
+          Continue in background
+        </button>
+      )}
+      {!busy && save.error && (edit || config) && (
+        <button type="button" onClick={reloadSource}>
+          Reload latest
+        </button>
+      )}
+    </div>
+  );
   useEffect(() => {
     if (q === query) return;
     const timer = setTimeout(() => {
@@ -73,23 +229,16 @@ export function Content({ version, notify, refresh }: any) {
           <form
             onSubmit={async (e) => {
               e.preventDefault();
-              if (busy) return;
-              setBusy(true);
-              try {
-                const value = await write("/content/rules", {
+              await queueSave(
+                "/content/rules",
+                {
                   name: newName,
                   category: "UC",
                   group,
-                });
-                setEdit(value);
-                setText(value.yaml);
-                setNewName(null);
-                refresh();
-              } catch (err: any) {
-                notify(err.message, true);
-              } finally {
-                setBusy(false);
-              }
+                  revision: data.revision,
+                },
+                "POST",
+              );
             }}
           >
             <div className="dialog-body">
@@ -98,6 +247,7 @@ export function Content({ version, notify, refresh }: any) {
                 <input
                   aria-label="Rule name"
                   required
+                  disabled={busy}
                   pattern="[A-Za-z_][A-Za-z0-9_]*"
                   autoFocus
                   value={newName}
@@ -109,6 +259,7 @@ export function Content({ version, notify, refresh }: any) {
                 draft.
               </p>
             </div>
+            {saveStatus}
             <div className="dialog-footer">
               <button
                 type="button"
@@ -152,7 +303,8 @@ export function Content({ version, notify, refresh }: any) {
                   setBusy(true);
                   try {
                     const value = await api("/content/config/" + name);
-                    setConfig({ name, yaml: value.yaml, original: value.yaml });
+                    setSave(null);
+                    setConfig({ name, ...value, original: value.yaml });
                   } catch (e: any) {
                     notify(e.message, true);
                   } finally {
@@ -180,10 +332,12 @@ export function Content({ version, notify, refresh }: any) {
                 label="YAML definition"
                 className="code-input yaml-editor"
                 value={config.yaml}
+                readOnly={busy}
                 onChange={(e) => setConfig({ ...config, yaml: e.target.value })}
               />
             </div>
           </div>
+          {saveStatus}
           <div className="dialog-footer">
             <button
               disabled={busy}
@@ -199,27 +353,19 @@ export function Content({ version, notify, refresh }: any) {
             </button>
             <button
               className="primary"
-              disabled={busy}
+              disabled={busy || config.yaml === config.original}
               onClick={async () => {
-                if (busy) return;
-                setBusy(true);
-                try {
-                  await write(
-                    "/content/config/" + config.name,
-                    { yaml: config.yaml },
-                    "PUT",
-                  );
-                  notify("Repository definition committed.");
-                  setConfig(null);
-                  refresh();
-                } catch (e: any) {
-                  notify(e.message, true);
-                } finally {
-                  setBusy(false);
-                }
+                await queueSave("/content/config/" + config.name, {
+                  yaml: config.yaml,
+                  revision: config.revision,
+                });
               }}
             >
-              {busy ? "Committing…" : "Validate & commit"}
+              {busy
+                ? save?.job?.status === "running"
+                  ? "Validating…"
+                  : "Queued…"
+                : "Validate & commit"}
             </button>
           </div>
         </Dialog>
@@ -236,6 +382,7 @@ export function Content({ version, notify, refresh }: any) {
         <div className="button-row">
           <button
             onClick={() => {
+              setSave(null);
               setEdit(null);
               setConfig(null);
               setNewName("");
@@ -246,14 +393,15 @@ export function Content({ version, notify, refresh }: any) {
           </button>
           <button
             onClick={async () => {
+              setSave(null);
               setEdit(null);
               setNewName(null);
-              const value = await api("/content/config/macros");
-              setConfig({
-                name: "macros",
-                yaml: value.yaml,
-                original: value.yaml,
-              });
+              try {
+                const value = await api("/content/config/macros");
+                setConfig({ name: "macros", ...value, original: value.yaml });
+              } catch (error: any) {
+                notify(error.message, true);
+              }
             }}
           >
             Repository settings
@@ -319,9 +467,14 @@ export function Content({ version, notify, refresh }: any) {
                     <button
                       className="record-name"
                       onClick={async () => {
-                        const v = await api("/content/rules/" + r.id);
-                        setEdit(v);
-                        setText(v.yaml);
+                        try {
+                          const v = await api("/content/rules/" + r.id);
+                          setSave(null);
+                          setEdit(v);
+                          setText(v.yaml);
+                        } catch (error: any) {
+                          notify(error.message, true);
+                        }
                       }}
                     >
                       <span className="file-icon">
@@ -495,6 +648,7 @@ export function Content({ version, notify, refresh }: any) {
                 className="code-input yaml-editor"
                 spellCheck={false}
                 value={text}
+                readOnly={busy}
                 onChange={(e) => setText(e.target.value)}
               />
             </div>
@@ -505,6 +659,7 @@ export function Content({ version, notify, refresh }: any) {
               </pre>
             ))}
           </div>
+          {saveStatus}
           <div className="dialog-footer">
             <code>{edit.id}</code>
             <button
@@ -518,28 +673,21 @@ export function Content({ version, notify, refresh }: any) {
             </button>
             <button
               className="primary"
-              disabled={busy}
+              disabled={busy || text === edit.yaml}
               onClick={async () => {
-                if (busy) return;
-                setBusy(true);
-                try {
-                  await write(
-                    "/content/rules/" + edit.id,
-                    { yaml: text },
-                    "PUT",
-                  );
-                  notify("Signature committed.");
-                  setEdit(null);
-                  refresh();
-                } catch (e: any) {
-                  notify(e.message, true);
-                } finally {
-                  setBusy(false);
-                }
+                await queueSave("/content/rules/" + edit.id, {
+                  yaml: text,
+                  revision: edit.revision,
+                  file_name: edit.file_name,
+                });
               }}
             >
               <Check size={16} />
-              {busy ? "Committing…" : "Validate & commit"}
+              {busy
+                ? save?.job?.status === "running"
+                  ? "Validating…"
+                  : "Queued…"
+                : "Validate & commit"}
             </button>
           </div>
         </Dialog>

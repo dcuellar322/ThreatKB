@@ -52,3 +52,26 @@ def authenticated(client):
     assert response.status_code == 200
     assert response.json["result"] is True
     return client
+
+
+@pytest.fixture
+def content_save(authenticated, monkeypatch):
+    """Submit through HTTP, then deliver the queued task separately."""
+    from app.routes.jobs import execute_job
+
+    monkeypatch.setattr(execute_job, "apply_async", lambda **kwargs: None)
+
+    def save(path, payload, method="POST"):
+        source = authenticated.get(
+            path if method == "PUT" else "/ThreatKB/content"
+        ).json
+        payload = {**payload, "revision": source["revision"]}
+        if "file_name" in source:
+            payload["file_name"] = source["file_name"]
+        response = authenticated.open(path, method=method, json=payload)
+        assert response.status_code == 202, response.json
+        job = execute_job.apply(args=[response.json["id"]]).result
+        assert job["status"] == "succeeded", job
+        return job["result"]
+
+    return save

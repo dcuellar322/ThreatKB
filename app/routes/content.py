@@ -1,9 +1,13 @@
 from pathlib import Path
+from contextlib import nullcontext
 import json
 import os
 import subprocess
 import stat
 import threading
+import hashlib
+import shutil
+import tempfile
 import yaml
 from flask import request, jsonify, abort, send_file
 from flask_login import login_required, current_user
@@ -17,6 +21,181 @@ _cache = {}
 _guard = threading.Lock()
 _git_cache = {}
 _git_guard = threading.Lock()
+CONFIG_NAMES = (
+    "macros",
+    "categories",
+    "policies",
+    "pairings",
+    "collections",
+    "indicators",
+    "components",
+)
+
+
+def source_revision(head=None, inventory=None):
+    """Optimistic token for both committed and external worktree changes."""
+    return hashlib.sha256(
+        json.dumps(
+            [
+                head if head is not None else git("rev-parse", "HEAD"),
+                inventory if inventory is not None else file_inventory(content_root()),
+            ]
+        ).encode()
+    ).hexdigest()
+
+
+def require_revision(data):
+    revision = data.get("revision")
+    if not isinstance(revision, str) or len(revision) != 64:
+        abort(
+            428,
+            description="Reload the content before saving; a source revision is required.",
+        )
+    if revision != source_revision():
+        abort(
+            409,
+            description="Content changed since you opened it. Reload before saving your draft.",
+        )
+    return revision
+
+
+def check_groups(user, groups, repo):
+    for group in groups:
+        policy = repo.groups.get(group)
+        if policy is None:
+            raise ContentError("Unknown policy group.")
+        members = list(map(str, policy.get("members", [])))
+        if members and not user.admin and str(user.id) not in members:
+            raise ContentError("You no longer have permission to save this content.")
+
+
+def save_target(payload, user):
+    """Resolve only server-supported targets and recheck current access."""
+    root = content_root()
+    repo = Repository(root, corpus(), load_rules=False)
+    if payload["action"] == "config":
+        if not user.admin or payload["name"] not in CONFIG_NAMES:
+            raise ContentError(
+                "Administrator access is required to save repository settings."
+            )
+        path = root / f"{payload['name']}.yaml"
+        if path.is_symlink():
+            raise ContentError(
+                "Linked settings must be edited in the content repository."
+            )
+        yaml.safe_load(payload["yaml"])
+        return path
+    name = payload["file_name"]
+    if (
+        not isinstance(name, str)
+        or Path(name).name != name
+        or not name.endswith(".yaml")
+    ):
+        raise ContentError("Invalid signature filename.")
+    path = root / "rules" / name
+    if not path.resolve().is_relative_to(root):
+        raise ContentError("Signature path must stay inside the content repository.")
+    if path.is_symlink():
+        raise ContentError(
+            "Linked signatures must be edited in the content repository."
+        )
+    if payload["action"] == "create":
+        if path.exists():
+            raise ContentError("This signature already exists.")
+    else:
+        if not path.is_file():
+            raise ContentError("Signature no longer exists.")
+        previous = load(path)
+        if previous["id"] != payload["identity"]:
+            raise ContentError("Signature identity changed. Reload before saving.")
+        # Existing multi-group rules remain editable by a member of any group.
+        permitted = any(
+            user.admin
+            or not policy.get("members")
+            or str(user.id) in map(str, policy["members"])
+            for group, policy in repo.groups.items()
+            if group in previous.get("groups", ["default"])
+        )
+        if not permitted:
+            raise ContentError("You no longer have permission to save this signature.")
+    value = yaml.safe_load(payload["yaml"])
+    Draft202012Validator(RULE_SCHEMA, format_checker=FormatChecker()).validate(value)
+    if value["id"] != payload["identity"]:
+        raise ContentError("A signature UUID is immutable.")
+    check_groups(user, value.get("groups", ["default"]), repo)
+    return path
+
+
+def run_content_save(payload, user_id):
+    from app.models.users import KBUser
+
+    user = db.session.get(KBUser, user_id, populate_existing=True)
+    if not user or not user.active:
+        raise ContentError("The saving account is no longer active.")
+    root = content_root()
+    with lock(root / ".git" / "threatkb"):
+        if source_revision() != payload["revision"]:
+            raise ContentError(
+                "Content changed while this save was pending. Reload before saving your draft."
+            )
+        path = save_target(payload, user)
+        # Validate a private copy: readers continue seeing the last committed source.
+        if git("status", "--porcelain"):
+            raise ContentError(
+                "Commit existing content edits before editing through the web interface."
+            )
+        text = payload["yaml"]
+        original = path.read_text() if path.exists() else None
+        if text != original:
+            with tempfile.TemporaryDirectory(prefix="threatkb-save-") as folder:
+                candidate = Path(folder) / "content"
+                shutil.copytree(root, candidate, ignore=shutil.ignore_patterns(".git"))
+                target = candidate / path.relative_to(root)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text)
+                repo = Repository(candidate, corpus())
+                import yara
+
+                yara.compile(
+                    source=repo.materialize(
+                        [r for r in repo.rules if r.get("enabled", True)]
+                    )
+                )
+            if source_revision() != payload["revision"]:
+                raise ContentError(
+                    "Content changed during validation. Reload before saving your draft."
+                )
+            # Recheck permissions after potentially slow validation.
+            # End MySQL's repeatable-read snapshot so this sees revocations
+            # committed by another request while validation was running.
+            db.session.commit()
+            db.session.refresh(user)
+            if not user.active:
+                raise ContentError("The saving account is no longer active.")
+            save_target(payload, user)
+            commit_file(
+                path, text, payload["message"], actor=user, locked=True, validated=True
+            )
+        return {
+            "id": payload.get("identity"),
+            "file_name": path.name,
+            "yaml": text,
+            "revision": source_revision(),
+            "git_commit": git("rev-parse", "HEAD"),
+            "history": git(
+                "log", "-10", "--format=%h %aI %s", "--", str(path.relative_to(root))
+            ).splitlines(),
+            "changed": text != original,
+        }
+
+
+def queue_save(payload):
+    data = request.get_json()
+    payload["revision"] = require_revision(data)
+    if not isinstance(payload.get("yaml"), str):
+        abort(400, description="Signature or configuration YAML must be text.")
+    # Lightweight authorization only; full YAML/catalog/YARA validation belongs to the worker.
+    return jsonify(enqueue_job("save_content", payload, current_user.id).to_dict()), 202
 
 
 def file_inventory(root):
@@ -174,10 +353,10 @@ def invalidate_repository():
         _cache.clear()
 
 
-def commit_file(path, text, message):
+def commit_file(path, text, message, actor=None, locked=False, validated=False):
     root = content_root()
     root.mkdir(parents=True, exist_ok=True)
-    with lock(root / ".git" / "threatkb"):
+    with nullcontext() if locked else lock(root / ".git" / "threatkb"):
         if not (root / ".git").is_dir():
             raise ContentError("Initialize the content Git repository first.")
         if git("status", "--porcelain"):
@@ -190,8 +369,8 @@ def commit_file(path, text, message):
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
-            repo = Repository(root, corpus())
-            if path.parent.name == "rules":
+            repo = None if validated else Repository(root, corpus())
+            if not validated and path.parent.name == "rules":
                 import yara
 
                 yara.compile(
@@ -202,9 +381,9 @@ def commit_file(path, text, message):
             git("add", "--", str(path.relative_to(root)))
             git(
                 "-c",
-                f"user.name={current_user.email}",
+                f"user.name={(actor or current_user).email}",
                 "-c",
-                f"user.email={current_user.id}@threatkb.local",
+                f"user.email={(actor or current_user).id}@threatkb.local",
                 "commit",
                 "-m",
                 message,
@@ -247,7 +426,11 @@ def run_content_build(payload, user_id):
     )
 
 
-JOB_HANDLERS.update(validate_content=run_content_check, build_content=run_content_build)
+JOB_HANDLERS.update(
+    validate_content=run_content_check,
+    build_content=run_content_build,
+    save_content=run_content_save,
+)
 
 
 @app.get("/ThreatKB/content")
@@ -286,6 +469,7 @@ def content_overview():
     recent = sorted(
         builds().glob("*/manifest.json"), key=lambda p: p.stat().st_mtime, reverse=True
     )[:20]
+    metadata = git_metadata(repo, inventory)
     return jsonify(
         rule_count=len(repo.rules),
         data=[
@@ -309,13 +493,49 @@ def content_overview():
             "testing_releases": sum(r["status"] == "testing" for r in releases),
             "production_releases": sum(r["status"] == "production" for r in releases),
         },
-        **git_metadata(repo, inventory),
+        **metadata,
+        revision=source_revision(metadata["git_commit"], inventory),
     )
 
 
 @app.route("/ThreatKB/content/rules/<identity>", methods=["GET", "PUT"])
 @login_required
 def content_rule(identity):
+    if request.method == "PUT":
+        data = request.get_json()
+        if not isinstance(data, dict):
+            abort(400, description="A JSON object is required.")
+        name = data.get("file_name", "")
+        if (
+            not isinstance(name, str)
+            or not name
+            or Path(name).name != name
+            or not name.endswith(".yaml")
+        ):
+            abort(400, description="Reload this signature before saving.")
+        path = content_root() / "rules" / name
+        if not path.resolve().is_relative_to(content_root()) or path.is_symlink():
+            abort(400)
+        if not path.is_file() or load(path).get("id") != identity:
+            abort(404)
+        previous = load(path)
+        repo = Repository(content_root(), corpus(), load_rules=False)
+        if not current_user.admin and not any(
+            not policy.get("members")
+            or str(current_user.id) in map(str, policy["members"])
+            for group, policy in repo.groups.items()
+            if group in previous.get("groups", ["default"])
+        ):
+            abort(403)
+        return queue_save(
+            {
+                "action": "rule",
+                "identity": identity,
+                "file_name": name,
+                "yaml": data.get("yaml"),
+                "message": f"Update signature {identity}",
+            }
+        )
     repo = repository()
     rule = next((r for r in repo.rules if r["id"] == identity), None)
     if not rule:
@@ -330,21 +550,12 @@ def content_rule(identity):
         if not set(rule.get("groups", ["default"])) & set(permitted):
             abort(403)
     path = content_root() / "rules" / rule["_path"]
-    if request.method == "PUT":
-        data = request.get_json()
-        text = data.get("yaml", "")
-        value = yaml.safe_load(text)
-        Draft202012Validator(RULE_SCHEMA, format_checker=FormatChecker()).validate(
-            value
-        )
-        if value["id"] != identity:
-            abort(409, description="A signature UUID is immutable.")
-        for group in value.get("groups", ["default"]):
-            authorize_group(group, repo)
-        commit_file(path, text, f"Update signature {identity}")
-    return jsonify(
+    revision = source_revision()
+    value = dict(
         yaml=path.read_text(),
         id=identity,
+        file_name=path.name,
+        revision=revision,
         history=git(
             "log",
             "-10",
@@ -353,6 +564,12 @@ def content_rule(identity):
             str(path.relative_to(content_root())),
         ).splitlines(),
     )
+    if source_revision() != revision:
+        abort(
+            409,
+            description="Content changed while opening this signature. Please reopen it.",
+        )
+    return jsonify(value)
 
 
 @app.post("/ThreatKB/content/jobs")
@@ -525,23 +742,27 @@ def content_error(error):
 @login_required
 @admin_only()
 def content_configuration(name):
-    if name not in (
-        "macros",
-        "categories",
-        "policies",
-        "pairings",
-        "collections",
-        "indicators",
-        "components",
-    ):
+    if name not in CONFIG_NAMES:
         abort(404)
     path = content_root() / f"{name}.yaml"
     if request.method == "PUT":
-        text = request.get_json()["yaml"]
-        yaml.safe_load(text)
-        commit_file(path, text, f"Update content {name}")
-    return jsonify(
-        yaml=path.read_text()
+        data = request.get_json()
+        if not isinstance(data, dict):
+            abort(400, description="A JSON object is required.")
+        text = data.get("yaml")
+        return queue_save(
+            {
+                "action": "config",
+                "name": name,
+                "yaml": text,
+                "message": f"Update content {name}",
+            }
+        )
+    if not (content_root() / ".git").exists():
+        repository()  # Bootstrap only; settings reads do not need a full catalog.
+    revision = source_revision()
+    text = (
+        path.read_text()
         if path.exists()
         else (
             "[]\n"
@@ -549,6 +770,12 @@ def content_configuration(name):
             else "{}\n"
         )
     )
+    if source_revision() != revision:
+        abort(
+            409,
+            description="Content changed while opening settings. Please reopen them.",
+        )
+    return jsonify(yaml=text, revision=revision)
 
 
 from app.celeryapp import celery
@@ -575,8 +802,12 @@ def create_content_rule():
     from uuid import uuid4
 
     data = request.get_json()
+    if not isinstance(data, dict):
+        abort(400, description="A JSON object is required.")
     group = data.get("group", "default")
-    authorize_group(group)
+    if not isinstance(group, str):
+        abort(400, description="Choose a policy group.")
+    authorize_group(group, Repository(content_root(), corpus(), load_rules=False))
     identity = str(uuid4())
     rule = {
         "id": identity,
@@ -589,12 +820,15 @@ def create_content_rule():
         "tags": [],
         "groups": [group],
     }
-    Draft202012Validator(RULE_SCHEMA, format_checker=FormatChecker()).validate(rule)
-    path = content_root() / "rules" / f"{identity}.yaml"
-    commit_file(
-        path, yaml.safe_dump(rule, sort_keys=False), f"Create signature {identity}"
+    return queue_save(
+        {
+            "action": "create",
+            "identity": identity,
+            "file_name": f"{identity}.yaml",
+            "yaml": yaml.safe_dump(rule, sort_keys=False),
+            "message": f"Create signature {identity}",
+        }
     )
-    return jsonify(id=identity, yaml=path.read_text(), history=[]), 201
 
 
 from jsonschema.exceptions import ValidationError

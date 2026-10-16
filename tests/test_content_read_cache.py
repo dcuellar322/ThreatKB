@@ -19,18 +19,13 @@ def git(root, *args):
 
 
 def test_search_and_pagination_reuse_metadata_without_creating_commits(
-    authenticated, monkeypatch, tmp_path
+    authenticated, monkeypatch, tmp_path, content_save
 ):
     root = tmp_path / "content"
     monkeypatch.setitem(app.config, "CONTENT_REPOSITORY", str(root))
     authenticated.get("/ThreatKB/content")
     for name in ("First", "Second"):
-        assert (
-            authenticated.post(
-                "/ThreatKB/content/rules", json={"name": name}
-            ).status_code
-            == 201
-        )
+        content_save("/ThreatKB/content/rules", {"name": name})
     first = authenticated.get("/ThreatKB/content").json
     head = git(root, "rev-parse", "HEAD")
 
@@ -48,7 +43,7 @@ def test_search_and_pagination_reuse_metadata_without_creating_commits(
 
 
 def test_external_edits_staging_and_commits_invalidate_read_metadata(
-    authenticated, monkeypatch, tmp_path
+    authenticated, monkeypatch, tmp_path, content_save
 ):
     root = tmp_path / "content"
     monkeypatch.setitem(app.config, "CONTENT_REPOSITORY", str(root))
@@ -86,12 +81,12 @@ def test_external_edits_staging_and_commits_invalidate_read_metadata(
 
 
 def test_external_same_size_rule_edit_refreshes_the_rule_catalog(
-    authenticated, monkeypatch, tmp_path
+    authenticated, monkeypatch, tmp_path, content_save
 ):
     root = tmp_path / "content"
     monkeypatch.setitem(app.config, "CONTENT_REPOSITORY", str(root))
     authenticated.get("/ThreatKB/content")
-    created = authenticated.post("/ThreatKB/content/rules", json={"name": "First"}).json
+    created = content_save("/ThreatKB/content/rules", {"name": "First"})
     original = authenticated.get("/ThreatKB/content").json
     path = root / "rules" / (created["id"] + ".yaml")
     info = path.stat()
@@ -113,7 +108,7 @@ def test_external_same_size_rule_edit_refreshes_the_rule_catalog(
 
 
 def test_worktree_head_changes_invalidate_metadata_without_source_changes(
-    authenticated, monkeypatch, tmp_path
+    authenticated, monkeypatch, tmp_path, content_save
 ):
     root = tmp_path / "repository"
     monkeypatch.setitem(app.config, "CONTENT_REPOSITORY", str(root))

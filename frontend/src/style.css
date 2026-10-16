@@ -2888,3 +2888,33 @@ label.file-row {
     gap: 12px;
   }
 }
+.content-save-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--border, #e4e4e8);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.content-save-status > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.content-save-status > span {
+  flex: 1;
+  white-space: pre-wrap;
+  max-height: 140px;
+  overflow: auto;
+}
+.content-save-status > button {
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .content-save-status {
+    flex-wrap: wrap;
+  }
+}
+.content-save-status.error {
+  color: #a71d2a;
+}

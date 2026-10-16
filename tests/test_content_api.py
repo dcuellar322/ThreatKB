@@ -1,40 +1,34 @@
 from app import app
 
 
-def test_git_content_create_update_and_immutable_uuid(authenticated, tmp_path):
-    previous = app.config.get("CONTENT_REPOSITORY")
-    app.config["CONTENT_REPOSITORY"] = str(tmp_path / "content")
-    try:
-        assert authenticated.get("/ThreatKB/content").status_code == 200
-        created = authenticated.post(
-            "/ThreatKB/content/rules", json={"name": "WebFixture", "category": "UC"}
-        )
-        assert created.status_code == 201, created.json
-        value = created.json
-        source = value["yaml"].replace("condition: 'false'", "condition: 'true'")
-        updated = authenticated.put(
-            "/ThreatKB/content/rules/" + value["id"],
-            json={"yaml": source + "\n# Reviewed locally\n"},
-        )
-        assert updated.status_code == 200, updated.json
-        assert len(updated.json["history"]) == 2
-        invalid = authenticated.put(
-            "/ThreatKB/content/rules/" + value["id"],
-            json={
-                "yaml": source.replace(
-                    value["id"], "4e9a971a-d85b-4e8f-97c1-7daa770b1ad9"
-                )
-            },
-        )
-        assert invalid.status_code == 409
-        assert (
-            authenticated.post("/ThreatKB/content/review", json={}).status_code == 409
-        )
-    finally:
-        if previous is None:
-            app.config.pop("CONTENT_REPOSITORY", None)
-        else:
-            app.config["CONTENT_REPOSITORY"] = previous
+def test_git_content_create_update_and_immutable_uuid(
+    authenticated, tmp_path, monkeypatch, content_save
+):
+    from app.routes.jobs import execute_job
+
+    monkeypatch.setitem(app.config, "CONTENT_REPOSITORY", str(tmp_path / "content"))
+    value = content_save(
+        "/ThreatKB/content/rules", {"name": "WebFixture", "category": "UC"}
+    )
+    source = value["yaml"].replace("condition: 'false'", "condition: 'true'")
+    updated = content_save(
+        "/ThreatKB/content/rules/" + value["id"],
+        {"yaml": source + "\n# Reviewed locally\n"},
+        "PUT",
+    )
+    assert len(updated["history"]) == 2
+    invalid = authenticated.put(
+        "/ThreatKB/content/rules/" + value["id"],
+        json={
+            "yaml": source.replace(value["id"], "4e9a971a-d85b-4e8f-97c1-7daa770b1ad9"),
+            "file_name": value["file_name"],
+            "revision": updated["revision"],
+        },
+    )
+    assert invalid.status_code == 202
+    failed = execute_job.apply(args=[invalid.json["id"]]).result
+    assert failed["status"] == "failed" and "immutable" in failed["error"]
+    assert authenticated.post("/ThreatKB/content/review", json={}).status_code == 409
 
 
 def test_feed_export_selects_only_active_released_indicators(authenticated, tmp_path):

@@ -73,7 +73,7 @@ copy/adapt the hook's root and Python executable paths.
 
 ## Migration, interfaces and rollback
 
-The optional web editor validates and commits YAML edits into the configured
+The optional web editor queues validation and local Git commits for YAML edits in the configured
 `CONTENT_REPOSITORY`; sample bytes are supplied by `CONTENT_CORPUS`. Defaults use
 ignored development directories. Export legacy signatures from Configuration;
 UUIDs already present are skipped. The legacy database remains available for IOC
@@ -109,7 +109,10 @@ require their actual integrations.
 
 ## Web execution and performance
 
-Page reads create no commits after initial repository bootstrap. Explicit saves
-validate and commit locally before returning; validation/build buttons use Celery
-jobs. See [content-performance.md](content-performance.md) for the execution
-boundaries, cache invalidation, measured improvement and remaining cold/save costs.
+Page reads create no commits after initial repository bootstrap. Signature and
+repository-settings saves return HTTP 202 with a durable Celery job; the editor
+reports success only after validation and the local commit finish. Saves require
+the editor's source revision and reject stale or conflicting changes. Validation
+and build buttons also use Celery jobs. See
+[content-performance.md](content-performance.md) for the execution boundaries,
+cache invalidation, measured improvement, and remaining cold-read costs.

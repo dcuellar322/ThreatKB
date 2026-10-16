@@ -102,6 +102,11 @@ def background_jobs():
         kind, payload = data.get("kind"), data.get("payload", {})
         if kind not in JOB_HANDLERS or not isinstance(payload, dict):
             abort(400, description="Choose a supported job type and JSON payload.")
+        if kind == "save_content":
+            abort(
+                400,
+                description="Queue content saves through the content editor endpoints.",
+            )
         if kind == "test_rule":
             rule = db.get_or_404(Yara_rule, payload.get("rule_id"))
             if not current_user.admin and rule.owner_user_id != current_user.id:

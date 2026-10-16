@@ -11,16 +11,21 @@ pushes these local commits to a remote.
 |---|---|---|
 | Open, search or paginate | Read YAML catalog, Git status, digest, manifests and channels | Browser fetch; synchronous Flask request with cached read metadata |
 | Open a signature | Read YAML and the last ten Git history entries | Synchronous request; no commit |
-| Create or save a signature | Validate YAML/schema and enabled YARA, stage the changed file and commit as the analyst | Synchronous request under a repository lock |
-| Save repository settings or record review | Validate the corresponding YAML/content definition and commit it | Synchronous request under the same lock |
+| Create or save a signature, or save repository settings | Queue a revision-bound draft; validate YAML/schema and enabled YARA in a private copy, then commit as the analyst | HTTP 202; Celery worker under a repository lock |
+| Record independent review | Validate the review definition and commit it | Synchronous request under the same lock |
 | Validate content or build a pack | Check samples/goodware or produce a checked artifact | Celery worker, Redis queue, HTTP 202 with a durable job ID |
 | Check automatic promotion | Apply review, elapsed-time and telemetry gates | Scheduled Celery task |
 
 A new, uninitialized local content repository receives one bootstrap commit on
 first access. Subsequent reads create no commits. Explicit saves reject an already
 dirty worktree, commit only the intended file, and restore the file/index on failure.
-Save success means validation and the local commit have finished. Validation and
-build progress/results remain available through Background jobs.
+A queued-save response is not a successful commit. The editor shows queued,
+validating, failed, or committed state and the resulting commit ID. Failed saves
+retain the draft, and a confirmed Reload latest action loads current source.
+Continue in background releases the editor while the durable job continues; the
+same browser tab restores the pending editor/job on a later visit or reload.
+Pending drafts are scoped to the signed-in account in session storage. Save,
+validation, and build results remain available through Background jobs.
 
 ## Measured improvement on 2026-10-15
 
@@ -67,17 +72,41 @@ The verified default-group validation job checked **1,250 selected rules and
 positive samples plus 25 goodware samples**; selection policy excludes the other
 catalog entries.
 
-Saving still includes parsing and compilation in the web request. This can take
-seconds for a large repository. If editing throughput or cold catalog loading
-becomes the next bottleneck, worker-maintained catalog snapshots and queued save
-validation are the next scaling options. A queued save would need an expected
-source revision checked inside the Git lock, rechecked analyst permissions, and
-clear pending/failed/completed UI state before reporting a successful commit.
-Those save semantics have not changed in this optimization.
+Signature creation, signature edits, and repository-settings saves now use the
+existing `save_content` job handler. Their HTTP requests perform lightweight
+access/revision checks without parsing or compiling the full catalog. The worker
+validates a private snapshot, so invalid drafts never replace live source. It
+checks the expected repository revision under the Git lock before validation and
+again before committing, then refreshes the analyst's active status/permissions.
+The final database check starts a fresh transaction to see revocations under
+MySQL's repeatable-read isolation. Saves with competing commits or external edits
+fail explicitly instead of overwriting newer work. A duplicate delivery of a
+completed job cannot create another commit.
+
+Editor GET responses provide `revision` and (for signatures) `file_name`.
+`POST /ThreatKB/content/rules` and both content-editor `PUT` endpoints require the
+revision; signature PUT also requires its returned filename. They return HTTP 202
+with a durable job ID. Missing revisions return 428 and already-stale revisions
+return 409. Validation errors and conflicts discovered after queueing are recorded
+as failed jobs. Poll `/ThreatKB/jobs/<id>` for the completed result, including the
+new revision, YAML, Git commit, and history. Direct generic-job submission of
+`save_content` is rejected; only the authorized editor endpoints construct saves.
+A broker outage returns 503 and does not modify content. No-op saves do not create
+an extra commit. Reads still create no commits after repository bootstrap.
+
+Full catalog parsing, snapshot copying, compilation, and the Git commit still take
+worker time; queueing removes them from the save request, not from total elapsed
+time. Cold catalog reads remain synchronous and can still take seconds. Review
+recording and explicit legacy exports remain synchronous. No action pushes local
+content commits to a remote.
 
 ## Verification
 
-All **111 backend/content tests** pass locally. New regressions cover cached reads
+All **122 backend/content tests** pass locally. Queued-save regressions cover
+deferred work, stale/missing revisions, competing saves, unchanged live source
+during failed compilation, external edits during validation, revoked account and
+administrator access, queue outages, no-op commits, rollback, and duplicate task
+delivery. Read-performance regressions cover cached reads
 without Git/hash work, external source and index changes, same-size edits, linked
 files, Git worktree commits and literal/Jinja output equivalence. Frontend type
 checking/build, formatting/lint, shell syntax and the dependency-age gate pass.
