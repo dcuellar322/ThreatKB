@@ -33,3 +33,11 @@ ThreatKB utilizes Plyara to parse YARA rules into Python dictionaries. A huge th
 - [Plyara](https://github.com/plyara/plyara) ([LICENSE](https://github.com/plyara/plyara/blob/master/LICENSE))
 
 When a release is created, the system first pulls all signatures that are in the release state. Then, it gathers all signatures that are in the staging state and checks their revision history for the most recently released revision that is in the release state. If it finds it, it will include it in the release. If it does not find any previously released revisions, it will skip the signature.
+
+## Frontend runtime security
+
+Use Node.js 22.23.4 from `.node-version`, or a patched supported release
+(24.22.1+ or 26.12.1+), for frontend dependency downloads. These releases
+include the CVE-2026-111497 Brotli decoder fix. The Docker build downloads
+Bower assets in a patched Node stage and excludes Node/npm from the final
+Python image. Rebuild existing images to apply this change.
