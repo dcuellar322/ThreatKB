@@ -5,6 +5,7 @@ Revises: 6f68d5b06411
 Create Date: 2019-04-28 22:19:05.831932
 
 """
+
 import datetime
 
 from alembic import op
@@ -13,8 +14,8 @@ from sqlalchemy.dialects import mysql
 from app.models import cfg_settings
 
 # revision identifiers, used by Alembic.
-revision = 'd5cfdd54cb1f'
-down_revision = '6f68d5b06411'
+revision = "d5cfdd54cb1f"
+down_revision = "6f68d5b06411"
 branch_labels = None
 depends_on = None
 
@@ -33,9 +34,9 @@ def upgrade():
                 "public": True,
                 "date_created": date_created,
                 "date_modified": date_modified,
-                "description": "Template used for Macro tags."
+                "description": "Template used for Macro tags.",
             }
-        ]
+        ],
     )
     # ### end Alembic commands ###
 

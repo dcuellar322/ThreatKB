@@ -5,6 +5,7 @@ Revises: d5cfdd54cb1f
 Create Date: 2019-09-02 16:03:07.978674
 
 """
+
 import datetime
 
 from alembic import op
@@ -14,8 +15,8 @@ from sqlalchemy.dialects import mysql
 # revision identifiers, used by Alembic.
 from app.models import cfg_settings
 
-revision = '072dd2b2d9a5'
-down_revision = 'd5cfdd54cb1f'
+revision = "072dd2b2d9a5"
+down_revision = "d5cfdd54cb1f"
 branch_labels = None
 depends_on = None
 
@@ -34,9 +35,9 @@ def upgrade():
                 "public": True,
                 "date_created": date_created,
                 "date_modified": date_modified,
-                "description": "Tasks are visible to non-admins when enabled."
+                "description": "Tasks are visible to non-admins when enabled.",
             }
-        ]
+        ],
     )
     # ### end Alembic commands ###
 

@@ -1,0 +1,6 @@
+- network: 192.0.2.0/24
+  provider: synthetic-fixture
+  purpose: documentation-only
+- domain_suffix: example.test
+  provider: synthetic-fixture
+  purpose: documentation-only

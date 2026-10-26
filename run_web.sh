@@ -1,13 +1,9 @@
 #!/bin/sh
-
+set -eu
+cd "$(dirname "$0")"
 if [ -f .env ]; then
-  /bin/sh .env
+    set -a
+    . ./.env
+    set +a
 fi
-
-/bin/sh install.sh
-
-git log -1 --format="%H" > version
-git log -1 --format="%cE" >> version
-git log -1 --format="%ci" >> version
-
-env/bin/uwsgi --yaml /etc/uwsgi.yaml --http "${LISTEN_ON:-0.0.0.0}:${LISTEN_PORT:-5000}" --py-autoreload 1
+exec .venv/bin/waitress-serve --host="${LISTEN_ON:-127.0.0.1}" --port="${LISTEN_PORT:-5080}" app.web:app

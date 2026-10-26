@@ -1,0 +1,3 @@
+type,value,observed_at,confidence,tags
+ip,192.0.2.42,2026-10-01T00:00:00Z,85,fixture:purpose=example
+domain,c2.example.test,2026-10-01T00:00:00Z,80,fixture:purpose=example

@@ -1,0 +1,6 @@
+# Harmless, long-lived CI fixtures. Use real age/routability policies for operational feeds.
+min_confidence: 70
+max_age_days: 36500
+require_review: true
+allow_non_global_ips: true
+allowlist: []

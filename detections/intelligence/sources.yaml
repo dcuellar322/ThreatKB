@@ -1,0 +1,5 @@
+synthetic:
+  confidence: 85
+  severity: 50
+  groups: [default]
+  max_age_days: 36500

@@ -1,0 +1,15 @@
+id: 5ca3686e-f3e4-4a0c-9d78-9d6257c61c83
+name: Demo_Marker
+category: SC
+status: released
+strings: $marker = "THREATKB_DEMO_MARKER"
+condition: $marker
+tags:
+  - source:synthetic
+  - purpose:verification
+references:
+  public:
+    samples:
+      - aa56108a66ac411627c7f489035833a7b2a82a992c95abf257e0967b88815519
+testing_strategy:
+  - match_all_referenced_samples

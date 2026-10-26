@@ -9,17 +9,32 @@ class Macros(db.Model):
     value = db.Column(db.TEXT())
     active = db.Column(db.Boolean, nullable=False, default=True, index=True)
 
-    date_created = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp())
-    date_modified = db.Column(db.DateTime(timezone=True), default=db.func.current_timestamp(),
-                              onupdate=db.func.current_timestamp())
+    date_created = db.Column(
+        db.DateTime(timezone=True), default=db.func.current_timestamp()
+    )
+    date_modified = db.Column(
+        db.DateTime(timezone=True),
+        default=db.func.current_timestamp(),
+        onupdate=db.func.current_timestamp(),
+    )
 
-    created_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
-    created_user = db.relationship('KBUser', foreign_keys=created_user_id,
-                                   primaryjoin="KBUser.id==Macros.created_user_id")
+    created_user_id = db.Column(
+        db.Integer, db.ForeignKey("kb_users.id"), nullable=False
+    )
+    created_user = db.relationship(
+        "KBUser",
+        foreign_keys=created_user_id,
+        primaryjoin="KBUser.id==Macros.created_user_id",
+    )
 
-    modified_user_id = db.Column(db.Integer, db.ForeignKey('kb_users.id'), nullable=False)
-    modified_user = db.relationship('KBUser', foreign_keys=modified_user_id,
-                                    primaryjoin="KBUser.id==Macros.modified_user_id")
+    modified_user_id = db.Column(
+        db.Integer, db.ForeignKey("kb_users.id"), nullable=False
+    )
+    modified_user = db.relationship(
+        "KBUser",
+        foreign_keys=modified_user_id,
+        primaryjoin="KBUser.id==Macros.modified_user_id",
+    )
 
     def to_dict(self):
         return dict(
@@ -29,11 +44,11 @@ class Macros(db.Model):
             date_created=self.date_created.isoformat(),
             date_modified=self.date_modified.isoformat(),
             created_user=self.created_user.to_dict(),
-            modified_user=self.modified_user.to_dict()
+            modified_user=self.modified_user.to_dict(),
         )
 
     def __repr__(self):
-        return '<Marcos %s>' % self.tag
+        return "<Marcos %s>" % self.tag
 
     def is_associated_with_sig(self):
         from app.models import yara_rule, cfg_settings
@@ -41,10 +56,16 @@ class Macros(db.Model):
         tag_template = cfg_settings.Cfg_settings.get_setting("MACRO_TAG_TEMPLATE")
         l_value = "%" + (tag_template % self.tag) + "%"
 
-        sig_count = db.session.query(yara_rule.Yara_rule) \
-            .filter(or_(yara_rule.Yara_rule.strings.like(l_value),
-                        yara_rule.Yara_rule.condition.like(l_value))) \
+        sig_count = (
+            db.session.query(yara_rule.Yara_rule)
+            .filter(
+                or_(
+                    yara_rule.Yara_rule.strings.like(l_value),
+                    yara_rule.Yara_rule.condition.like(l_value),
+                )
+            )
             .count()
+        )
 
         return True if sig_count > 0 else False
 
@@ -63,3 +84,15 @@ class Macros(db.Model):
             return [entity.to_dict() for entity in entities]
         except:
             return None
+
+
+from sqlalchemy import event
+from flask import g, has_app_context
+
+
+@event.listens_for(Macros, "after_insert")
+@event.listens_for(Macros, "after_update")
+@event.listens_for(Macros, "after_delete")
+def invalidate_macro_snapshot(mapper, connection, target):
+    if has_app_context():
+        g.pop("_macro_replacements", None)

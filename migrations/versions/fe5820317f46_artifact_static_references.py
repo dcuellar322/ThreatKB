@@ -5,6 +5,7 @@ Revises: 650b0ad88d25
 Create Date: 2019-03-30 23:29:48.344330
 
 """
+
 import datetime
 
 from alembic import op
@@ -14,8 +15,8 @@ from sqlalchemy.dialects import mysql
 # revision identifiers, used by Alembic.
 from app.models import cfg_settings
 
-revision = 'fe5820317f46'
-down_revision = '43120a4ae154'
+revision = "fe5820317f46"
+down_revision = "43120a4ae154"
 branch_labels = None
 depends_on = None
 
@@ -30,13 +31,13 @@ def upgrade():
         [
             {
                 "key": "ARTIFACT_STATIC_REFERENCES",
-                "value": "{\"DNS\": [\"https://whois.domaintools.com/\",\"https://www.virustotal.com/#/domain/\"],\"IP\": [\"https://whois.domaintools.com/\",\"https://reverseip.domaintools.com/search/?q=\",\"https://www.shodan.io/host/\",\"https://viz.greynoise.io/ip/\",\"https://www.virustotal.com/#/ip-address/\"]}",
+                "value": '{"DNS": ["https://whois.domaintools.com/","https://www.virustotal.com/#/domain/"],"IP": ["https://whois.domaintools.com/","https://reverseip.domaintools.com/search/?q=","https://www.shodan.io/host/","https://viz.greynoise.io/ip/","https://www.virustotal.com/#/ip-address/"]}',
                 "public": True,
                 "date_created": date_created,
                 "date_modified": date_modified,
-                "description": "Links of Static References for Artifacts."
+                "description": "Links of Static References for Artifacts.",
             }
-        ]
+        ],
     )
     # ### end Alembic commands ###
 
