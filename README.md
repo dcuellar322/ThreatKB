@@ -21,7 +21,8 @@ Native MySQL on port 3306 is not reused. Set `WEB_PORT`, `MYSQL_PORT` and
 
 ## Run natively
 
-Install uv, Node.js/npm, libmagic, OpenSSL, pkg-config and C build tools. Intel macOS
+Install uv, patched Node.js/npm (26.12.1 from `.node-version`, or 24.22.1+),
+libmagic, OpenSSL, pkg-config and C build tools. Intel macOS
 also needs Rust/rustup to compile the pinned cryptography release; the repository
 pins the Rust toolchain. Configure native database/Redis URLs in `.env`, then:
 
@@ -86,3 +87,12 @@ claimed complete.
 
 Original project: [InQuest/ThreatKB](https://github.com/InQuest/ThreatKB).
 YARA parsing uses [Plyara](https://github.com/plyara/plyara).
+
+## Brotli runtime security
+
+CVE-2026-111497 requires patched Node 24.22.1+ or 26.12.1+. Frontend
+installs enforce these floors. Docker pins Node 26.12.1 by immutable digest,
+validates decoder behavior and built assets in CI, and copies only the workbench
+assets into the Python application image. Rebuild existing images to apply the
+update. See [the dependency policy](docs/dependency-policy.md) for the narrow
+security exception to the usual release-age requirement.

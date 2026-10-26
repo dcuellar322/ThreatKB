@@ -2,10 +2,11 @@
   {
     "kind": "image",
     "name": "node",
-    "version": "26.9.0-bookworm-slim",
-    "digest": "sha256:582460f614631b59b824ac6020533b9bf339c7fdf3a6d7db31abb6b4065f0212",
-    "published": "2026-09-19T05:41:47.675674Z",
-    "source": "https://hub.docker.com/v2/repositories/library/node/tags/26.9.0-bookworm-slim"
+    "version": "26.12.1-bookworm-slim",
+    "digest": "sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe",
+    "published": "2026-10-21T17:40:04.007004Z",
+    "source": "https://hub.docker.com/v2/repositories/library/node/tags/26.12.1-bookworm-slim",
+    "security_exception": "CVE-2026-111497"
   },
   {
     "kind": "image",

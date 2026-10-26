@@ -27,3 +27,29 @@ def test_python_age_audit_includes_development_lock_and_rejects_ranges(tmp_path)
     (tmp_path / "requirements-dev.txt").write_text("pytest>=9\n")
     with pytest.raises(ValueError):
         python_pins(tmp_path)
+
+
+def test_brotli_exception_is_limited_to_the_exact_security_image():
+    from scripts.audit_dependencies import (
+        NODE_BROTLI_SECURITY_EXCEPTION,
+        validate_infrastructure_age,
+    )
+
+    as_of = date(2026, 10, 26)
+    cutoff = cutoff_for(as_of, 10)
+    validate_infrastructure_age(dict(NODE_BROTLI_SECURITY_EXCEPTION), cutoff, as_of)
+    for changes in (
+        {"version": "26.12.0-bookworm-slim"},
+        {"digest": "sha256:" + "0" * 64},
+        {"name": "python"},
+        {"security_exception": "unreviewed"},
+        {"published": "2026-11-01T00:00:00Z"},
+    ):
+        with pytest.raises(ValueError):
+            validate_infrastructure_age(
+                {**NODE_BROTLI_SECURITY_EXCEPTION, **changes}, cutoff, as_of
+            )
+    with pytest.raises(ValueError):
+        validate_infrastructure_age(
+            dict(NODE_BROTLI_SECURITY_EXCEPTION), cutoff, date(2026, 10, 20)
+        )

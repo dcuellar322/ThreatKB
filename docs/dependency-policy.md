@@ -11,9 +11,13 @@ locks: `requirements.txt`, `requirements-dev.txt`, and `requirements-build.txt`.
 uv pip compile requirements.in --python-version 3.14 --exclude-newer 2026-10-05T00:00:00Z --upgrade -o requirements.txt
 uv pip compile requirements-dev.in --python-version 3.14 --exclude-newer 2026-10-05T00:00:00Z --upgrade -o requirements-dev.txt
 uv pip compile requirements-build.in --python-version 3.14 --exclude-newer 2026-10-05T00:00:00Z --upgrade -o requirements-build.txt
-.venv/bin/python scripts/audit_dependencies.py --as-of 2026-10-15
-.venv/bin/python scripts/audit_dependencies.py --offline --as-of 2026-10-15
+.venv/bin/python scripts/audit_dependencies.py --as-of 2026-10-26
+.venv/bin/python scripts/audit_dependencies.py --offline --as-of 2026-10-26
 ```
+
+The resolver commands retain the historical October 5 package cutoff. Audit the
+current tree as of October 26 or later so its October 21 security image is not
+misrepresented as a future release.
 
 The online command queries PyPI/npm and records publication times. `--check` checks
 without rewriting evidence. `--offline` verifies exact lock coverage and ages
@@ -23,8 +27,11 @@ release one second later is rejected. A minimum age below ten days is rejected.
 All npm lock entries, including optional platform packages and integrity hashes,
 are checked. Evidence covers the union of all three Python locks.
 
-Docker bases and Compose services use immutable manifest digests. The Node
-26.10 image was too recent and is replaced with the eligible Node 26.9 image.
+Docker bases and Compose services use immutable manifest digests. Node 26.12.1
+includes the CVE-2026-111497 Brotli decoder fix. Its October 21 image is an
+explicit security exception to the ten-day age policy, limited to the exact
+version and digest recorded in the infrastructure evidence and checker. Other
+packages, images and actions retain the existing age requirements.
 MySQL remains 26.7.0 and Redis remains 8.10.2; their selected September builds avoid
 October rebuilds of those same software tags. Python remains 3.14.7. Official
 registry/image-history references, dates and pins are in

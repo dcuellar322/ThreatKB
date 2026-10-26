@@ -7,6 +7,6 @@
     "build": "npm --prefix frontend run build"
   },
   "engines": {
-    "node": ">=24"
+    "node": "^24.22.1 || >=26.12.1"
   }
 }

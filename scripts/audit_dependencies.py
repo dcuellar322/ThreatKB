@@ -15,6 +15,29 @@ import requests
 ROOT = Path(__file__).resolve().parents[1]
 
 
+# The exact security update approved for the Brotli decoder vulnerability.
+# This does not exempt other Node images or change the general ten-day policy.
+NODE_BROTLI_SECURITY_EXCEPTION = {
+    "kind": "image",
+    "name": "node",
+    "version": "26.12.1-bookworm-slim",
+    "digest": "sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe",
+    "published": "2026-10-21T17:40:04.007004Z",
+    "source": "https://hub.docker.com/v2/repositories/library/node/tags/26.12.1-bookworm-slim",
+    "security_exception": "CVE-2026-111497",
+}
+
+
+def validate_infrastructure_age(row, cutoff, as_of):
+    published = datetime.fromisoformat(row["published"].replace("Z", "+00:00"))
+    if published.tzinfo is None or published > datetime.combine(
+        as_of, time.max, timezone.utc
+    ):
+        raise ValueError(f"Infrastructure publication date is invalid: {row}")
+    if published > cutoff and row != NODE_BROTLI_SECURITY_EXCEPTION:
+        raise ValueError(f"Infrastructure dependency is too new: {row}")
+
+
 def cutoff_for(as_of, minimum_age_days):
     if minimum_age_days < 10:
         raise ValueError("The minimum release age must be at least ten days.")
@@ -95,7 +118,7 @@ def validate_evidence(pins, evidence, cutoff):
             raise ValueError(f"Release is too new for {cutoff.isoformat()}: {row}")
 
 
-def validate_infrastructure(root, cutoff):
+def validate_infrastructure(root, cutoff, as_of):
     evidence = json.loads(
         (root / "docs/infrastructure-dependency-audit.json").read_text()
     )
@@ -105,9 +128,7 @@ def validate_infrastructure(root, cutoff):
         if key in references:
             raise ValueError(f"Duplicate infrastructure evidence: {key}")
         references[key] = row
-        published = datetime.fromisoformat(row["published"].replace("Z", "+00:00"))
-        if published.tzinfo is None or published > cutoff:
-            raise ValueError(f"Infrastructure dependency is too new: {row}")
+        validate_infrastructure_age(row, cutoff, as_of)
     dockerfile = (root / "Dockerfile").read_text()
     stages = set()
     for line in dockerfile.splitlines():
@@ -196,9 +217,9 @@ def main():
         if not args.offline and not args.check:
             path.write_text(json.dumps(evidence, indent=2) + "\n")
         counts.append(len(pins))
-    infrastructure = validate_infrastructure(ROOT, cutoff)
+    infrastructure = validate_infrastructure(ROOT, cutoff, args.as_of)
     print(
-        f"Verified {counts[0]} Python and {counts[1]} npm releases plus {infrastructure} infrastructure pins on/before {cutoff.isoformat()}"
+        f"Verified {counts[0]} Python and {counts[1]} npm releases plus {infrastructure} infrastructure pins against cutoff {cutoff.isoformat()} (explicit security exceptions verified)"
     )
 
 
