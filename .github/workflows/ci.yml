@@ -1,0 +1,30 @@
+name: Verify frontend runtime
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Build frontend dependencies with patched Node
+        run: docker build --pull --target frontend --tag threatkb-frontend:verify .
+      - name: Verify runtime, decoder behavior, and required assets
+        run: |
+          docker run --rm --network none threatkb-frontend:verify node -e '
+            const assert = require("node:assert/strict");
+            const fs = require("node:fs");
+            const zlib = require("node:zlib");
+            assert.equal(process.version, "v22.23.4");
+            const input = Buffer.from("ThreatKB frontend runtime");
+            assert.deepEqual(zlib.brotliDecompressSync(zlib.brotliCompressSync(input)), input);
+            assert.throws(() => zlib.brotliDecompressSync(Buffer.from([255, 255, 255, 255])));
+            assert.ok(fs.existsSync("app/static/lib/angular/angular.js"));
+            assert.ok(fs.existsSync("app/static/lib/bootstrap/dist/css/bootstrap.css"));
+          '
